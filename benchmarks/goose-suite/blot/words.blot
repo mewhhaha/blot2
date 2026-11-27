@@ -1,5 +1,5 @@
-// Word frequency counting: generate skewed text into a byte buffer,
-// split into packed (start, len) spans, and count in an open-addressed hash table.
+// Word frequency counting: generate skewed text into a pre-sized byte buffer
+// via bulk extend_view, split into packed spans, and count in an open-addressed table.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 2000000 // BENCH_N
@@ -26,61 +26,48 @@ func eq_span (buf: #[U8]) -> (a: U32) -> (b: U32) -> (len: U32): Bool =>
       return false
   return true
 
-func build_text (vocab: U32): (#[U8], U32) =>
-  let r: U64 = 12345
-  let dict: #[U8] = #[]
+func build_text (vocab: U32): #[U8] =>
+  let r: U64 = 12345u64
+  let dict: #[U8] = Array.with_capacity (vocab * 9)
   let dict_spans = @array.fill vocab 0
 
   for i in 0 .. vocab:
     r := rng.xs_next self
-    let n = 3 + rng.xs_mod r 12
+    let n = 3 + (r % 12u64).to_u32
     let start = dict.length
     for _ in 0 .. n:
       r := rng.xs_next self
-      dict := self.push (97 + rng.xs_mod r 26).to_u8
+      dict := self.push (97 + (r % 26u64).to_u32).to_u8
     dict_spans[i] := (start << 4) | n
 
-  // Pre-size for the expected word lengths, with growth if the estimate is low.
-  let text: #[U8] = @array.fill (BENCH_N * 12) (U32.to_u8 0)
-  let len: U32 = 0
+  let text: #[U8] = Array.with_capacity (BENCH_N * 10)
+  let vocab_u64 = vocab.to_u64
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    let a = rng.xs_mod r vocab
-    let k = rng.sq_div_u32 a vocab
+    let a = (r % vocab_u64).to_u32
+    let a64 = a.to_u64
+    let k = ((a64 * a64) / vocab_u64).to_u32
     let sp = dict_spans[k]
     let ds = sp >> 4
     let dl = sp & 15
-    for j in 0 .. dl:
-      let ch = dict[ds + j]
-      if len < text.length:
-        text[len] := ch
-      else:
-        text := self.push ch
-      len := self + 1
-    if len < text.length:
-      text[len] := 32
-    else:
-      text := self.push 32
-    len := self + 1
-  return (text, len)
+    text := Array.extend_view self dict[ds .. ds + dl]
+    text := self.push ' '
+  return text
 
 io bench (): #[U32] =>
   let vocab = BENCH_N / 10 + 16
-  let (text, text_len) = build_text vocab
+  let text = build_text vocab
 
   // Split text on spaces into packed (start << 4 | len) spans.
-  let words = @array.fill BENCH_N 0
-  let wcount: U32 = 0
+  let words: #[U32] = Array.with_capacity BENCH_N
   let wstart: U32 = 0
-  for ti in 0 .. text_len:
-    if text[ti] == 32:
+  for ti in 0 .. text.length:
+    if text[ti] == ' ':
       if ti > wstart:
-        words[wcount] := (wstart << 4) | (ti - wstart)
-        wcount := self + 1
+        words := self.push ((wstart << 4) | (ti - wstart))
       wstart := ti + 1
-  if text_len > wstart:
-    words[wcount] := (wstart << 4) | (text_len - wstart)
-    wcount := self + 1
+  if text.length > wstart:
+    words := self.push ((wstart << 4) | (text.length - wstart))
 
   // Count in an open-addressed hash table referencing spans in text.
   let nslots = next_pow2 (vocab * 4)
@@ -88,7 +75,7 @@ io bench (): #[U32] =>
   let slots = @array.fill nslots ($Slot { packed: 0, count: 0 })
   let distinct: U32 = 0
 
-  for wi in 0 .. wcount:
+  for wi in 0 .. words.length:
     let wp = words[wi]
     let ws = wp >> 4
     let wl = wp & 15
@@ -101,11 +88,11 @@ io bench (): #[U32] =>
         break
       let sl = sp & 15
       if sl == wl and eq_span text (sp >> 4) ws wl:
-        slots[idx] := $Slot { packed: sp, count: sc + 1 }
+        slots[idx].count := sc + 1
         break
       idx := (self + 1) & mask
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for si in 0 .. nslots:
     let $Slot { packed: sp, count: sc } = slots[si]
     if sc > 0:
@@ -115,7 +102,7 @@ io bench (): #[U32] =>
       total := self + contrib
 
   let out: #[U32] = #[]
-  out := rng.emit_u32 self wcount
+  out := rng.emit_u32 self words.length
   out := rng.emit_u32 self distinct
   out := rng.emit_i64 self total
   return out

@@ -8,40 +8,40 @@ const PASSES: U32 = 4
 type Event is data = $Tick | $Move { id: U32, dx: I32, dy: I32 } | $Say { id: U32, start: U32, len: U32 } | $Quit { id: U32, code: U32 }
 
 io bench (): #[U32] =>
-  let log = @array.fill BENCH_N $Tick
-  let text: #[U8] = #[]
-  let r: U64 = 12345
+  let log: #[Event] = Array.with_capacity BENCH_N
+  let text: #[U8] = Array.with_capacity (BENCH_N * 3)
+  let r: U64 = 12345u64
 
-  for i in 0 .. BENCH_N:
+  for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    let k = rng.xs_mod r 8
-    let id = rng.xs_mod (r >> 3) 100000
+    let k = (r & 7u64).to_u32
+    let id = ((r >> 3u64) % 100000u64).to_u32
     if k < 4:
-      let dx = (rng.xs_mod (r >> 20) 201).to_i32 - 100
-      let dy = (rng.xs_mod (r >> 40) 201).to_i32 - 100
-      log[i] := $Move { id, dx, dy }
+      let dx = ((r >> 20u64) % 201u64).to_u32.to_i32 - 100i32
+      let dy = ((r >> 40u64) % 201u64).to_u32.to_i32 - 100i32
+      log := self.push ($Move { id, dx, dy })
     else:
       if k < 6:
         let wr = rng.xs_next r
-        let n = 4 + rng.xs_mod wr 12
+        let n = 4 + (wr % 12u64).to_u32
         let start = text.length
         for _ in 0 .. n:
           wr := rng.xs_next self
-          text := self.push (97 + rng.xs_mod wr 26).to_u8
-        log[i] := $Say { id, start, len: n }
+          text := self.push (97 + (wr % 26u64).to_u32).to_u8
+        log := self.push ($Say { id, start, len: n })
       else:
         if k < 7:
-          let code = rng.xs_mod (r >> 20) 256
-          log[i] := $Quit { id, code }
+          let code = ((r >> 20u64) & 255u64).to_u32
+          log := self.push ($Quit { id, code })
         else:
-          log[i] := $Tick
+          log := self.push $Tick
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for _ in 0 .. PASSES:
     for i in 0 .. log.length:
       case log[i] of
         $Tick => do:
-          total := self + 1
+          total := self + 1i64
         $Move { id, dx, dy } => do:
           total := self + id.to_i64 + dx.to_i64 + dy.to_i64
         $Say { id, start, len } => do:

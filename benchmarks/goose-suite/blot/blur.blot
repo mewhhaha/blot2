@@ -1,6 +1,8 @@
-// 16 passes of a 3x3 Gaussian blur over a WxW 8-bit image using a 3-column
-// sliding window (3 loads per pixel instead of 9) over byte-packed #[U8] buffers.
+// 16 passes of a 3x3 Gaussian blur over a WxW 8-bit image using 16-wide
+// Wasm SIMD128 (U8x16 load/store + I16x8 widen/add/shift/narrow) over
+// byte-packed #[U8] buffers, with an exact scalar tail for the trailing pixels.
 import * as rng from "./rng"
+import * as simd from "std/simd"
 
 const BENCH_N: U32 = 1024 // BENCH_N
 const PASSES: U32 = 16
@@ -11,20 +13,58 @@ func blur_pass (src: #[U8]) -> (dst: own #[U8]) -> (w: U32): #[U8] =>
     let row = y * w
     let up = row - w
     let dn = row + w
-    let c0 = src[up].to_u32 + (src[row].to_u32 << 1) + src[dn].to_u32
-    let c1 = src[up + 1].to_u32 + (src[row + 1].to_u32 << 1) + src[dn + 1].to_u32
-    for x in 1 .. wm1:
-      let c2 = src[up + x + 1].to_u32 + (src[row + x + 1].to_u32 << 1) + src[dn + x + 1].to_u32
-      dst[row + x] := ((c0 + (c1 << 1) + c2) >> 4).to_u8
-      c0 := c1
-      c1 := c2
+    let x: U32 = 1
+    for ever:
+      if x + 17 > w:
+        break
+      // Load 3 horizontally shifted 16-byte windows for up, row, dn.
+      let u0 = simd.load_u8x16 (up + x - 1) src
+      let u1 = simd.load_u8x16 (up + x) src
+      let u2 = simd.load_u8x16 (up + x + 1) src
+      let m0 = simd.load_u8x16 (row + x - 1) src
+      let m1 = simd.load_u8x16 (row + x) src
+      let m2 = simd.load_u8x16 (row + x + 1) src
+      let d0 = simd.load_u8x16 (dn + x - 1) src
+      let d1 = simd.load_u8x16 (dn + x) src
+      let d2 = simd.load_u8x16 (dn + x + 1) src
+
+      // Low 8 lanes: h_r = r0 + 2*r1 + r2, total = h_u + 2*h_m + h_d
+      let u1l = simd.i16_extend_low_u u1
+      let hu_l = simd.i16_add (simd.i16_add (simd.i16_extend_low_u u0) (simd.i16_extend_low_u u2)) (simd.i16_add u1l u1l)
+      let m1l = simd.i16_extend_low_u m1
+      let hm_l = simd.i16_add (simd.i16_add (simd.i16_extend_low_u m0) (simd.i16_extend_low_u m2)) (simd.i16_add m1l m1l)
+      let d1l = simd.i16_extend_low_u d1
+      let hd_l = simd.i16_add (simd.i16_add (simd.i16_extend_low_u d0) (simd.i16_extend_low_u d2)) (simd.i16_add d1l d1l)
+      let sum_l = simd.i16_shr_u 4 (simd.i16_add (simd.i16_add hu_l hd_l) (simd.i16_add hm_l hm_l))
+
+      // High 8 lanes
+      let u1h = simd.i16_extend_high_u u1
+      let hu_h = simd.i16_add (simd.i16_add (simd.i16_extend_high_u u0) (simd.i16_extend_high_u u2)) (simd.i16_add u1h u1h)
+      let m1h = simd.i16_extend_high_u m1
+      let hm_h = simd.i16_add (simd.i16_add (simd.i16_extend_high_u m0) (simd.i16_extend_high_u m2)) (simd.i16_add m1h m1h)
+      let d1h = simd.i16_extend_high_u d1
+      let hd_h = simd.i16_add (simd.i16_add (simd.i16_extend_high_u d0) (simd.i16_extend_high_u d2)) (simd.i16_add d1h d1h)
+      let sum_h = simd.i16_shr_u 4 (simd.i16_add (simd.i16_add hu_h hd_h) (simd.i16_add hm_h hm_h))
+
+      dst := simd.store_u8x16 (row + x) (simd.u8_narrow sum_l sum_h) self
+      x := self + 16
+
+    // Exact scalar tail for remaining pixels in [x .. w - 1)
+    if x < wm1:
+      let c0 = src[up + x - 1].to_u32 + (src[row + x - 1].to_u32 << 1) + src[dn + x - 1].to_u32
+      let c1 = src[up + x].to_u32 + (src[row + x].to_u32 << 1) + src[dn + x].to_u32
+      for tx in x .. wm1:
+        let c2 = src[up + tx + 1].to_u32 + (src[row + tx + 1].to_u32 << 1) + src[dn + tx + 1].to_u32
+        dst[row + tx] := ((c0 + (c1 << 1) + c2) >> 4).to_u8
+        c0 := c1
+        c1 := c2
   return dst
 
 io bench (): #[U32] =>
   let total_px = BENCH_N * BENCH_N
-  let a: #[U8] = @array.fill total_px (U32.to_u8 0)
-  let b: #[U8] = @array.fill total_px (U32.to_u8 0)
-  let r: U64 = 12345
+  let a: #[U8] = @array.fill total_px 0u8
+  let b: #[U8] = @array.fill total_px 0u8
+  let r: U64 = 12345u64
   for i in 0 .. total_px:
     r := rng.xs_next self
     a[i] := r.to_u8
@@ -33,7 +73,7 @@ io bench (): #[U32] =>
     b := blur_pass a self BENCH_N
     a := blur_pass b self BENCH_N
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for px in a:
     total := self + px.to_i64
 

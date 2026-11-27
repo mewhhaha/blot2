@@ -1,6 +1,6 @@
 // Standalone native PLB runner for Blot wtime-aot --blot-cdylib modules.
 // Usage:
-//   blot_plb_runner <mode: int|str|fasta> <module.so> [args...]
+//   blot_plb_runner <mode: int|str|fasta|u8|json> <module.so> [args...]
 
 #include <dlfcn.h>
 #include <stdint.h>
@@ -48,9 +48,32 @@ static uint64_t upload_u32_array(
     return ptr;
 }
 
+static uint64_t upload_u8_array(
+    void *h, fn_call_export call, fn_mem_data mem_data, fn_trap_message trap_msg,
+    const uint8_t *bytes_data, uint32_t count
+) {
+    uint8_t trap = 0;
+    uint64_t dummy = 0;
+    call(h, (const uint8_t *)"blot:reset", 10, 0, &dummy, &trap);
+    uint64_t ptr = 0;
+    uint64_t alloc_bytes = ((4ull + (uint64_t)count) + 3ull) & ~3ull;
+    int32_t rc = call(h, (const uint8_t *)"blot:allocate", 13, alloc_bytes, &ptr, &trap);
+    if (rc != 0) {
+        fprintf(stderr, "blot:allocate(%llu) failed rc=%d\n", (unsigned long long)alloc_bytes, rc);
+        print_trap(trap_msg, trap);
+        exit(4);
+    }
+    uint8_t *mem = NULL;
+    size_t mem_len = 0;
+    mem_data(h, &mem, &mem_len);
+    memcpy(mem + (uint32_t)ptr, &count, 4);
+    if (count > 0) memcpy(mem + (uint32_t)ptr + 4, bytes_data, (size_t)count);
+    return ptr;
+}
+
 int main(int argc, char **argv) {
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <int|str|fasta> <module.so> [args...]\n", argv[0]);
+        fprintf(stderr, "usage: %s <int|str|fasta|u8|json> <module.so> [args...]\n", argv[0]);
         return 2;
     }
     const char *mode = argv[1];
@@ -113,6 +136,58 @@ int main(int argc, char **argv) {
                 off += cnt;
             }
         }
+    } else if (strcmp(mode, "u8") == 0) {
+        uint32_t args[4] = {0, 0, 0, 0};
+        uint32_t nargs = 0;
+        for (int i = 3; i < argc && nargs < 4; i++) {
+            args[nargs++] = (uint32_t)strtoul(argv[i], NULL, 10);
+        }
+        uint64_t inp = upload_u32_array(h, blot_call, blot_mem, trap_msg, args, nargs > 0 ? nargs : 1);
+        uint64_t out = 0;
+        int32_t rc = blot_call(h, (const uint8_t *)"bench", 5, inp, &out, &trap);
+        if (rc != 0) { print_trap(trap_msg, trap); blot_drop(h); return 4; }
+        uint8_t *mem = NULL; size_t mlen = 0;
+        blot_mem(h, &mem, &mlen);
+        uint32_t blen = 0;
+        memcpy(&blen, mem + (uint32_t)out, 4);
+        if (blen > 0) fwrite(mem + (uint32_t)out + 4, 1, blen, stdout);
+        if (blot_finish) { int32_t fin = 0; blot_finish(h, &fin, &trap); }
+    } else if (strcmp(mode, "json") == 0) {
+        const char *stem = argc >= 4 ? argv[3] : "sample";
+        uint32_t n = argc >= 5 ? (uint32_t)strtoul(argv[4], NULL, 10) : 10u;
+        size_t slen = strlen(stem);
+        char *path = (char *)malloc(slen + 6);
+        memcpy(path, stem, slen);
+        if (slen >= 5 && strcmp(stem + slen - 5, ".json") == 0) {
+            path[slen] = '\0';
+        } else {
+            memcpy(path + slen, ".json", 6);
+        }
+        FILE *fp = fopen(path, "rb");
+        if (!fp) { fprintf(stderr, "cannot open %s\n", path); free(path); blot_drop(h); return 2; }
+        free(path);
+        fseek(fp, 0, SEEK_END);
+        long fsz = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        if (fsz < 0) fsz = 0;
+        uint32_t total = 4u + (uint32_t)fsz;
+        uint8_t *buf = (uint8_t *)malloc(total);
+        memcpy(buf, &n, 4);
+        if (fsz > 0 && fread(buf + 4, 1, (size_t)fsz, fp) != (size_t)fsz) {
+            fprintf(stderr, "short read\n"); fclose(fp); free(buf); blot_drop(h); return 2;
+        }
+        fclose(fp);
+        uint64_t inp = upload_u8_array(h, blot_call, blot_mem, trap_msg, buf, total);
+        free(buf);
+        uint64_t out = 0;
+        int32_t rc = blot_call(h, (const uint8_t *)"bench", 5, inp, &out, &trap);
+        if (rc != 0) { print_trap(trap_msg, trap); blot_drop(h); return 4; }
+        uint8_t *mem = NULL; size_t mlen = 0;
+        blot_mem(h, &mem, &mlen);
+        uint32_t blen = 0;
+        memcpy(&blen, mem + (uint32_t)out, 4);
+        if (blen > 0) fwrite(mem + (uint32_t)out + 4, 1, blen, stdout);
+        if (blot_finish) { int32_t fin = 0; blot_finish(h, &fin, &trap); }
     } else {
         uint32_t args[4] = {0, 0, 0, 0};
         uint32_t nargs = 0;

@@ -1,0 +1,219 @@
+// PLB mandelbrot: 8-pixel F64x2 SIMD (4 x F64x2 vectors per output byte)
+// with 5-iteration escape checks and RFC 1321 MD5 hex digest over the PBM image.
+import * as simd from "std/simd"
+
+const MD5_S: #[U32] = #[
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+]
+
+const MD5_K: #[U32] = #[
+  0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+  0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+  0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+  0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+  0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+  0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+  0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+  0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+]
+
+const HEX: #[U8] = b"0123456789abcdef"
+
+func rotl (x: U32) -> (s: U32): U32 => (x << s) | (x >> (32 - s))
+
+func md5_block (h: own #[U32]) -> (blk: #[U8]) -> (off: U32): #[U32] =>
+  let w = @array.fill 16 0
+  for i in 0 .. 16:
+    let p = off + (i << 2)
+    w[i] := blk[p].to_u32 | (blk[p + 1].to_u32 << 8) | (blk[p + 2].to_u32 << 16) | (blk[p + 3].to_u32 << 24)
+  let a = h[0]
+  let b = h[1]
+  let c = h[2]
+  let d = h[3]
+  for i in 0 .. 16:
+    let t = a + ((b & c) | ((b ^ 0xFFFFFFFF) & d)) + MD5_K[i] + w[i]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 16 .. 32:
+    let t = a + ((d & b) | ((d ^ 0xFFFFFFFF) & c)) + MD5_K[i] + w[(5 * i + 1) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 32 .. 48:
+    let t = a + (b ^ c ^ d) + MD5_K[i] + w[(3 * i + 5) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 48 .. 64:
+    let t = a + (c ^ (b | (d ^ 0xFFFFFFFF))) + MD5_K[i] + w[(7 * i) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  h[0] := self + a
+  h[1] := self + b
+  h[2] := self + c
+  h[3] := self + d
+  return h
+
+func mbrot_byte (cr0: simd.F64x2) -> (cr1: simd.F64x2) -> (cr2: simd.F64x2) -> (cr3: simd.F64x2) -> (ci: simd.F64x2) -> (four: simd.F64x2): U8 =>
+  let zero = simd.f64_splat 0.0f64
+  let zr0 = zero
+  let zi0 = zero
+  let tr0 = zero
+  let ti0 = zero
+  let zr1 = zero
+  let zi1 = zero
+  let tr1 = zero
+  let ti1 = zero
+  let zr2 = zero
+  let zi2 = zero
+  let tr2 = zero
+  let ti2 = zero
+  let zr3 = zero
+  let zi3 = zero
+  let tr3 = zero
+  let ti3 = zero
+
+  for _ in 0 .. 10:
+    for _ in 0 .. 5:
+      zi0 := simd.f64_add (simd.f64_mul (simd.f64_add zr0 zr0) zi0) ci
+      zr0 := simd.f64_add (simd.f64_sub tr0 ti0) cr0
+      tr0 := simd.f64_mul zr0 zr0
+      ti0 := simd.f64_mul zi0 zi0
+
+      zi1 := simd.f64_add (simd.f64_mul (simd.f64_add zr1 zr1) zi1) ci
+      zr1 := simd.f64_add (simd.f64_sub tr1 ti1) cr1
+      tr1 := simd.f64_mul zr1 zr1
+      ti1 := simd.f64_mul zi1 zi1
+
+      zi2 := simd.f64_add (simd.f64_mul (simd.f64_add zr2 zr2) zi2) ci
+      zr2 := simd.f64_add (simd.f64_sub tr2 ti2) cr2
+      tr2 := simd.f64_mul zr2 zr2
+      ti2 := simd.f64_mul zi2 zi2
+
+      zi3 := simd.f64_add (simd.f64_mul (simd.f64_add zr3 zr3) zi3) ci
+      zr3 := simd.f64_add (simd.f64_sub tr3 ti3) cr3
+      tr3 := simd.f64_mul zr3 zr3
+      ti3 := simd.f64_mul zi3 zi3
+
+    let m0 = simd.f64_le (simd.f64_add tr0 ti0) four
+    let m1 = simd.f64_le (simd.f64_add tr1 ti1) four
+    let m2 = simd.f64_le (simd.f64_add tr2 ti2) four
+    let m3 = simd.f64_le (simd.f64_add tr3 ti3) four
+    let any = simd.u64_or (simd.u64_or m0 m1) (simd.u64_or m2 m3)
+    if not (simd.u64_any_true any):
+      return 0u8
+
+  let (a0, b0) = simd.f64_le (simd.f64_add tr0 ti0) four
+  let (a1, b1) = simd.f64_le (simd.f64_add tr1 ti1) four
+  let (a2, b2) = simd.f64_le (simd.f64_add tr2 ti2) four
+  let (a3, b3) = simd.f64_le (simd.f64_add tr3 ti3) four
+  let bits: U32 = 0
+  if a0 != 0u64:
+    bits := self | 128
+  if b0 != 0u64:
+    bits := self | 64
+  if a1 != 0u64:
+    bits := self | 32
+  if b1 != 0u64:
+    bits := self | 16
+  if a2 != 0u64:
+    bits := self | 8
+  if b2 != 0u64:
+    bits := self | 4
+  if a3 != 0u64:
+    bits := self | 2
+  if b3 != 0u64:
+    bits := self | 1
+  return bits.to_u8
+
+func push_u32_ascii (out: own #[U8]) -> (v: U32): #[U8] =>
+  if v == 0:
+    return out.push '0'
+  let d = @array.fill 10 0u8
+  let n: U32 = 0
+  let t = v
+  for ever:
+    if t == 0:
+      break
+    d[n] := (48 + (t % 10)).to_u8
+    n := self + 1
+    t := self / 10
+  for ever:
+    if n == 0:
+      break
+    n := self - 1
+    out := self.push d[n]
+  return out
+
+io bench (inp: #[U32]): #[U8] =>
+  let n = inp[0]
+  let size = ((n + 7) >> 3) << 3
+  let inv = 2.0f64 / size.to_f64
+  let row_bytes = size >> 3
+  let xs = @array.fill size 0.0f64
+  for x in 0 .. size:
+    xs[x] := x.to_f64 * inv - 1.5f64
+
+  let image = @array.fill (size * row_bytes) 0u8
+  let four = simd.f64_splat 4.0f64
+  for y in 0 .. size:
+    let ci = simd.f64_splat (y.to_f64 * inv - 1.0f64)
+    let row_off = y * row_bytes
+    for bx in 0 .. row_bytes:
+      let px = bx << 3
+      let cr0 = simd.load_f64x2 px xs
+      let cr1 = simd.load_f64x2 (px + 2) xs
+      let cr2 = simd.load_f64x2 (px + 4) xs
+      let cr3 = simd.load_f64x2 (px + 6) xs
+      image[row_off + bx] := mbrot_byte cr0 cr1 cr2 cr3 ci four
+
+  // MD5 over image
+  let h = #[0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]
+  let total = image.length
+  let full = (total >> 6) << 6
+  let off: U32 = 0
+  for ever:
+    if off >= full:
+      break
+    h := md5_block self image off
+    off := self + 64
+  let rest = total - full
+  let tail = @array.fill 128 0u8
+  for k in 0 .. rest:
+    tail[k] := image[full + k]
+  tail[rest] := 0x80u8
+  let end: U32 = if rest < 56 then 64 else 128
+  let bitlen: U64 = total.to_u64 << 3u64
+  for k in 0 .. 8:
+    tail[end - 8 + k] := (bitlen >> (k.to_u64 << 3u64)).to_u8
+  h := md5_block self tail 0
+  if end == 128:
+    h := md5_block self tail 64
+
+  let out: #[U8] = Array.with_capacity 64
+  out := Array.extend self b"P4\n"
+  out := push_u32_ascii self size
+  out := self.push ' '
+  out := push_u32_ascii self size
+  out := self.push '\n'
+  for wi in 0 .. 4:
+    let word = h[wi]
+    for k in 0 .. 4:
+      let byte = (word >> (k << 3)) & 255
+      out := self.push HEX[byte >> 4]
+      out := self.push HEX[byte & 15]
+  out := self.push '\n'
+  return out

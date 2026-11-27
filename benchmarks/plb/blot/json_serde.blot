@@ -1,0 +1,962 @@
+// PLB json-serde: GeoJSON FeatureCollection parser and serializer into flat
+// typed arenas with exact 128-bit IEEE-754 decimal F64 parsing, pure-integer
+// Ryu shortest-decimal F64 formatting (via F64.to_bits & U64.mul_wide), and
+// RFC 1321 MD5 hex digests.
+//
+// Input packet (`inp: #[U8]`):
+//   inp[0..4]        = little-endian U32 repeat count `n`
+//   inp[4..inp.len]  = raw GeoJSON file bytes
+// Output packet (`#[U8]`):
+//   "<md5(single_doc)>\n<md5(n_doc_array)>\n"
+
+const MD5_S: #[U32] = #[
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+]
+
+const MD5_K: #[U32] = #[
+  0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+  0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+  0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+  0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+  0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+  0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+  0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+  0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+]
+
+const HEX: #[U8] = b"0123456789abcdef"
+const DIGIT_PAIRS: #[U8] = b"00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899"
+
+const POW5: #[U64] = #[
+  1u64, 5u64, 25u64, 125u64, 625u64, 3125u64, 15625u64, 78125u64,
+  390625u64, 1953125u64, 9765625u64, 48828125u64, 244140625u64, 1220703125u64,
+  6103515625u64, 30517578125u64, 152587890625u64, 762939453125u64,
+  3814697265625u64, 19073486328125u64, 95367431640625u64, 476837158203125u64,
+  2384185791015625u64, 11920928955078125u64, 59604644775390625u64,
+  298023223876953125u64, 1490116119384765625u64, 7450580596923828125u64,
+]
+
+const POW10_U64: #[U64] = #[
+  1u64, 10u64, 100u64, 1000u64, 10000u64, 100000u64, 1000000u64, 10000000u64,
+  100000000u64, 1000000000u64, 10000000000u64, 100000000000u64, 1000000000000u64,
+  10000000000000u64, 100000000000000u64, 1000000000000000u64, 10000000000000000u64,
+  100000000000000000u64, 1000000000000000000u64, 10000000000000000000u64,
+]
+
+const POW10_F64: #[F64] = #[
+  1.0f64, 1e1f64, 1e2f64, 1e3f64, 1e4f64, 1e5f64, 1e6f64, 1e7f64,
+  1e8f64, 1e9f64, 1e10f64, 1e11f64, 1e12f64, 1e13f64, 1e14f64, 1e15f64,
+  1e16f64, 1e17f64, 1e18f64, 1e19f64, 1e20f64, 1e21f64, 1e22f64,
+]
+
+const K_DOC_TYPE: #[U8] = b"{\"type\":"
+const K_FEATURES: #[U8] = b",\"features\":["
+const K_PROPS_NAME: #[U8] = b",\"properties\":{\"name\":"
+const K_GEOM_TYPE: #[U8] = b"},\"geometry\":{\"type\":"
+const K_COORDS: #[U8] = b",\"coordinates\":["
+const K_FEAT_END: #[U8] = b"]}}"
+const K_DOC_END: #[U8] = b"]}"
+const K_DOT_ZERO: #[U8] = b".0"
+const K_ZERO_DOT: #[U8] = b"0."
+const K_NULL: #[U8] = b"null"
+const K_NEG_ZERO: #[U8] = b"-0.0"
+const K_POS_ZERO: #[U8] = b"0.0"
+const K_ESC_N: #[U8] = b"\\n"
+const K_ESC_R: #[U8] = b"\\r"
+const K_ESC_T: #[U8] = b"\\t"
+const K_ESC_B: #[U8] = b"\\b"
+const K_ESC_F: #[U8] = b"\\f"
+const K_ESC_U00: #[U8] = b"\\u00"
+
+const KEY_TYPE: #[U8] = b"type"
+const KEY_FEATURES: #[U8] = b"features"
+const KEY_PROPERTIES: #[U8] = b"properties"
+const KEY_NAME: #[U8] = b"name"
+const KEY_GEOMETRY: #[U8] = b"geometry"
+const KEY_COORDINATES: #[U8] = b"coordinates"
+
+type Run is data = $Run { first: U32, count: U32 }
+type Feature is data = $Feature {
+  kind_off: U32,
+  kind_len: U32,
+  name_off: U32,
+  name_len: U32,
+  geom_off: U32,
+  geom_len: U32,
+  coords_first: U32,
+  coords_count: U32,
+}
+type GeoDoc is data = $GeoDoc {
+  kind_off: U32,
+  kind_len: U32,
+  feat_first: U32,
+  feat_count: U32,
+}
+
+// --- MD5 (RFC 1321) ----------------------------------------------------------
+
+func rotl (x: U32) -> (s: U32): U32 => (x << s) | (x >> (32 - s))
+
+func md5_block (h: own #[U32]) -> (blk: #[U8]) -> (off: U32): #[U32] =>
+  let w = @array.fill 16 0
+  for i in 0 .. 16:
+    let p = off + (i << 2)
+    w[i] := blk[p].to_u32 | (blk[p + 1].to_u32 << 8) | (blk[p + 2].to_u32 << 16) | (blk[p + 3].to_u32 << 24)
+  let a = h[0]
+  let b = h[1]
+  let c = h[2]
+  let d = h[3]
+  for i in 0 .. 16:
+    let t = a + ((b & c) | ((b ^ 0xFFFFFFFF) & d)) + MD5_K[i] + w[i]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 16 .. 32:
+    let t = a + ((d & b) | ((d ^ 0xFFFFFFFF) & c)) + MD5_K[i] + w[(5 * i + 1) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 32 .. 48:
+    let t = a + (b ^ c ^ d) + MD5_K[i] + w[(3 * i + 5) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  for i in 48 .. 64:
+    let t = a + (c ^ (b | (d ^ 0xFFFFFFFF))) + MD5_K[i] + w[(7 * i) & 15]
+    let na = d
+    d := c
+    c := b
+    b := b + rotl t MD5_S[i]
+    a := na
+  h[0] := self + a
+  h[1] := self + b
+  h[2] := self + c
+  h[3] := self + d
+  return h
+
+func append_md5_hex (out: own #[U8]) -> (bytes: #[U8]): #[U8] =>
+  let h = #[0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]
+  let total = bytes.length
+  let full = (total >> 6) << 6
+  let off: U32 = 0
+  for ever:
+    if off >= full:
+      break
+    h := md5_block self bytes off
+    off := self + 64
+  let rest = total - full
+  let tail = @array.fill 128 0u8
+  for k in 0 .. rest:
+    tail[k] := bytes[full + k]
+  tail[rest] := 0x80u8
+  let end: U32 = if rest < 56 then 64 else 128
+  let bitlen: U64 = total.to_u64 << 3u64
+  for k in 0 .. 8:
+    tail[end - 8 + k] := (bitlen >> (k.to_u64 << 3u64)).to_u8
+  h := md5_block self tail 0
+  if end == 128:
+    h := md5_block self tail 64
+  for wi in 0 .. 4:
+    let word = h[wi]
+    for k in 0 .. 4:
+      let byte = (word >> (k << 3)) & 255
+      out := self.push HEX[byte >> 4]
+      out := self.push HEX[byte & 15]
+  out := self.push '\n'
+  return out
+
+// --- Exact decimal F64 parsing & Ryu formatting ------------------------------
+
+func cmp_u128 (ah: U64) -> (al: U64) -> (bh: U64) -> (bl: U64): I32 =>
+  if ah < bh:
+    return -1i32
+  if ah > bh:
+    return 1i32
+  if al < bl:
+    return -1i32
+  if al > bl:
+    return 1i32
+  return 0i32
+
+// Compare `mant * 2^sh` against `(2 * m + 1) * 5^k` (or `2 * m - 1` for lower bound).
+func cmp_mant_vs_bound (mant: U64) -> (sh: I32) -> (bound_m: U64) -> (k: U32): I32 =>
+  let p5 = POW5[k]
+  let (rlo, rhi) = U64.mul_wide bound_m p5
+  let llo: U64 = 0u64
+  let lhi: U64 = 0u64
+  if sh >= 0i32:
+    let s = sh.to_u64
+    if s == 0u64:
+      llo := mant
+      lhi := 0u64
+    else:
+      if s < 64u64:
+        llo := mant << s
+        lhi := mant >> (64u64 - s)
+      else:
+        llo := 0u64
+        lhi := mant << (s - 64u64)
+  else:
+    // Shift right side left by -sh instead.
+    let s = (0i32 - sh).to_u64
+    llo := mant
+    lhi := 0u64
+    let nrhi = if s < 64u64 then (rhi << s) | (rlo >> (64u64 - s)) else rlo << (s - 64u64)
+    let nrlo = if s < 64u64 then rlo << s else 0u64
+    return cmp_u128 lhi llo nrhi nrlo
+  return cmp_u128 lhi llo rhi rlo
+
+// Exact IEEE-754 F64 conversion for `mant * 10^exp10` (1..19 digits).
+func decimal_to_f64 (mant: U64) -> (exp10: I32) -> (neg: Bool): F64 =>
+  if mant == 0u64:
+    return if neg then -0.0f64 else 0.0f64
+  let approx: F64 = 0.0f64
+  if exp10 >= 0i32 and exp10 <= 22i32:
+    approx := mant.to_f64 * POW10_F64[exp10.to_u32]
+    if mant <= 9007199254740991u64:
+      return if neg then 0.0f64 - approx else approx
+  else:
+    if exp10 < 0i32 and exp10 >= -22i32:
+      let k = (0i32 - exp10).to_u32
+      approx := mant.to_f64 / POW10_F64[k]
+      if mant <= 9007199254740991u64:
+        return if neg then 0.0f64 - approx else approx
+      // Correct at most 1 ULP from double-rounding of >53-bit `mant`.
+      let bits = F64.to_bits approx
+      let be = ((bits >> 52u64) & 0x7FFu64).to_i32
+      let frac = bits & 0xFFFFFFFFFFFFFu64
+      if be > 0i32 and be < 2047i32:
+        let mf = frac | 0x10000000000000u64
+        let ef = be - 1075i32
+        let sh = 1i32 - ef - k.to_i32
+        let cmp_hi = cmp_mant_vs_bound mant sh (2u64 * mf + 1u64) k
+        if cmp_hi > 0i32 or (cmp_hi == 0i32 and (mf & 1u64) == 1u64):
+          approx := F64.from_bits (bits + 1u64)
+        else:
+          let lo_m = if frac != 0u64 then 2u64 * mf - 1u64 else 4u64 * mf - 1u64
+          let lo_sh = if frac != 0u64 then sh else sh + 1i32
+          let cmp_lo = cmp_mant_vs_bound mant lo_sh lo_m k
+          if cmp_lo < 0i32 or (cmp_lo == 0i32 and (mf & 1u64) == 1u64):
+            approx := F64.from_bits (bits - 1u64)
+      return if neg then 0.0f64 - approx else approx
+    else:
+      let v = mant.to_f64
+      let e = exp10
+      for ever:
+        if e <= 22i32:
+          break
+        v := self * 1e22f64
+        e := self - 22i32
+      for ever:
+        if e >= -22i32:
+          break
+        v := self / 1e22f64
+        e := self + 22i32
+      if e >= 0i32:
+        approx := v * POW10_F64[e.to_u32]
+      else:
+        approx := v / POW10_F64[(0i32 - e).to_u32]
+  return if neg then 0.0f64 - approx else approx
+
+func append_i64_ascii (out: own #[U8]) -> (v: I64): #[U8] =>
+  let x: U64 = 0u64
+  if v < 0i64:
+    out := self.push '-'
+    x := (0u64 - v.to_u64)
+  else:
+    x := v.to_u64
+  if x == 0u64:
+    return out.push '0'
+  let digs = @array.fill 20 0u8
+  let n: U32 = 0
+  for ever:
+    if x == 0u64:
+      break
+    digs[n] := (48u64 + (x % 10u64)).to_u8
+    n := self + 1
+    x := self / 10u64
+  for ever:
+    if n == 0:
+      break
+    n := self - 1
+    out := self.push digs[n]
+  return out
+
+func format_f64_ryu (out: own #[U8]) -> (val: F64): #[U8] =>
+  if not (F64.is_finite val):
+    return Array.extend out K_NULL
+  if val >= 9223372036854775807.0f64:
+    return append_i64_ascii out 9223372036854775807i64
+  if val <= -9223372036854775808.0f64:
+    return append_i64_ascii out (-9223372036854775807i64 - 1i64)
+  let iv = F64.to_i64 val
+  if iv.to_f64 == val:
+    if iv == 0i64 and (F64.to_bits val >> 63u64) != 0u64:
+      return Array.extend out K_NEG_ZERO
+    return append_i64_ascii out iv
+
+  let b = F64.to_bits val
+  let neg = (b >> 63u64) != 0u64
+  let be = ((b >> 52u64) & 0x7FFu64).to_i32
+  let frac = b & 0xFFFFFFFFFFFFFu64
+  let k = 17i32 - (((be - 1023i32) * 78913i32) >> 18i32)
+  let t = 1077i32 - be - k
+  if k < 0i32 or k > 27i32 or t < 1i32 or t > 63i32:
+    // Fallback for extreme exponents outside [1e-10, 2^51]
+    if neg:
+      out := self.push '-'
+    return append_i64_ascii out (F64.to_i64 (F64.abs val))
+
+  let m = frac | 0x10000000000000u64
+  let even = (m & 1u64) == 0u64
+  let p = POW5[k.to_u32]
+  let (nl, nh) = U64.mul_wide m p
+  let xh = (nh << 2u64) | (nl >> 62u64)
+  let xl = nl << 2u64
+  let uh = xh
+  let ul = xl
+  for _ in 0 .. 2:
+    ul := self + p
+    if ul < p:
+      uh := self + 1u64
+  let lh = xh
+  let ll = xl
+  let lsteps: U32 = if frac != 0u64 then 2 else 1
+  for _ in 0 .. lsteps:
+    if ll < p:
+      lh := self - 1u64
+    ll := self - p
+
+  let tu = t.to_u64
+  let low = (1u64 << tu) - 1u64
+  let vr = (xh << (64u64 - tu)) | (xl >> tu)
+  let vp = (uh << (64u64 - tu)) | (ul >> tu)
+  let vm = (lh << (64u64 - tu)) | (ll >> tu)
+  let digits0: U32 = if vr >= 1000000000000000000u64 then 19 else 18
+  let vr_exact = (xl & low) == 0u64
+  let vm_exact = even and (ll & low) == 0u64
+  if (not even) and (ul & low) == 0u64:
+    vp := self - 1u64
+
+  let removed: U32 = 0
+  let c: U64 = 0u64
+  if (not vr_exact) and (not vm_exact):
+    let round_up = false
+    let vp100 = vp / 100u64
+    let vm100 = vm / 100u64
+    if vp100 > vm100:
+      let vr100 = vr / 100u64
+      round_up := (vr - 100u64 * vr100) >= 50u64
+      vr := vr100
+      vp := vp100
+      vm := vm100
+      removed := 2
+    for ever:
+      let vp10 = vp / 10u64
+      let vm10 = vm / 10u64
+      if vp10 <= vm10:
+        break
+      let vr10 = vr / 10u64
+      round_up := (vr - 10u64 * vr10) >= 5u64
+      vr := vr10
+      vp := vp10
+      vm := vm10
+      removed := self + 1
+    c := vr + (if vr == vm or round_up then 1u64 else 0u64)
+  else:
+    let last: U64 = 0u64
+    for ever:
+      let vp10 = vp / 10u64
+      let vm10 = vm / 10u64
+      if vp10 <= vm10:
+        break
+      let vr10 = vr / 10u64
+      vm_exact := self and (vm - 10u64 * vm10 == 0u64)
+      vr_exact := self and (last == 0u64)
+      last := vr - 10u64 * vr10
+      vr := vr10
+      vp := vp10
+      vm := vm10
+      removed := self + 1
+    if vm_exact:
+      for ever:
+        let vm10 = vm / 10u64
+        if vm - 10u64 * vm10 != 0u64:
+          break
+        let vr10 = vr / 10u64
+        vr_exact := self and (last == 0u64)
+        last := vr - 10u64 * vr10
+        vr := vr10
+        vp := self / 10u64
+        vm := vm10
+        removed := self + 1
+    if vr_exact and last == 5u64 and (vr & 1u64) == 0u64:
+      last := 4u64
+    c := vr + (if (vr == vm and not vm_exact) or last >= 5u64 then 1u64 else 0u64)
+
+  let dlen = digits0 - removed
+  if c >= POW10_U64[dlen]:
+    dlen := self + 1
+  let point = dlen.to_i32 + removed.to_i32 - k
+
+  // Write `dlen` digits into stack-backed DirectArray `text[1 .. dlen + 1]`.
+  let text = @array.fill 22 0u8
+  let x = c
+  let idx = dlen
+  for ever:
+    if idx < 2:
+      break
+    let r = (x % 100u64).to_u32
+    x := self / 100u64
+    idx := self - 2
+    text[idx + 1] := DIGIT_PAIRS[r << 1]
+    text[idx + 2] := DIGIT_PAIRS[(r << 1) + 1]
+  if idx == 1:
+    text[1] := (48u64 + x).to_u8
+
+  let trim = dlen
+  for ever:
+    if trim <= 1 or text[trim] != '0':
+      break
+    trim := self - 1
+
+  if neg:
+    out := self.push '-'
+
+  if point > 0i32 and point < trim.to_i32:
+    let pt = point.to_u32
+    for i in 0 .. pt:
+      out := self.push text[i + 1]
+    out := self.push '.'
+    for i in pt .. trim:
+      out := self.push text[i + 1]
+    return out
+  if point >= trim.to_i32 and point <= 16i32:
+    for i in 0 .. trim:
+      out := self.push text[i + 1]
+    let zeros = (point - trim.to_i32).to_u32
+    for _ in 0 .. zeros:
+      out := self.push '0'
+    return Array.extend out K_DOT_ZERO
+  if point > -5i32 and point <= 0i32:
+    out := Array.extend self K_ZERO_DOT
+    let zeros = (0i32 - point).to_u32
+    for _ in 0 .. zeros:
+      out := self.push '0'
+    for i in 0 .. trim:
+      out := self.push text[i + 1]
+    return out
+  out := self.push text[1]
+  if trim > 1:
+    out := self.push '.'
+    for i in 1 .. trim:
+      out := self.push text[i + 1]
+  out := self.push 'e'
+  return append_i64_ascii out (point - 1i32).to_i64
+
+// --- JSON reader helpers -----------------------------------------------------
+
+func skip_ws (src: #[U8]) -> (pos: U32): U32 =>
+  let p = pos
+  let n = src.length
+  for ever:
+    if p >= n:
+      break
+    let c = src[p]
+    if c == ' ' or c == '\n' or c == '\r' or c == '\t':
+      p := self + 1
+    else:
+      break
+  return p
+
+func eq_key (src: #[U8]) -> (off: U32) -> (len: U32) -> (pat: #[U8]): Bool =>
+  if len != pat.length:
+    return false
+  for i in 0 .. len:
+    if src[off + i] != pat[i]:
+      return false
+  return true
+
+// Read a JSON string at `src[pos]` (pointing at opening `"`), storing decoded
+// bytes into `strs` and returning `(strs, off, len, next_pos)`.
+func read_string (src: #[U8]) -> (pos: U32) -> (strs: own #[U8]): (#[U8], U32, U32, U32) =>
+  let p = pos + 1
+  let start = p
+  let n = src.length
+  let has_esc = false
+  for ever:
+    if p >= n:
+      break
+    let c = src[p]
+    if c == '\"':
+      break
+    if c == '\\':
+      has_esc := true
+      p := self + 2
+    else:
+      p := self + 1
+  let off = strs.length
+  if not has_esc:
+    strs := Array.extend_view self (&src[start .. p])
+    return (strs, off, p - start, p + 1)
+  let q = start
+  for ever:
+    if q >= p:
+      break
+    let c = src[q]
+    if c == '\\':
+      q := self + 1
+      let e = src[q]
+      let decoded: U8 =
+        case e of
+          'n' => '\n'
+          'r' => '\r'
+          't' => '\t'
+          'b' => 8u8
+          'f' => 12u8
+          _ => e
+      strs := self.push decoded
+      q := self + 1
+    else:
+      strs := self.push c
+      q := self + 1
+  let slen = strs.length - off
+  return (strs, off, slen, p + 1)
+
+// Read a raw key span `(off, len, next_pos)` directly in `src` (GeoJSON keys have no escapes).
+func read_key_span (src: #[U8]) -> (pos: U32): (U32, U32, U32) =>
+  let p = pos + 1
+  let start = p
+  let n = src.length
+  for ever:
+    if p >= n:
+      break
+    let c = src[p]
+    if c == '\"':
+      break
+    if c == '\\':
+      p := self + 2
+    else:
+      p := self + 1
+  return (start, p - start, p + 1)
+
+// Iterative JSON value skipper (handles arbitrarily nested objects/arrays/strings/primitives).
+func skip_value (src: #[U8]) -> (pos: U32): U32 =>
+  let p = skip_ws src pos
+  let n = src.length
+  let depth: U32 = 0
+  for ever:
+    if p >= n:
+      break
+    let c = src[p]
+    if c == '\"':
+      p := self + 1
+      for ever:
+        if p >= n:
+          break
+        let sc = src[p]
+        if sc == '\\':
+          p := self + 2
+        else:
+          p := self + 1
+          if sc == '\"':
+            break
+      if depth == 0:
+        break
+    else:
+      if c == '{' or c == '[':
+        depth := self + 1
+        p := self + 1
+      else:
+        if c == '}' or c == ']':
+          p := self + 1
+          if depth <= 1:
+            break
+          depth := self - 1
+        else:
+          p := self + 1
+          if depth == 0:
+            for ever:
+              if p >= n:
+                break
+              let pc = src[p]
+              if pc == ',' or pc == '}' or pc == ']' or pc == ' ' or pc == '\n' or pc == '\r' or pc == '\t':
+                break
+              p := self + 1
+            break
+  return p
+
+func read_number (src: #[U8]) -> (pos: U32): (F64, U32) =>
+  let p = skip_ws src pos
+  let n = src.length
+  let neg = false
+  if p < n and src[p] == '-':
+    neg := true
+    p := self + 1
+  let mant: U64 = 0u64
+  let digits: U32 = 0
+  let exp10: I32 = 0i32
+  for ever:
+    if p >= n:
+      break
+    let c = src[p]
+    if c >= '0' and c <= '9':
+      if digits < 19:
+        let d = (c - '0').to_u64
+        if mant != 0u64 or d != 0u64:
+          mant := self * 10u64 + d
+          digits := self + 1
+      else:
+        exp10 := self + 1i32
+      p := self + 1
+    else:
+      break
+  if p < n and src[p] == '.':
+    p := self + 1
+    for ever:
+      if p >= n:
+        break
+      let c = src[p]
+      if c >= '0' and c <= '9':
+        if digits < 19:
+          let d = (c - '0').to_u64
+          if mant != 0u64 or d != 0u64:
+            mant := self * 10u64 + d
+            digits := self + 1
+          exp10 := self - 1i32
+        p := self + 1
+      else:
+        break
+  if p < n and (src[p] == 'e' or src[p] == 'E'):
+    p := self + 1
+    let eneg = false
+    if p < n and (src[p] == '-' or src[p] == '+'):
+      eneg := src[p] == '-'
+      p := self + 1
+    let ev: I32 = 0i32
+    for ever:
+      if p >= n:
+        break
+      let c = src[p]
+      if c >= '0' and c <= '9':
+        ev := self * 10i32 + (c - '0').to_i32
+        p := self + 1
+      else:
+        break
+    if eneg:
+      exp10 := self - ev
+    else:
+      exp10 := self + ev
+  return (decimal_to_f64 mant exp10 neg, p)
+
+// --- GeoJSON parser & serializer ---------------------------------------------
+
+func parse_doc (src: #[U8]) -> (start_pos: U32) -> (strs: own #[U8]) -> (points: own #[F64]) -> (rings: own #[Run]) -> (features: own #[Feature]): (GeoDoc, #[U8], #[F64], #[Run], #[Feature]) =>
+  let p = skip_ws src start_pos
+  let doc_kind_off: U32 = 0
+  let doc_kind_len: U32 = 0
+  let doc_feat_first: U32 = features.length
+  let doc_feat_count: U32 = 0
+
+  if p < src.length and src[p] == '{':
+    p := skip_ws src (self + 1)
+    for ever:
+      if p >= src.length or src[p] == '}':
+        if p < src.length:
+          p := self + 1
+        break
+      let (ko, kl, p1) = read_key_span src p
+      p := skip_ws src p1
+      if p < src.length and src[p] == ':':
+        p := skip_ws src (self + 1)
+      if eq_key src ko kl KEY_TYPE:
+        let (s1, off, slen, p2) = read_string src p strs
+        strs := s1
+        doc_kind_off := off
+        doc_kind_len := slen
+        p := p2
+      else:
+        if eq_key src ko kl KEY_FEATURES:
+          doc_feat_first := features.length
+          if p < src.length and src[p] == '[':
+            p := skip_ws src (self + 1)
+            for ever:
+              if p >= src.length or src[p] == ']':
+                if p < src.length:
+                  p := self + 1
+                break
+              // Parse one Feature object
+              let fk_off: U32 = 0
+              let fk_len: U32 = 0
+              let fn_off: U32 = 0
+              let fn_len: U32 = 0
+              let fg_off: U32 = 0
+              let fg_len: U32 = 0
+              let fc_first: U32 = 0
+              let fc_count: U32 = 0
+              if p < src.length and src[p] == '{':
+                p := skip_ws src (self + 1)
+                for ever:
+                  if p >= src.length or src[p] == '}':
+                    if p < src.length:
+                      p := self + 1
+                    break
+                  let (fko, fkl, fp1) = read_key_span src p
+                  p := skip_ws src fp1
+                  if p < src.length and src[p] == ':':
+                    p := skip_ws src (self + 1)
+                  if eq_key src fko fkl KEY_TYPE:
+                    let (s1, off, slen, fp2) = read_string src p strs
+                    strs := s1
+                    fk_off := off
+                    fk_len := slen
+                    p := fp2
+                  else:
+                    if eq_key src fko fkl KEY_PROPERTIES:
+                      if p < src.length and src[p] == '{':
+                        p := skip_ws src (self + 1)
+                        for ever:
+                          if p >= src.length or src[p] == '}':
+                            if p < src.length:
+                              p := self + 1
+                            break
+                          let (pko, pkl, pp1) = read_key_span src p
+                          p := skip_ws src pp1
+                          if p < src.length and src[p] == ':':
+                            p := skip_ws src (self + 1)
+                          if eq_key src pko pkl KEY_NAME:
+                            let (s1, off, slen, pp2) = read_string src p strs
+                            strs := s1
+                            fn_off := off
+                            fn_len := slen
+                            p := pp2
+                          else:
+                            p := skip_value src self
+                          p := skip_ws src self
+                          if p < src.length and src[p] == ',':
+                            p := skip_ws src (self + 1)
+                      else:
+                        p := skip_value src self
+                    else:
+                      if eq_key src fko fkl KEY_GEOMETRY:
+                        if p < src.length and src[p] == '{':
+                          p := skip_ws src (self + 1)
+                          for ever:
+                            if p >= src.length or src[p] == '}':
+                              if p < src.length:
+                                p := self + 1
+                              break
+                            let (gko, gkl, gp1) = read_key_span src p
+                            p := skip_ws src gp1
+                            if p < src.length and src[p] == ':':
+                              p := skip_ws src (self + 1)
+                            if eq_key src gko gkl KEY_TYPE:
+                              let (s1, off, slen, gp2) = read_string src p strs
+                              strs := s1
+                              fg_off := off
+                              fg_len := slen
+                              p := gp2
+                            else:
+                              if eq_key src gko gkl KEY_COORDINATES:
+                                fc_first := rings.length
+                                if p < src.length and src[p] == '[':
+                                  p := skip_ws src (self + 1)
+                                  for ever:
+                                    if p >= src.length or src[p] == ']':
+                                      if p < src.length:
+                                        p := self + 1
+                                      break
+                                    // Parse one Ring: [[x, y], ...]
+                                    let r_first = points.length >> 1
+                                    if p < src.length and src[p] == '[':
+                                      p := skip_ws src (self + 1)
+                                      for ever:
+                                        if p >= src.length or src[p] == ']':
+                                          if p < src.length:
+                                            p := self + 1
+                                          break
+                                        // Parse one Point: [x, y]
+                                        if p < src.length and src[p] == '[':
+                                          p := skip_ws src (self + 1)
+                                          let (px, xp1) = read_number src p
+                                          points := self.push px
+                                          p := skip_ws src xp1
+                                          if p < src.length and src[p] == ',':
+                                            p := skip_ws src (self + 1)
+                                          let (py, yp1) = read_number src p
+                                          points := self.push py
+                                          p := skip_ws src yp1
+                                          for ever:
+                                            if p >= src.length or src[p] == ']':
+                                              if p < src.length:
+                                                p := self + 1
+                                              break
+                                            if src[p] == ',':
+                                              p := skip_value src (self + 1)
+                                              p := skip_ws src self
+                                            else:
+                                              p := self + 1
+                                        else:
+                                          p := skip_value src self
+                                        p := skip_ws src self
+                                        if p < src.length and src[p] == ',':
+                                          p := skip_ws src (self + 1)
+                                    else:
+                                      p := skip_value src self
+                                    rings := self.push ($Run { first: r_first, count: (points.length >> 1) - r_first })
+                                    p := skip_ws src self
+                                    if p < src.length and src[p] == ',':
+                                      p := skip_ws src (self + 1)
+                                fc_count := rings.length - fc_first
+                              else:
+                                p := skip_value src self
+                            p := skip_ws src self
+                            if p < src.length and src[p] == ',':
+                              p := skip_ws src (self + 1)
+                        else:
+                          p := skip_value src self
+                      else:
+                        p := skip_value src self
+                  p := skip_ws src self
+                  if p < src.length and src[p] == ',':
+                    p := skip_ws src (self + 1)
+              else:
+                p := skip_value src self
+              features := self.push ($Feature {
+                kind_off: fk_off, kind_len: fk_len,
+                name_off: fn_off, name_len: fn_len,
+                geom_off: fg_off, geom_len: fg_len,
+                coords_first: fc_first, coords_count: fc_count,
+              })
+              p := skip_ws src self
+              if p < src.length and src[p] == ',':
+                p := skip_ws src (self + 1)
+          doc_feat_count := features.length - doc_feat_first
+        else:
+          p := skip_value src self
+      p := skip_ws src self
+      if p < src.length and src[p] == ',':
+        p := skip_ws src (self + 1)
+
+  let doc = $GeoDoc { kind_off: doc_kind_off, kind_len: doc_kind_len, feat_first: doc_feat_first, feat_count: doc_feat_count }
+  return (doc, strs, points, rings, features)
+
+func append_json_string (out: own #[U8]) -> (strs: #[U8]) -> (off: U32) -> (len: U32): #[U8] =>
+  out := self.push '\"'
+  let plain = true
+  for i in 0 .. len:
+    let c = strs[off + i]
+    if c < 0x20u8 or c == '\"' or c == '\\':
+      plain := false
+      break
+  if plain:
+    out := Array.extend_view self (&strs[off .. (off + len)])
+    return out.push '\"'
+  for i in 0 .. len:
+    let c = strs[off + i]
+    if c >= 0x20u8 and c != '\"' and c != '\\':
+      out := self.push c
+    else:
+      if c == '\"' or c == '\\':
+        out := self.push '\\'
+        out := self.push c
+      else:
+        case c of
+          '\n' => do:
+            out := Array.extend self K_ESC_N
+          '\r' => do:
+            out := Array.extend self K_ESC_R
+          '\t' => do:
+            out := Array.extend self K_ESC_T
+          8u8 => do:
+            out := Array.extend self K_ESC_B
+          12u8 => do:
+            out := Array.extend self K_ESC_F
+          _ => do:
+            out := Array.extend self K_ESC_U00
+            out := self.push HEX[(c >> 4u8).to_u32]
+            out := self.push HEX[(c & 15u8).to_u32]
+  return out.push '\"'
+
+func write_doc (out: own #[U8]) -> (doc: GeoDoc) -> (strs: #[U8]) -> (points: #[F64]) -> (rings: #[Run]) -> (features: #[Feature]): #[U8] =>
+  out := Array.extend self K_DOC_TYPE
+  out := append_json_string self strs doc.kind_off doc.kind_len
+  out := Array.extend self K_FEATURES
+  for fi in 0 .. doc.feat_count:
+    let f = features[doc.feat_first + fi]
+    if fi > 0:
+      out := self.push ','
+    out := Array.extend self K_DOC_TYPE
+    out := append_json_string self strs f.kind_off f.kind_len
+    out := Array.extend self K_PROPS_NAME
+    out := append_json_string self strs f.name_off f.name_len
+    out := Array.extend self K_GEOM_TYPE
+    out := append_json_string self strs f.geom_off f.geom_len
+    out := Array.extend self K_COORDS
+    for ri in 0 .. f.coords_count:
+      let ring = rings[f.coords_first + ri]
+      if ri > 0:
+        out := self.push ','
+      out := self.push '['
+      for pi in 0 .. ring.count:
+        let at = (ring.first + pi) << 1
+        if pi > 0:
+          out := self.push ','
+        out := self.push '['
+        out := format_f64_ryu self points[at]
+        out := self.push ','
+        out := format_f64_ryu self points[at + 1]
+        out := self.push ']'
+      out := self.push ']'
+    out := Array.extend self K_FEAT_END
+  return Array.extend out K_DOC_END
+
+io bench (inp: #[U8]): #[U8] =>
+  let n = inp[0].to_u32 | (inp[1].to_u32 << 8) | (inp[2].to_u32 << 16) | (inp[3].to_u32 << 24)
+  let src_len = inp.length - 4
+  let est_pts = (src_len >> 4) + 64
+  let strs: #[U8] = Array.with_capacity 4096
+  let points: #[F64] = Array.with_capacity (est_pts * (n + 1))
+  let rings: #[Run] = Array.with_capacity ((n + 1) * 64)
+  let features: #[Feature] = Array.with_capacity ((n + 1) * 16)
+  let docs: #[GeoDoc] = Array.with_capacity n
+
+  let (first, s0, p0, r0, f0) = parse_doc inp 4 strs points rings features
+  strs := s0
+  points := p0
+  rings := r0
+  features := f0
+
+  let single_out: #[U8] = Array.with_capacity (src_len + 64)
+  single_out := write_doc self first strs points rings features
+
+  let result: #[U8] = Array.with_capacity 72
+  result := append_md5_hex self single_out
+
+  for _ in 0 .. n:
+    let (d, s1, p1, r1, f1) = parse_doc inp 4 strs points rings features
+    strs := s1
+    points := p1
+    rings := r1
+    features := f1
+    docs := self.push d
+
+  let all_out: #[U8] = Array.with_capacity (single_out.length * n + n + 8)
+  all_out := self.push '['
+  for i in 0 .. docs.length:
+    if i > 0:
+      all_out := self.push ','
+    all_out := write_doc self docs[i] strs points rings features
+  all_out := self.push ']'
+
+  result := append_md5_hex self all_out
+  return result

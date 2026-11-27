@@ -2162,7 +2162,7 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
     let n = tm.node(root);
     if n.tag == blot_check_core::Tag.scalar && n.c == 0 && simdForwardingOperands(tm, body, n.a, n.b) {
         let left = g.s.vals[args.start + forwardedParameter(tm, body, n.a)];
-        if left.len == 4 && tagOf(g, left.ty) == blot_direct_types::Tag.tuple {
+        if (left.len == 4 || left.len == 2) && tagOf(g, left.ty) == blot_direct_types::Tag.tuple {
             var right = neverVal();
             if n.b != 0 {
                 let index = forwardedParameter(tm, body, n.b);
@@ -2172,11 +2172,11 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
                     let pair = tm.children(n.b);
                     let first = g.s.vals[args.start + forwardedParameter(tm, body, pair[0])];
                     let second = g.s.vals[args.start + forwardedParameter(tm, body, pair[1])];
-                    if first.len != 4 || second.len != 4 { return neverVal(), false, blot_direct_types::Error.none; }
+                    if first.len != left.len || second.len != left.len { return neverVal(), false, blot_direct_types::Error.none; }
                     let start = g.s.words.len as u32;
-                    for lane in 0..4 { g.s.words.push(w(g, first, lane)); }
-                    for lane in 0..4 { g.s.words.push(w(g, second, lane)); }
-                    right = Val { start: start, len: 8 };
+                    for lane in 0..(first.len as i64) { g.s.words.push(w(g, first, lane)); }
+                    for lane in 0..(second.len as i64) { g.s.words.push(w(g, second, lane)); }
+                    right = Val { start: start, len: first.len + second.len };
                 }
             }
             let selector = laneSelectorOperand(n.op, n.a, n.b);
@@ -2195,14 +2195,27 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
             let value, error = lanes(g, f, n.op, left, right, result, id, elide_nan, selector_node);
             return value, true, error;
         }
-    } else if n.tag == blot_check_core::Tag.product && args.len == 1 && n.b == 4 {
+        if left.len == 1 && (n.op == blot_check_core::Op.i8x16_splat || n.op == blot_check_core::Op.i16x8_splat) {
+            lget(g, w(g, left, 0));
+            if n.op == blot_check_core::Op.i8x16_splat { simdOp(g, SIMD_i8x16_splat); } else { simdOp(g, SIMD_i16x8_splat); }
+            return popV128(g, f, result), true, blot_direct_types::Error.none;
+        }
+    } else if n.tag == blot_check_core::Tag.product && args.len == 1 && (n.b == 4 || n.b == 2) {
         let arg = g.s.vals[args.start];
-        if arg.ty == blot_direct_types::f32_ || arg.ty == blot_direct_types::u32_ {
+        if n.b == 4 && (arg.ty == blot_direct_types::f32_ || arg.ty == blot_direct_types::u32_) {
             for child in tm.children(root) {
                 if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, blot_direct_types::Error.none; }
             }
             let word = w(g, arg, 0);
             let words = g.saveWords([word, word, word, word]);
+            return Val { result, words.start, words.len }, true, blot_direct_types::Error.none;
+        }
+        if n.b == 2 && (arg.ty == blot_direct_types::f64_ || arg.ty == blot_direct_types::u64_) {
+            for child in tm.children(root) {
+                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, blot_direct_types::Error.none; }
+            }
+            let word = w(g, arg, 0);
+            let words = g.saveWords([word, word]);
             return Val { result, words.start, words.len }, true, blot_direct_types::Error.none;
         }
     }

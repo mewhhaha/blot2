@@ -1,72 +1,75 @@
-// PLB pidigits: strictly non-negative Gibbons/Lambert spigot in base-2^30 U64 limbs.
-// Tracks (num, s, den) where s = 3*num + acc = n2 and s + num = n1, so every limb
-// operation is non-negative and digit extraction never underflows.
+// PLB pidigits: strictly non-negative Gibbons/Lambert spigot using full 64-bit
+// U64 limbs (base 2^64) accelerated by U64.mul_wide (64x64 -> 128-bit product).
 import * as buf from "./buf"
 
-// A limb times the largest scale (2*k + 1 for U32 k), plus carry, fits in U64.
-const LIMB_BITS: U64 = 30
-const MASK: U64 = 0x3FFFFFFF
-
 func bi_mul (a: own #[U64]) -> (alen: U32) -> (m: U64): (#[U64], U32) =>
-  if alen == 0 or m == 0:
+  if alen == 0 or m == 0u64:
     return (a, 0)
-  let carry: U64 = 0
+  let carry: U64 = 0u64
   for i in 0 .. alen:
-    let prod = a[i] * m + carry
-    a[i] := prod & MASK
-    carry := prod >> LIMB_BITS
-  for ever:
-    if carry == 0:
-      break
+    let (lo, hi) = U64.mul_wide a[i] m
+    let sum = lo + carry
+    let c: U64 = if sum < lo then 1u64 else 0u64
+    a[i] := sum
+    carry := hi + c
+  if carry != 0u64:
     if alen < a.length:
-      a[alen] := carry & MASK
+      a[alen] := carry
     else:
-      a := self.push (carry & MASK)
+      a := self.push carry
     alen := self + 1
-    carry := self >> LIMB_BITS
   return (a, alen)
 
 func bi_add_scaled (dst: own #[U64]) -> (dlen: U32) -> (src: #[U64]) -> (slen: U32) -> (m: U64): (#[U64], U32) =>
-  if slen == 0 or m == 0:
+  if slen == 0 or m == 0u64:
     return (dst, dlen)
   let maxl = if dlen > slen then dlen else slen
-  let carry: U64 = 0
+  let carry: U64 = 0u64
   let i: U32 = 0
   for ever:
-    if i >= maxl and carry == 0:
+    if i >= maxl and carry == 0u64:
       break
-    let dv: U64 = if i < dlen then dst[i] else 0
-    let sv: U64 = if i < slen then src[i] * m else 0
-    let sum = dv + sv + carry
+    let dv: U64 = if i < dlen then dst[i] else 0u64
+    let lo: U64 = 0u64
+    let hi: U64 = 0u64
+    if i < slen:
+      let (p_lo, p_hi) = U64.mul_wide src[i] m
+      lo := p_lo
+      hi := p_hi
+    let s1 = dv + lo
+    let c1: U64 = if s1 < dv then 1u64 else 0u64
+    let s2 = s1 + carry
+    let c2: U64 = if s2 < s1 then 1u64 else 0u64
     if i < dst.length:
-      dst[i] := sum & MASK
+      dst[i] := s2
     else:
-      dst := self.push (sum & MASK)
-    carry := sum >> LIMB_BITS
+      dst := self.push s2
+    carry := hi + c1 + c2
     i := self + 1
   return (dst, i)
 
 func bi_sub_scaled (dst: own #[U64]) -> (dlen: U32) -> (src: #[U64]) -> (slen: U32) -> (m: U64): (#[U64], U32) =>
-  if m == 0 or slen == 0:
+  if m == 0u64 or slen == 0:
     return (dst, dlen)
-  let borrow: U64 = 0
+  let borrow: U64 = 0u64
   for i in 0 .. dlen:
     let dv = dst[i]
-    let prod: U64 = if i < slen then src[i] * m else 0
-    let sv = prod + borrow
-    if dv >= sv:
-      dst[i] := dv - sv
-      borrow := 0
-    else:
-      let diff = sv - dv
-      let b = (diff + MASK) >> LIMB_BITS
-      dst[i] := (b << LIMB_BITS) - diff
-      borrow := b
+    let lo: U64 = 0u64
+    let hi: U64 = 0u64
+    if i < slen:
+      let (p_lo, p_hi) = U64.mul_wide src[i] m
+      lo := p_lo
+      hi := p_hi
+    let sub = lo + borrow
+    let c1: U64 = if sub < lo then 1u64 else 0u64
+    let c2: U64 = if dv < sub then 1u64 else 0u64
+    dst[i] := dv - sub
+    borrow := hi + c1 + c2
   let nl = dlen
   for ever:
     if nl == 0:
       break
-    if dst[nl - 1] != 0:
+    if dst[nl - 1] != 0u64:
       break
     nl := self - 1
   return (dst, nl)
@@ -87,15 +90,15 @@ func bi_cmp (a: #[U64]) -> (alen: U32) -> (b: #[U64]) -> (blen: U32): U32 =>
 
 io bench (inp: #[U32]): #[U32] =>
   let target = inp[0]
-  let cap: U32 = (target >> 3) + 64
-  let num = @array.fill cap (U32.to_u64 0)
-  let s = @array.fill cap (U32.to_u64 0)
-  let den = @array.fill cap (U32.to_u64 0)
-  let rem = @array.fill cap (U32.to_u64 0)
-  let chk = @array.fill cap (U32.to_u64 0)
-  num[0] := 1
-  s[0] := 3
-  den[0] := 1
+  let cap: U32 = (target >> 4) + 64
+  let num = @array.fill cap 0u64
+  let s = @array.fill cap 0u64
+  let den = @array.fill cap 0u64
+  let rem = @array.fill cap 0u64
+  let chk = @array.fill cap 0u64
+  num[0] := 1u64
+  s[0] := 3u64
+  den[0] := 1u64
   let nlen: U32 = 1
   let slen: U32 = 1
   let dlen: U32 = 1
@@ -107,7 +110,7 @@ io bench (inp: #[U32]): #[U32] =>
     if printed >= target:
       break
     // Try extracting digits while floor(s / den) == floor((s + num) / den).
-    let d3: U64 = 0
+    let d3: U64 = 0u64
     let rlen: U32 = slen
     for i in 0 .. slen:
       if i < rem.length:
@@ -116,20 +119,25 @@ io bench (inp: #[U32]): #[U32] =>
         rem := self.push s[i]
     if rlen >= dlen:
       let top_d = den[dlen - 1]
-      let high: U64 = if rlen > dlen then rem[dlen] else 0
-      let top_r = (high << LIMB_BITS) + rem[dlen - 1]
-      d3 := top_r / (top_d + 1)
-      if d3 > 0:
+      if rlen > dlen:
+        // rem < 10 * den so rem[dlen] <= 9; shift right by 4 fits in U64.
+        let top_r = (rem[dlen] << 60u64) | (rem[dlen - 1] >> 4u64)
+        let td = (top_d >> 4u64) + 1u64
+        d3 := top_r / td
+      else:
+        if top_d < 0xffff_ffff_ffff_ffffu64:
+          d3 := rem[dlen - 1] / (top_d + 1u64)
+      if d3 > 0u64:
         let (rem1, rlen1) = bi_sub_scaled rem rlen den dlen d3
         rem := rem1
         rlen := rlen1
       for ever:
         if bi_cmp rem rlen den dlen == 0:
           break
-        let (rem2, rlen2) = bi_sub_scaled rem rlen den dlen 1
+        let (rem2, rlen2) = bi_sub_scaled rem rlen den dlen 1u64
         rem := rem2
         rlen := rlen2
-        d3 := self + 1
+        d3 := self + 1u64
     // chk = rem + num; safe iff chk < den.
     let clen: U32 = rlen
     for i in 0 .. rlen:
@@ -137,7 +145,7 @@ io bench (inp: #[U32]): #[U32] =>
         chk[i] := rem[i]
       else:
         chk := self.push rem[i]
-    let (chk1, clen1) = bi_add_scaled chk clen num nlen 1
+    let (chk1, clen1) = bi_add_scaled chk clen num nlen 1u64
     chk := chk1
     clen := clen1
 
@@ -175,18 +183,18 @@ io bench (inp: #[U32]): #[U32] =>
           s[i] := rem[i]
         else:
           s := self.push rem[i]
-      let (s1, slen1) = bi_mul s rlen 10
+      let (s1, slen1) = bi_mul s rlen 10u64
       s := s1
       slen := slen1
-      let (num1, nlen1) = bi_mul num nlen 10
+      let (num1, nlen1) = bi_mul num nlen 10u64
       num := num1
       nlen := nlen1
     else:
       k := self + 1
-      let k2 = (k.to_u64 << 1) + 1
+      let k2 = (k.to_u64 << 1u64) + 1u64
       // s' = s * (2*k + 1) + num * (k - 1)
       let (s1, slen1) = bi_mul s slen k2
-      let (s2, slen2) = bi_add_scaled s1 slen1 num nlen (k.to_u64 - 1)
+      let (s2, slen2) = bi_add_scaled s1 slen1 num nlen (k.to_u64 - 1u64)
       s := s2
       slen := slen2
       let (den1, dlen1) = bi_mul den dlen k2

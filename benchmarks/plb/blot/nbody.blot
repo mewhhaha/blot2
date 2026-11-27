@@ -1,0 +1,198 @@
+// PLB nbody: 5-body solar system symplectic integration in F64 with F64x2 SIMD
+// pairing all 10 interactions into 5 vector sqrt/div steps per tick, keeping
+// all 5 bodies in Wasm f64 locals (zero inner-loop memory traffic).
+import * as simd from "std/simd"
+
+const PI_F64: F64 = 3.141592653589793f64
+const SOLAR_MASS: F64 = 39.47841760435743f64
+const DAYS_PER_YEAR: F64 = 365.24f64
+const DT: F64 = 0.01f64
+
+func push_f64_9 (out: own #[U8]) -> (val: F64): #[U8] =>
+  let x = val
+  if x < 0.0f64:
+    out := self.push '-'
+    x := 0.0f64 - self
+  let scaled = F64.to_u64 (x * 1000000000.0f64 + 0.5f64)
+  let int_part = scaled / 1000000000u64
+  let frac_part = scaled % 1000000000u64
+  if int_part == 0u64:
+    out := self.push '0'
+  else:
+    let digs = @array.fill 20 0u8
+    let n: U32 = 0
+    let t = int_part
+    for ever:
+      if t == 0u64:
+        break
+      digs[n] := (48u64 + (t % 10u64)).to_u8
+      n := self + 1
+      t := self / 10u64
+    for ever:
+      if n == 0:
+        break
+      n := self - 1
+      out := self.push digs[n]
+  out := self.push '.'
+  let fdigs = @array.fill 9 0u8
+  let f = frac_part
+  for i in 0 .. 9:
+    fdigs[8 - i] := (48u64 + (f % 10u64)).to_u8
+    f := self / 10u64
+  for i in 0 .. 9:
+    out := self.push fdigs[i]
+  out := self.push '\n'
+  return out
+
+func pair_mag (dx: simd.F64x2) -> (dy: simd.F64x2) -> (dz: simd.F64x2) -> (dt_v: simd.F64x2): simd.F64x2 =>
+  let d2 = simd.f64_add (simd.f64_add (simd.f64_mul dx dx) (simd.f64_mul dy dy)) (simd.f64_mul dz dz)
+  return simd.f64_div dt_v (simd.f64_mul d2 (simd.f64_sqrt d2))
+
+func energy (bx: #[F64]) -> (by: #[F64]) -> (bz: #[F64]) -> (vx: #[F64]) -> (vy: #[F64]) -> (vz: #[F64]) -> (bm: #[F64]): F64 =>
+  let e: F64 = 0.0f64
+  for i in 0 .. 5:
+    e := self + 0.5f64 * bm[i] * (vx[i] * vx[i] + vy[i] * vy[i] + vz[i] * vz[i])
+    for j in (i + 1) .. 5:
+      let dx = bx[i] - bx[j]
+      let dy = by[i] - by[j]
+      let dz = bz[i] - bz[j]
+      e := self - (bm[i] * bm[j]) / F64.sqrt (dx * dx + dy * dy + dz * dz)
+  return e
+
+io bench (inp: #[U32]): #[U8] =>
+  let steps = inp[0]
+  let sm = 4.0f64 * PI_F64 * PI_F64
+
+  // Body 0 (Sun), 1 (Jupiter), 2 (Saturn), 3 (Uranus), 4 (Neptune)
+  let x0 = 0.0f64
+  let y0 = 0.0f64
+  let z0 = 0.0f64
+  let m0 = 1.0f64 * sm
+
+  let x1 = 4.84143144246472090e+00f64
+  let y1 = -1.16032004402742839e+00f64
+  let z1 = -1.03622044471123109e-01f64
+  let vx1 = 1.66007664274403694e-03f64 * DAYS_PER_YEAR
+  let vy1 = 7.69901118419740425e-03f64 * DAYS_PER_YEAR
+  let vz1 = -6.90460016972063023e-05f64 * DAYS_PER_YEAR
+  let m1 = 9.54791938424326609e-04f64 * sm
+
+  let x2 = 8.34336671824457987e+00f64
+  let y2 = 4.12479856412430479e+00f64
+  let z2 = -4.03523417114321381e-01f64
+  let vx2 = -2.76742510726862411e-03f64 * DAYS_PER_YEAR
+  let vy2 = 4.99852801234917238e-03f64 * DAYS_PER_YEAR
+  let vz2 = 2.30417297573763929e-05f64 * DAYS_PER_YEAR
+  let m2 = 2.85885980666130812e-04f64 * sm
+
+  let x3 = 1.28943695621391310e+01f64
+  let y3 = -1.51111514016986312e+01f64
+  let z3 = -2.23307578892655734e-01f64
+  let vx3 = 2.96460137564761618e-03f64 * DAYS_PER_YEAR
+  let vy3 = 2.37847173959480950e-03f64 * DAYS_PER_YEAR
+  let vz3 = -2.96589568540237556e-05f64 * DAYS_PER_YEAR
+  let m3 = 4.36624404335156298e-05f64 * sm
+
+  let x4 = 1.53796971148509165e+01f64
+  let y4 = -2.59193146099879641e+01f64
+  let z4 = 1.79258772950371181e-01f64
+  let vx4 = 2.68067772490389322e-03f64 * DAYS_PER_YEAR
+  let vy4 = 1.62824170038242295e-03f64 * DAYS_PER_YEAR
+  let vz4 = -9.51592254519715870e-05f64 * DAYS_PER_YEAR
+  let m4 = 5.15138902046611451e-05f64 * sm
+
+  let vx0 = (0.0f64 - (vx1 * m1 + vx2 * m2 + vx3 * m3 + vx4 * m4)) / sm
+  let vy0 = (0.0f64 - (vy1 * m1 + vy2 * m2 + vy3 * m3 + vy4 * m4)) / sm
+  let vz0 = (0.0f64 - (vz1 * m1 + vz2 * m2 + vz3 * m3 + vz4 * m4)) / sm
+
+  let e0 = energy #[x0, x1, x2, x3, x4] #[y0, y1, y2, y3, y4] #[z0, z1, z2, z3, z4] #[vx0, vx1, vx2, vx3, vx4] #[vy0, vy1, vy2, vy3, vy4] #[vz0, vz1, vz2, vz3, vz4] #[m0, m1, m2, m3, m4]
+
+  let dt_v = simd.f64_splat DT
+  for _ in 0 .. steps:
+    // Group A: (0,1) and (0,2)
+    let dx01 = x0 - x1
+    let dy01 = y0 - y1
+    let dz01 = z0 - z1
+    let dx02 = x0 - x2
+    let dy02 = y0 - y2
+    let dz02 = z0 - z2
+    let (mag01, mag02) = pair_mag (dx01, dx02) (dy01, dy02) (dz01, dz02) dt_v
+
+    // Group B: (0,3) and (0,4)
+    let dx03 = x0 - x3
+    let dy03 = y0 - y3
+    let dz03 = z0 - z3
+    let dx04 = x0 - x4
+    let dy04 = y0 - y4
+    let dz04 = z0 - z4
+    let (mag03, mag04) = pair_mag (dx03, dx04) (dy03, dy04) (dz03, dz04) dt_v
+
+    // Group C: (1,2) and (1,3)
+    let dx12 = x1 - x2
+    let dy12 = y1 - y2
+    let dz12 = z1 - z2
+    let dx13 = x1 - x3
+    let dy13 = y1 - y3
+    let dz13 = z1 - z3
+    let (mag12, mag13) = pair_mag (dx12, dx13) (dy12, dy13) (dz12, dz13) dt_v
+
+    // Group D: (1,4) and (2,3)
+    let dx14 = x1 - x4
+    let dy14 = y1 - y4
+    let dz14 = z1 - z4
+    let dx23 = x2 - x3
+    let dy23 = y2 - y3
+    let dz23 = z2 - z3
+    let (mag14, mag23) = pair_mag (dx14, dx23) (dy14, dy23) (dz14, dz23) dt_v
+
+    // Group E: (2,4) and (3,4)
+    let dx24 = x2 - x4
+    let dy24 = y2 - y4
+    let dz24 = z2 - z4
+    let dx34 = x3 - x4
+    let dy34 = y3 - y4
+    let dz34 = z3 - z4
+    let (mag24, mag34) = pair_mag (dx24, dx34) (dy24, dy34) (dz24, dz34) dt_v
+
+    vx0 := self - dx01 * (m1 * mag01) - dx02 * (m2 * mag02) - dx03 * (m3 * mag03) - dx04 * (m4 * mag04)
+    vy0 := self - dy01 * (m1 * mag01) - dy02 * (m2 * mag02) - dy03 * (m3 * mag03) - dy04 * (m4 * mag04)
+    vz0 := self - dz01 * (m1 * mag01) - dz02 * (m2 * mag02) - dz03 * (m3 * mag03) - dz04 * (m4 * mag04)
+
+    vx1 := self + dx01 * (m0 * mag01) - dx12 * (m2 * mag12) - dx13 * (m3 * mag13) - dx14 * (m4 * mag14)
+    vy1 := self + dy01 * (m0 * mag01) - dy12 * (m2 * mag12) - dy13 * (m3 * mag13) - dy14 * (m4 * mag14)
+    vz1 := self + dz01 * (m0 * mag01) - dz12 * (m2 * mag12) - dz13 * (m3 * mag13) - dz14 * (m4 * mag14)
+
+    vx2 := self + dx02 * (m0 * mag02) + dx12 * (m1 * mag12) - dx23 * (m3 * mag23) - dx24 * (m4 * mag24)
+    vy2 := self + dy02 * (m0 * mag02) + dy12 * (m1 * mag12) - dy23 * (m3 * mag23) - dy24 * (m4 * mag24)
+    vz2 := self + dz02 * (m0 * mag02) + dz12 * (m1 * mag12) - dz23 * (m3 * mag23) - dz24 * (m4 * mag24)
+
+    vx3 := self + dx03 * (m0 * mag03) + dx13 * (m1 * mag13) + dx23 * (m2 * mag23) - dx34 * (m4 * mag34)
+    vy3 := self + dy03 * (m0 * mag03) + dy13 * (m1 * mag13) + dy23 * (m2 * mag23) - dy34 * (m4 * mag34)
+    vz3 := self + dz03 * (m0 * mag03) + dz13 * (m1 * mag13) + dz23 * (m2 * mag23) - dz34 * (m4 * mag34)
+
+    vx4 := self + dx04 * (m0 * mag04) + dx14 * (m1 * mag14) + dx24 * (m2 * mag24) + dx34 * (m3 * mag34)
+    vy4 := self + dy04 * (m0 * mag04) + dy14 * (m1 * mag14) + dy24 * (m2 * mag24) + dy34 * (m3 * mag34)
+    vz4 := self + dz04 * (m0 * mag04) + dz14 * (m1 * mag14) + dz24 * (m2 * mag24) + dz34 * (m3 * mag34)
+
+    x0 := self + DT * vx0
+    y0 := self + DT * vy0
+    z0 := self + DT * vz0
+    x1 := self + DT * vx1
+    y1 := self + DT * vy1
+    z1 := self + DT * vz1
+    x2 := self + DT * vx2
+    y2 := self + DT * vy2
+    z2 := self + DT * vz2
+    x3 := self + DT * vx3
+    y3 := self + DT * vy3
+    z3 := self + DT * vz3
+    x4 := self + DT * vx4
+    y4 := self + DT * vy4
+    z4 := self + DT * vz4
+
+  let e1 = energy #[x0, x1, x2, x3, x4] #[y0, y1, y2, y3, y4] #[z0, z1, z2, z3, z4] #[vx0, vx1, vx2, vx3, vx4] #[vy0, vy1, vy2, vy3, vy4] #[vz0, vz1, vz2, vz3, vz4] #[m0, m1, m2, m3, m4]
+
+  let out: #[U8] = Array.with_capacity 40
+  out := push_f64_9 self e0
+  out := push_f64_9 self e1
+  return out

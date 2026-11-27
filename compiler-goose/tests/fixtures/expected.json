@@ -801,7 +801,7 @@
     }
    ],
    "wasm_bytes": 6421,
-   "wasm_sha256": "0e8bc1ef94da092565e991667355241ccca32423ced2f70d2835522cfad6373e"
+   "wasm_sha256": "2e836d030fb72e756c07882f462b4b78158451eb9a892ad750e3f40a7d40e013"
   },
   "direct/branch_appends.blot": {
    "exit": 0,
@@ -1321,7 +1321,7 @@
     }
    ],
    "wasm_bytes": 5293,
-   "wasm_sha256": "74b1aa1025dcc6f69f8aec0588dc744374d5e9eb9083433608bad3027848f9c2"
+   "wasm_sha256": "70cf63e8997246f9fcc7d79ad92086f6c50ba3ea2cca26db41bc17d235370fff"
   },
   "direct/generic_comprehensions.blot": {
    "exit": 0,
@@ -1481,7 +1481,7 @@
     }
    ],
    "wasm_bytes": 5355,
-   "wasm_sha256": "fb81f09089bea2377cc9aff5293ea63855232afb614af6f80b205afd998db9db"
+   "wasm_sha256": "bd4052f007f59fc1a309f26fe783ecae575b2e3f769072c54ae740a9bcb3d93f"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
@@ -2001,7 +2001,7 @@
     }
    ],
    "wasm_bytes": 7202,
-   "wasm_sha256": "e7f6fc9fa1a31e9cd797e691a09c21d6871531e32cb3872dc1bafd2e57103d35"
+   "wasm_sha256": "5ddda45403b45f0ef196333604c103e6c23e5b29a182c7e4220b3d4f49c7acde"
   },
   "direct/terminal_scratch_reads.blot": {
    "exit": 0,
@@ -2041,7 +2041,7 @@
     }
    ],
    "wasm_bytes": 13664,
-   "wasm_sha256": "76764156a32551a3caec6be7ff5e852e9667e93e811fc8873d7ef2e92d11d6fe"
+   "wasm_sha256": "8899e2ae1e03cc5c0ea39ad7d53edc41a2e1c7b9d3e363f9e751651836d58dcb"
   },
   "direct/unused_generic_fields.blot": {
    "exit": 0,
@@ -2161,7 +2161,7 @@
     }
    ],
    "wasm_bytes": 5907,
-   "wasm_sha256": "4ef7d7c3451be0d484c4dcf6ab51ae5a82077675910ed9be3f2016ad53bdd2b4"
+   "wasm_sha256": "28cd4ad7e435a671e5e2db68dc0f0b622050a26ec6ea1e6585b8bc96d9586397"
   },
   "discard-fixtures/deferred-alias.blot": {
    "exit": 0,
@@ -2668,7 +2668,7 @@
     }
    ],
    "wasm_bytes": 9440,
-   "wasm_sha256": "44442613c76646b4c7c186cb1cf9bf6130c341b2c34c843307889bb1196f188c"
+   "wasm_sha256": "ea807d269c879c72f4f633e6514030a37621ab1aa75ae5cca793e51c07599f84"
   },
   "fresh_owner_borrow_escape.blot": {
    "exit": 0,
@@ -3009,7 +3009,7 @@
     }
    ],
    "wasm_bytes": 6680,
-   "wasm_sha256": "68464d0fe08a157092f23ce0fdca6ba61f15969b2c74361ecea085b1d37b0afe"
+   "wasm_sha256": "1dc42343f8842f92d470808fb761364897062eb068b3561556813af2c4229725"
   },
   "global_call_read.blot": {
    "exit": 0,
@@ -3169,7 +3169,7 @@
     }
    ],
    "wasm_bytes": 5720,
-   "wasm_sha256": "a091d84cb136744ed2a4a2e74b86a5feb38461b66a11d3a34f7cf462c288cfe7"
+   "wasm_sha256": "b2ddcfbf549ec986d14831ece277370e1ffc121fa1610d2b7d0278ee66aafb13"
   },
   "input_alias_borrow_escape.blot": {
    "exit": 0,
@@ -3209,7 +3209,7 @@
     }
    ],
    "wasm_bytes": 4689,
-   "wasm_sha256": "af3d97e2b2890d1bf7b40f00123795ec5ea02e8c60a77756cec4fa65f1b61ffd"
+   "wasm_sha256": "6e9e68e0ff8319e4d05d300988537146b371e44ec4f58309df0d959094be663f"
   },
   "input_alias_descriptors.blot": {
    "exit": 0,
@@ -3249,7 +3249,7 @@
     }
    ],
    "wasm_bytes": 6751,
-   "wasm_sha256": "1208b2da20c19e19e64b2bdaa1a15b77406d995eb0e0070ac6f518b8a4d16ce8"
+   "wasm_sha256": "aeec3a1508dd93d9fb80a246ab1069afc2615e72e540507995c656bb047d53cb"
   },
   "input_alias_partition.blot": {
    "exit": 0,
@@ -3940,7 +3940,7 @@
     }
    ],
    "wasm_bytes": 5379,
-   "wasm_sha256": "094deac66b833287089b82b373e71132ec14bb1e07b9d353aaa383a542e76bf8"
+   "wasm_sha256": "b1594df5e6bdce37d60f3bad905dd6728ed6df8bdd021b51b2e204355b52ff94"
   },
   "partial-runtime-fixtures/a.blot": {
    "exit": 1,
@@ -4354,7 +4354,7 @@
     }
    ],
    "wasm_bytes": 10064,
-   "wasm_sha256": "5a77376db74592c6df23659798a35d9be5baeb79fe235df234168bf1cb92f214"
+   "wasm_sha256": "981c9d0b765941aa408bf63937758ff6da64f8f1e64f50c6d72317bf6d91a287"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,
@@ -4394,7 +4394,7 @@
     }
    ],
    "wasm_bytes": 11158,
-   "wasm_sha256": "7fb30ab17dab8a2eb1b5b05f5f03da8772a5621a01e59e4a4d5490d11f1557c4"
+   "wasm_sha256": "24e60dbb3057f64da88ff016d19ef6e92423ceb0ddf658a318cc1ae4c73c552f"
   },
   "scoped-opaque/facade.blot": {
    "exit": 1,

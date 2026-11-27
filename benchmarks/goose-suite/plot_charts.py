@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DIR = ROOT / "benchmarks/evidence/measurements/2026-11-26-goose-suite"
+DEFAULT_DIR = ROOT / "benchmarks/evidence/measurements/2026-11-27-goose-suite"
 
 FONT = "'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
 
@@ -74,6 +74,7 @@ SHORT_LABELS = {
     "blot streaming": "Blot",
     "blot sliding 3-col": "Blot",
     "blot sliding 3-col, #[U8]": "Blot",
+    "blot 16-wide U8x16 SIMD": "Blot (SIMD)",
     # Goose
     "goose grow-only array": "Goose",
     "goose array, typed references": "Goose",

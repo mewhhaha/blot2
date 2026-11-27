@@ -1,7 +1,6 @@
-// Push N records while keeping indices to every 64th one.
-// Uses pre-sized storage (`@array.fill`, matching Rust's `Vec::with_capacity`
-// and C++'s `vector::reserve`) so N=16M (128 MB) fits cleanly inside Blot's
-// stock 128 MiB Wasm32 stack region while `marks` grows dynamically on heap.
+// Push N records into pre-sized capacity (`Array.with_capacity`, matching Rust's
+// `Vec::with_capacity` and C++'s `vector::reserve`) while keeping indices to
+// every 64th one.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 1000000 // BENCH_N
@@ -9,20 +8,20 @@ const BENCH_N: U32 = 1000000 // BENCH_N
 type Item is data = $Item { key: U32, val: U32 }
 
 io bench (): #[U32] =>
-  let items = @array.fill BENCH_N ($Item { key: 0, val: 0 })
-  let marks: #[U32] = #[]
-  let r: U64 = 12345
+  let items: #[Item] = Array.with_capacity BENCH_N
+  let marks: #[U32] = Array.with_capacity ((BENCH_N >> 6) + 1)
+  let r: U64 = 12345u64
   for i in 0 .. BENCH_N:
     r := rng.xs_next self
-    items[i] := $Item { key: rng.xs_mod r 1000000, val: i % 97 }
+    items := self.push ($Item { key: (r % 1000000u64).to_u32, val: i % 97 })
     if (i & 63) == 0:
       marks := self.push i
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for i in 0 .. BENCH_N:
     total := self + items[i].key.to_i64
 
-  let mt: I64 = 0
+  let mt: I64 = 0i64
   for i in 0 .. marks.length:
     mt := self + items[marks[i]].val.to_i64
 

@@ -45,86 +45,91 @@ func gen_and_corrupt (text: own #[U8]) -> (st_d: own #[U32]) -> (st_stage: own #
     let top = sp - 1
     let stage = st_stage[top]
     let d = st_d[top]
-    if stage == 0:
-      seed := rng.xs_next self
-      let k = rng.xs_mod seed 8
-      if d == 0 or k == 0:
-        let v = 1 + rng.xs_mod (seed >> 8) 99
-        if v >= 10:
-          let (t1, l1) = push_ch text tlen (48 + v / 10).to_u8
-          text := t1
-          tlen := l1
-        let (t2, l2) = push_ch text tlen (48 + v % 10).to_u8
-        text := t2
-        tlen := l2
-        sp := self - 1
-      else:
-        if k == 1:
-          let (t1, l1) = push_ch text tlen 45
-          text := t1
-          tlen := l1
-          st_d[top] := d - 1
-        else:
-          if k == 2:
-            let (t1, l1) = push_ch text tlen 40
+    case stage of
+      0 => do:
+        seed := rng.xs_next self
+        let k = (seed & 7u64).to_u32
+        if d == 0 or k == 0:
+          let v = 1 + ((seed >> 8u64) % 99u64).to_u32
+          if v >= 10:
+            let (t1, l1) = push_ch text tlen (48 + v / 10).to_u8
             text := t1
             tlen := l1
-            st_stage[top] := 1
-            st_d[sp] := d - 1
-            st_stage[sp] := 0
-            sp := self + 1
-          else:
-            st_stage[top] := 2
-            st_d[sp] := d - 1
-            st_stage[sp] := 0
-            sp := self + 1
-    else:
-      if stage == 1:
-        let (t1, l1) = push_ch text tlen 41
+          let (t2, l2) = push_ch text tlen (48 + v % 10).to_u8
+          text := t2
+          tlen := l2
+          sp := self - 1
+        else:
+          case k of
+            1 => do:
+              let (t1, l1) = push_ch text tlen '-'
+              text := t1
+              tlen := l1
+              st_d[top] := d - 1
+            2 => do:
+              let (t1, l1) = push_ch text tlen '('
+              text := t1
+              tlen := l1
+              st_stage[top] := 1
+              st_d[sp] := d - 1
+              st_stage[sp] := 0
+              sp := self + 1
+            _ => do:
+              st_stage[top] := 2
+              st_d[sp] := d - 1
+              st_stage[sp] := 0
+              sp := self + 1
+      1 => do:
+        let (t1, l1) = push_ch text tlen ')'
         text := t1
         tlen := l1
         sp := self - 1
-      else:
-        let op = rng.xs_mod (seed >> 16) 4
-        let op_ch: U8 = if op == 0 then 43 else if op == 1 then 45 else if op == 2 then 42 else 47
-        let (t1, l1) = push_ch text tlen 32
+      _ => do:
+        let op = ((seed >> 16u64) & 3u64).to_u32
+        let op_ch: U8 =
+          case op of
+            0 => '+'
+            1 => '-'
+            2 => '*'
+            _ => '/'
+        let (t1, l1) = push_ch text tlen ' '
         let (t2, l2) = push_ch t1 l1 op_ch
-        let (t3, l3) = push_ch t2 l2 32
+        let (t3, l3) = push_ch t2 l2 ' '
         text := t3
         tlen := l3
         seed := rng.xs_next self
         st_d[top] := d - 1
         st_stage[top] := 0
 
-  let kind = rng.xs_mod seed 16
-  if kind == 0:
-    let i = tlen
-    let patched = false
-    for ever:
-      if i == 0:
-        break
-      i := self - 1
-      if text[i] == 41:
-        text[i] := 32
-        patched := true
-        break
-    if not patched:
-      text[0] := 35
-  else:
-    if kind == 1:
-      let idx = rng.xs_mod (seed >> 8) tlen
-      text[idx] := 35
-    else:
-      if kind == 2:
-        tlen := self / 2
-      else:
-        if kind == 3:
-          let (t1, l1) = push_ch text tlen 32
-          let (t2, l2) = push_ch t1 l1 47
-          let (t3, l3) = push_ch t2 l2 32
-          let (t4, l4) = push_ch t3 l3 48
-          text := t4
-          tlen := l4
+  let kind = (seed & 15u64).to_u32
+  case kind of
+    0 => do:
+      let i = tlen
+      let patched = false
+      for ever:
+        if i == 0:
+          break
+        i := self - 1
+        if text[i] == ')':
+          text[i] := ' '
+          patched := true
+          break
+      if not patched:
+        text[0] := '#'
+    1 => do:
+      let idx = ((seed >> 8u64) % tlen.to_u64).to_u32
+      text[idx] := '#'
+    2 => do:
+      tlen := self / 2
+    3 => do:
+      let (t1, l1) = push_ch text tlen ' '
+      let (t2, l2) = push_ch t1 l1 '/'
+      let (t3, l3) = push_ch t2 l2 ' '
+      let (t4, l4) = push_ch t3 l3 '0'
+      text := t4
+      tlen := l4
+    _ => do:
+      tlen := self
   return (text, st_d, st_stage, tlen)
 
 func skip (text: #[U8]) -> (tlen: U32) -> (pos: U32): U32 =>
@@ -132,13 +137,13 @@ func skip (text: #[U8]) -> (tlen: U32) -> (pos: U32): U32 =>
   for ever:
     if p >= tlen:
       break
-    if text[p] != 32:
+    if text[p] != ' ':
       break
     p := self + 1
   return p
 
 func run_one (text: #[U8]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U32]) -> (fop: own #[U8]) -> (e_idx: own #[U32]) -> (e_stage: own #[U32]) -> (e_left: own #[U64]): (RunRes, #[U32], #[U32], #[U8], #[U32], #[U32], #[U64]) =>
-  let pool: #[Expr] = #[]
+  let pool: #[Expr] = Array.with_capacity 64
   let sp: U32 = 0
   let pos: U32 = 0
   let mode: U32 = M_EXPR
@@ -149,119 +154,115 @@ func run_one (text: #[U8]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U3
   for ever:
     if err != 0:
       break
-    if mode == M_EXPR:
-      fk[sp] := F_EXPR_AFTER_TERM
-      sp := self + 1
-      mode := M_TERM
-    else:
-      if mode == M_TERM:
+    case mode of
+      0 => do:
+        fk[sp] := F_EXPR_AFTER_TERM
+        sp := self + 1
+        mode := M_TERM
+      1 => do:
         fk[sp] := F_TERM_AFTER_FACTOR
         sp := self + 1
         mode := M_FACTOR
-      else:
-        if mode == M_FACTOR:
-          pos := skip text tlen self
-          if pos >= tlen:
-            err := E_EOF
-          else:
-            let c = text[pos]
-            if c >= 48 and c <= 57:
-              let v: U32 = 0
-              for ever:
-                if pos >= tlen:
-                  break
-                let ch = text[pos]
-                if ch >= 48 and ch <= 57:
-                  v := self * 10 + (ch - 48).to_u32
-                  pos := self + 1
-                else:
-                  break
-              pool := self.push ($Num { v })
-              nodes := self + 1
-              ret := pool.length - 1
-              mode := M_RETURN
-            else:
-              if c == 45:
-                pos := self + 1
-                fk[sp] := F_NEG
-                sp := self + 1
-                mode := M_FACTOR
-              else:
-                if c != 40:
-                  err := E_TOKEN
-                else:
-                  pos := self + 1
-                  fk[sp] := F_PAREN
-                  sp := self + 1
-                  mode := M_EXPR
+      2 => do:
+        pos := skip text tlen self
+        if pos >= tlen:
+          err := E_EOF
         else:
-          if sp == 0:
-            break
-          sp := self - 1
-          let kind = fk[sp]
-          if kind == F_NEG:
+          let c = text[pos]
+          if c >= '0' and c <= '9':
+            let v: U32 = 0
+            for ever:
+              if pos >= tlen:
+                break
+              let ch = text[pos]
+              if ch >= '0' and ch <= '9':
+                v := self * 10 + (ch - '0').to_u32
+                pos := self + 1
+              else:
+                break
+            pool := self.push ($Num { v })
+            nodes := self + 1
+            ret := pool.length - 1
+            mode := M_RETURN
+          else:
+            if c == '-':
+              pos := self + 1
+              fk[sp] := F_NEG
+              sp := self + 1
+              mode := M_FACTOR
+            else:
+              if c != '(':
+                err := E_TOKEN
+              else:
+                pos := self + 1
+                fk[sp] := F_PAREN
+                sp := self + 1
+                mode := M_EXPR
+      _ => do:
+        if sp == 0:
+          break
+        sp := self - 1
+        let kind = fk[sp]
+        case kind of
+          4 => do:
             pool := self.push ($Neg { inner: ret })
             nodes := self + 1
             ret := pool.length - 1
-          else:
-            if kind == F_PAREN:
-              pos := skip text tlen self
-              if pos >= tlen or text[pos] != 41:
-                err := E_PAREN
-              else:
-                pos := self + 1
-                pool := self.push ($Paren { inner: ret })
-                nodes := self + 1
-                ret := pool.length - 1
+          5 => do:
+            pos := skip text tlen self
+            if pos >= tlen or text[pos] != ')':
+              err := E_PAREN
             else:
-              if kind == F_TERM_AFTER_RHS:
-                pool := self.push ($Bin { op: fop[sp], l: flhs[sp], r: ret })
-                nodes := self + 1
-                ret := pool.length - 1
-                pos := skip text tlen self
-                if pos < tlen and (text[pos] == 42 or text[pos] == 47):
-                  let op = text[pos]
-                  pos := self + 1
-                  fk[sp] := F_TERM_AFTER_RHS
-                  flhs[sp] := ret
-                  fop[sp] := op
-                  sp := self + 1
-                  mode := M_FACTOR
-              else:
-                if kind == F_TERM_AFTER_FACTOR:
-                  pos := skip text tlen self
-                  if pos < tlen and (text[pos] == 42 or text[pos] == 47):
-                    let op = text[pos]
-                    pos := self + 1
-                    fk[sp] := F_TERM_AFTER_RHS
-                    flhs[sp] := ret
-                    fop[sp] := op
-                    sp := self + 1
-                    mode := M_FACTOR
-                else:
-                  if kind == F_EXPR_AFTER_RHS:
-                    pool := self.push ($Bin { op: fop[sp], l: flhs[sp], r: ret })
-                    nodes := self + 1
-                    ret := pool.length - 1
-                    pos := skip text tlen self
-                    if pos < tlen and (text[pos] == 43 or text[pos] == 45):
-                      let op = text[pos]
-                      pos := self + 1
-                      fk[sp] := F_EXPR_AFTER_RHS
-                      flhs[sp] := ret
-                      fop[sp] := op
-                      sp := self + 1
-                      mode := M_TERM
-                  else:
-                    pos := skip text tlen self
-                    if pos < tlen and (text[pos] == 43 or text[pos] == 45):
-                      let op = text[pos]
-                      pos := self + 1
-                      fk[sp] := F_EXPR_AFTER_RHS
-                      flhs[sp] := ret
-                      fop[sp] := op
-                      sp := self + 1
-                      mode := M_TERM
+              pos := self + 1
+              pool := self.push ($Paren { inner: ret })
+              nodes := self + 1
+              ret := pool.length - 1
+          3 => do:
+            pool := self.push ($Bin { op: fop[sp], l: flhs[sp], r: ret })
+            nodes := self + 1
+            ret := pool.length - 1
+            pos := skip text tlen self
+            if pos < tlen and (text[pos] == '*' or text[pos] == '/'):
+              let op = text[pos]
+              pos := self + 1
+              fk[sp] := F_TERM_AFTER_RHS
+              flhs[sp] := ret
+              fop[sp] := op
+              sp := self + 1
+              mode := M_FACTOR
+          2 => do:
+            pos := skip text tlen self
+            if pos < tlen and (text[pos] == '*' or text[pos] == '/'):
+              let op = text[pos]
+              pos := self + 1
+              fk[sp] := F_TERM_AFTER_RHS
+              flhs[sp] := ret
+              fop[sp] := op
+              sp := self + 1
+              mode := M_FACTOR
+          1 => do:
+            pool := self.push ($Bin { op: fop[sp], l: flhs[sp], r: ret })
+            nodes := self + 1
+            ret := pool.length - 1
+            pos := skip text tlen self
+            if pos < tlen and (text[pos] == '+' or text[pos] == '-'):
+              let op = text[pos]
+              pos := self + 1
+              fk[sp] := F_EXPR_AFTER_RHS
+              flhs[sp] := ret
+              fop[sp] := op
+              sp := self + 1
+              mode := M_TERM
+          _ => do:
+            pos := skip text tlen self
+            if pos < tlen and (text[pos] == '+' or text[pos] == '-'):
+              let op = text[pos]
+              pos := self + 1
+              fk[sp] := F_EXPR_AFTER_RHS
+              flhs[sp] := ret
+              fop[sp] := op
+              sp := self + 1
+              mode := M_TERM
 
   if err != 0:
     return ($RunRes { val: 0, err, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
@@ -317,50 +318,49 @@ func run_one (text: #[U8]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U3
           else:
             let a = e_left[top]
             let b = res
-            if op == 43:
-              res := a + b
-            else:
-              if op == 45:
+            case op of
+              '+' => do:
+                res := a + b
+              '-' => do:
                 res := a - b
-              else:
-                if op == 42:
-                  res := a * b
+              '*' => do:
+                res := a * b
+              _ => do:
+                if b == 0u64:
+                  eerr := E_DIV0
                 else:
-                  if b == 0:
-                    eerr := E_DIV0
-                  else:
-                    res := a / b
+                  res := a / b
             esp := self - 1
 
   if eerr != 0:
-    return ($RunRes { val: 0, err: eerr, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
+    return ($RunRes { val: 0u64, err: eerr, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
   return ($RunRes { val: res, err: 0, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
 
 io bench (): #[U32] =>
-  let seed: U64 = 12345
-  let text: #[U8] = #[]
+  let seed: U64 = 12345u64
+  let text: #[U8] = Array.with_capacity 128
   let gd = @array.fill 16 0
   let gs = @array.fill 16 0
   let fk = @array.fill 64 0
   let flhs = @array.fill 64 0
-  let fop = @array.fill 64 (U32.to_u8 0)
+  let fop = @array.fill 64 0u8
   let e_idx = @array.fill 64 0
   let e_stage = @array.fill 64 0
-  let e_left = @array.fill 64 (U32.to_u64 0)
+  let e_left = @array.fill 64 0u64
 
   let ok: U32 = 0
   let e_eof: U32 = 0
   let e_paren: U32 = 0
   let e_token: U32 = 0
   let e_div0: U32 = 0
-  let sum: U64 = 0
-  let chars: I64 = 0
-  let nodes: I64 = 0
+  let sum: U64 = 0u64
+  let chars: I64 = 0i64
+  let nodes: I64 = 0i64
 
   for _ in 0 .. BENCH_N:
     seed := rng.xs_next self
-    let depth = 3 + rng.xs_mod seed 4
-    let (t1, gd1, gs1, tlen) = gen_and_corrupt text gd gs depth (seed >> 8)
+    let depth = 3 + (seed & 3u64).to_u32
+    let (t1, gd1, gs1, tlen) = gen_and_corrupt text gd gs depth (seed >> 8u64)
     text := t1
     gd := gd1
     gs := gs1
@@ -373,20 +373,18 @@ io bench (): #[U32] =>
     e_stage := es1
     e_left := el1
     nodes := self + nn.to_i64
-    if err == 0:
-      ok := self + 1
-      sum := self * 31 + val
-    else:
-      if err == E_EOF:
+    case err of
+      0 => do:
+        ok := self + 1
+        sum := self * 31u64 + val
+      1 => do:
         e_eof := self + 1
-      else:
-        if err == E_PAREN:
-          e_paren := self + 1
-        else:
-          if err == E_TOKEN:
-            e_token := self + 1
-          else:
-            e_div0 := self + 1
+      2 => do:
+        e_paren := self + 1
+      3 => do:
+        e_token := self + 1
+      _ => do:
+        e_div0 := self + 1
 
   let out: #[U32] = #[]
   out := rng.emit_i64 self chars

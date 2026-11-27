@@ -1,4 +1,4 @@
-// Control benchmark: build a flat U32 array of N values in [0, 1000),
+// Control benchmark: build a pre-sized flat U32 array of N values in [0, 1000),
 // then scan it 8 times accumulating sum(x ^ p).
 import * as rng from "./rng"
 
@@ -6,13 +6,13 @@ const BENCH_N: U32 = 1000000 // BENCH_N
 const PASSES: U32 = 8
 
 io bench (): #[U32] =>
-  let arr: #[U32] = #[]
-  let r: U64 = 12345
+  let arr: #[U32] = Array.with_capacity BENCH_N
+  let r: U64 = 12345u64
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    arr := self.push (rng.xs_mod r 1000)
+    arr := self.push ((r % 1000u64).to_u32)
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for p in 0 .. PASSES:
     for i in 0 .. arr.length:
       total := self + (arr[i] ^ p).to_i64

@@ -129,6 +129,48 @@ PROBLEMS = [
         "refs": {"go": "1.go"},
         "reps": 3,
     },
+    {
+        "name": "nbody",
+        "blot_file": "nbody.blot",
+        "blot_mode": "u8",
+        "unittests": [(["1000"], "1000_out"), (["10000"], "10000_out")],
+        "bench_args": ["5000000"],
+        "bench_label": "5,000,000 steps (F64x2 SIMD)",
+        "refs": {"go": "1.go", "rust": "1.rs", "c": "2.c", "cpp": "1.cpp"},
+        "reps": 3,
+    },
+    {
+        "name": "spectral-norm",
+        "blot_file": "spectral_norm.blot",
+        "blot_mode": "u8",
+        "unittests": [(["100"], "100_out"), (["101"], "101_out")],
+        "bench_args": ["4000"],
+        "bench_label": "n = 4,000 (F64x2 SIMD)",
+        "refs": {"go": "1.go", "rust": "2.rs", "c": "3.c"},
+        "reps": 3,
+    },
+    {
+        "name": "mandelbrot",
+        "blot_file": "mandelbrot.blot",
+        "blot_mode": "u8",
+        "unittests": [(["200"], "200_out"), (["500"], "500_out")],
+        "bench_args": ["5000"],
+        "bench_label": "5,000 × 5,000 (4×F64x2 SIMD)",
+        "refs": {"go": "1.go"},
+        "reps": 3,
+    },
+    {
+        "name": "json-serde",
+        "blot_file": "json_serde.blot",
+        "blot_mode": "json",
+        "blot_flags": ["--transport-mb", "8"],
+        "use_problem_cwd": True,
+        "unittests": [(["sample", "10"], "sample_10_out"), (["canada", "3"], "canada_3_out")],
+        "bench_args": ["canada", "15"],
+        "bench_label": "canada.json × 15 (2.2 MiB)",
+        "refs": {"go": "1.go"},
+        "reps": 3,
+    },
 ]
 
 LANG_META = {
@@ -175,7 +217,7 @@ def normalize_out(b: bytes) -> bytes:
     return b.replace(b"\r\n", b"\n").strip()
 
 
-def measure_once(measure_bin: Path, argv: list[str], env: dict | None = None, capture_hash: bool = False) -> tuple[float, float, int, str | None]:
+def measure_once(measure_bin: Path, argv: list[str], env: dict | None = None, capture_hash: bool = False, cwd: Path | None = None) -> tuple[float, float, int, str | None]:
     merged_env = os.environ.copy()
     merged_env["GOMAXPROCS"] = "1"
     merged_env["OMP_NUM_THREADS"] = "1"
@@ -185,12 +227,12 @@ def measure_once(measure_bin: Path, argv: list[str], env: dict | None = None, ca
         metrics_path = Path(tf.name)
     try:
         if capture_hash:
-            p = subprocess.run([str(measure_bin), str(metrics_path), *argv], env=merged_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.run([str(measure_bin), str(metrics_path), *argv], cwd=cwd, env=merged_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if p.returncode != 0:
                 raise RuntimeError(f"Run failed ({p.returncode}): {' '.join(argv)}\nSTDERR: {p.stderr.decode(errors='replace')}")
             digest = hashlib.sha256(normalize_out(p.stdout)).hexdigest()
         else:
-            p = subprocess.run([str(measure_bin), str(metrics_path), *argv], env=merged_env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            p = subprocess.run([str(measure_bin), str(metrics_path), *argv], cwd=cwd, env=merged_env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             if p.returncode != 0:
                 raise RuntimeError(f"Run failed ({p.returncode}): {' '.join(argv)}\nSTDERR: {p.stderr.decode(errors='replace')}")
             digest = None
@@ -220,7 +262,8 @@ def build_all(wtime: Path, selected: set[str] | None) -> tuple[Path, Path, dict[
         wasm = bdir / f"{name}.wasm"
         so = bdir / f"{name}.so"
         t0 = time.perf_counter()
-        run_cmd([str(BLOTC), "build", str(BLOT_DIR / prob["blot_file"]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT)])
+        extra_flags = prob.get("blot_flags", [])
+        run_cmd([str(BLOTC), "build", str(BLOT_DIR / prob["blot_file"]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT), *extra_flags])
         blotc_ms = (time.perf_counter() - t0) * 1000.0
         t1 = time.perf_counter()
         run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--blot-cdylib", str(wasm), "-o", str(so)])
@@ -263,11 +306,13 @@ def verify_unittests(bins: dict[str, dict[str, dict]], selected: set[str] | None
         if selected and name not in selected:
             continue
         pdir = PLB_ALGO / name
+        run_cwd = pdir if prob.get("use_problem_cwd") else None
         for args, out_file in prob["unittests"]:
             expected = normalize_out((pdir / out_file).read_bytes())
             for lang, info in bins[name].items():
                 p = subprocess.run(
                     [*info["argv"], *args],
+                    cwd=run_cwd,
                     env={**os.environ, "GOMAXPROCS": "1", "OMP_NUM_THREADS": "1"},
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -421,7 +466,7 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", help="Subset of problem names to run")
     ap.add_argument("--reps", type=int, default=None, help="Override repetitions per benchmark")
     ap.add_argument("--verify-only", action="store_true", help="Build and verify unittests only")
-    ap.add_argument("--out-dir", type=Path, default=REPO / "benchmarks" / "evidence" / "measurements" / "2026-11-26-plb")
+    ap.add_argument("--out-dir", type=Path, default=REPO / "benchmarks" / "evidence" / "measurements" / "2026-11-27-plb")
     args = ap.parse_args()
 
     selected = set(args.only) if args.only else None
@@ -441,6 +486,7 @@ def main() -> None:
             continue
         reps = args.reps if args.reps is not None else prob["reps"]
         bench_args = prob["bench_args"]
+        run_cwd = (PLB_ALGO / name) if prob.get("use_problem_cwd") else None
         print(f"\nBenchmarking {name} ({' '.join(bench_args)}) x {reps}...")
         samples: dict[str, list[tuple[float, float, int]]] = {l: [] for l in bins[name]}
         hashes: dict[str, str] = {}
@@ -448,7 +494,7 @@ def main() -> None:
 
         # Warmup + exact full-input hash cross-check
         for lang in langs:
-            _, _, _, h = measure_once(measure_bin, [*bins[name][lang]["argv"], *bench_args], capture_hash=True)
+            _, _, _, h = measure_once(measure_bin, [*bins[name][lang]["argv"], *bench_args], capture_hash=True, cwd=run_cwd)
             hashes[lang] = h or ""
         uniq_hashes = set(hashes.values())
         if len(uniq_hashes) != 1:
@@ -459,7 +505,7 @@ def main() -> None:
         for r in range(reps):
             order = langs if r % 2 == 0 else list(reversed(langs))
             for lang in order:
-                wall_ms, cpu_ms, rss_b, _ = measure_once(measure_bin, [*bins[name][lang]["argv"], *bench_args], capture_hash=False)
+                wall_ms, cpu_ms, rss_b, _ = measure_once(measure_bin, [*bins[name][lang]["argv"], *bench_args], capture_hash=False, cwd=run_cwd)
                 samples[lang].append((wall_ms, cpu_ms, rss_b))
 
         results[name] = {}

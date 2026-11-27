@@ -7,39 +7,36 @@ const PASSES: U32 = 4
 type Span is data = $Span { start: U32, len: U32 }
 
 io bench (): #[U32] =>
-  let text: #[U8] = #[]
-  let r: U64 = 12345
+  let text: #[U8] = Array.with_capacity (BENCH_N * 13)
+  let r: U64 = 12345u64
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    let wl = 3 + rng.xs_mod r 18
+    let wl = 3 + (r % 18u64).to_u32
     for _ in 0 .. wl:
       r := rng.xs_next self
-      text := self.push (97 + rng.xs_mod r 26).to_u8
-    text := self.push 32
+      text := self.push (97 + (r % 26u64).to_u32).to_u8
+    text := self.push ' '
 
-  // Split text on ASCII 32 into word spans.
-  let words = @array.fill BENCH_N ($Span { start: 0, len: 0 })
-  let wcount: U32 = 0
+  // Split text on ASCII space into word spans.
+  let words: #[Span] = Array.with_capacity BENCH_N
   let wstart: U32 = 0
   for i in 0 .. text.length:
-    if text[i] == 32:
+    if text[i] == ' ':
       if i > wstart:
-        words[wcount] := $Span { start: wstart, len: i - wstart }
-        wcount := self + 1
+        words := self.push ($Span { start: wstart, len: i - wstart })
       wstart := i + 1
   if text.length > wstart:
-    words[wcount] := $Span { start: wstart, len: text.length - wstart }
-    wcount := self + 1
+    words := self.push ($Span { start: wstart, len: text.length - wstart })
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   for _ in 0 .. PASSES:
-    for wi in 0 .. wcount:
+    for wi in 0 .. words.length:
       let $Span { start, len } = words[wi]
       let first = text[start].to_i64
       let last = text[start + len - 1].to_i64
       total := self + len.to_i64 + first + last
 
   let out: #[U32] = #[]
-  out := rng.emit_u32 self wcount
+  out := rng.emit_u32 self words.length
   out := rng.emit_i64 self total
   return out

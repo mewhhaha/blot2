@@ -65,12 +65,14 @@ io bench (): #[U32] =>
   let hits: U32 = 0
   let misses: U32 = 0
   let removes: U32 = 0
-  let r: U64 = 12345
+  let r: U64 = 12345u64
+  let keys64 = keys.to_u64
 
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    let a = rng.xs_mod r keys
-    let key = rng.sq_div_u32 a keys
+    let a = (r % keys64).to_u32
+    let wide = a.to_u64
+    let key = ((wide * wide) / keys64).to_u32
     let at = find_slot slots mask key
     let f = slots[at].node
     let hi = (r >> 32).to_u32

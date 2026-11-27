@@ -1,4 +1,4 @@
-// Generate N s-expressions into a byte buffer, parse into a
+// Generate N s-expressions into a pre-sized byte buffer, parse into a
 // compact 8-byte/node AST arena with error checks, then walk 4 times.
 import * as rng from "./rng"
 
@@ -16,69 +16,36 @@ const TAG_LIST: U32 = 2
 //   a = (start << 4) | len  for Sym; v for Num; first for List.
 type Sexp is data = $Sexp { a: U32, b: U32 }
 
-func push_byte (text: own #[U8]) -> (len: U32) -> (b: U8): (#[U8], U32) =>
-  if len < text.length:
-    text[len] := b
-  else:
-    text := self.push b
-  return (text, len + 1)
-
-func emit_sym (text: own #[U8]) -> (len: U32) -> (sym_seed: U64): (#[U8], U32) =>
+func emit_sym (text: own #[U8]) -> (sym_seed: U64): #[U8] =>
   let r = sym_seed
-  let n = 3 + (((r >> 32).to_u32 % 12) * 4 + (r.to_u32 % 12)) % 12
+  let n = 3 + (r % 12u64).to_u32
   for _ in 0 .. n:
     r := rng.xs_next self
-    let ch = 97 + (((r >> 32).to_u32 % 26) * 22 + (r.to_u32 % 26)) % 26
-    let (t1, l1) = push_byte text len ch.to_u8
-    text := t1
-    len := l1
-  return (text, len)
+    text := self.push (97 + (r % 26u64).to_u32).to_u8
+  return text
 
-func emit_uint (text: own #[U8]) -> (len: U32) -> (v: U32): (#[U8], U32) =>
+func emit_uint (text: own #[U8]) -> (v: U32): #[U8] =>
   if v == 0:
-    return push_byte text len 48
-  // Max value is 99999 (5 digits) — format in scalar locals (zero allocation).
-  let d0: U32 = 0
-  let d1: U32 = 0
-  let d2: U32 = 0
-  let d3: U32 = 0
-  let d4: U32 = 0
+    return text.push '0'
+  let digits = @array.fill 8 0u8
   let n: U32 = 0
   let x = v
   for ever:
     if x == 0:
       break
-    let dig = 48 + (x % 10)
-    if n == 0:
-      d0 := dig
-    else:
-      if n == 1:
-        d1 := dig
-      else:
-        if n == 2:
-          d2 := dig
-        else:
-          if n == 3:
-            d3 := dig
-          else:
-            d4 := dig
+    digits[n] := (48 + (x % 10)).to_u8
     n := self + 1
     x := self / 10
   for ever:
     if n == 0:
       break
     n := self - 1
-    let ch = if n == 0 then d0 else if n == 1 then d1 else if n == 2 then d2 else if n == 3 then d3 else d4
-    let (t1, l1) = push_byte text len ch.to_u8
-    text := t1
-    len := l1
-  return (text, len)
+    text := self.push digits[n]
+  return text
 
-func build_text (): (#[U8], U32) =>
-  // Pre-size for depth-4 forms, with growth if the estimate is low.
-  let text: #[U8] = @array.fill (BENCH_N * 496) (U32.to_u8 0)
-  let len: U32 = 0
-  let seed: U64 = 12345
+func build_text (): #[U8] =>
+  let text: #[U8] = Array.with_capacity (BENCH_N * 496)
+  let seed: U64 = 12345u64
 
   let st_depth = @array.fill 16 0
   let st_rem = @array.fill 16 0
@@ -96,24 +63,16 @@ func build_text (): (#[U8], U32) =>
       if st_active[top] == 0:
         seed := rng.xs_next self
         let d = st_depth[top]
-        if d == 0 or (seed & 3) == 0:
-          if ((seed >> 8) & 1) == 0:
-            let (t1, l1) = emit_sym text len seed
-            text := t1
-            len := l1
+        if d == 0 or (seed & 3u64) == 0u64:
+          if ((seed >> 8u64) & 1u64) == 0u64:
+            text := emit_sym self seed
           else:
-            let (t1, l1) = emit_uint text len (rng.xs_mod (seed >> 16) 100000)
-            text := t1
-            len := l1
-          let (t2, l2) = push_byte text len 32
-          text := t2
-          len := l2
+            text := emit_uint self (((seed >> 16u64) % 100000u64).to_u32)
+          text := self.push ' '
           sp := self - 1
         else:
-          let (t1, l1) = push_byte text len 40
-          text := t1
-          len := l1
-          st_rem[top] := 2 + ((seed >> 24) & 3).to_u32
+          text := self.push '('
+          st_rem[top] := 2 + ((seed >> 24u64) & 3u64).to_u32
           st_active[top] := 1
       else:
         let rem = st_rem[top]
@@ -123,20 +82,11 @@ func build_text (): (#[U8], U32) =>
           st_active[sp] := 0
           sp := self + 1
         else:
-          let (t1, l1) = push_byte text len 41
-          let (t2, l2) = push_byte t1 l1 32
-          text := t2
-          len := l2
+          text := self.push ')'
+          text := self.push ' '
           sp := self - 1
 
-  return (text, len)
-
-func push_node (pool: own #[Sexp]) -> (plen: U32) -> (nd: Sexp): (#[Sexp], U32) =>
-  if plen < pool.length:
-    pool[plen] := nd
-    return (pool, plen + 1)
-  pool := self.push nd
-  return (pool, plen + 1)
+  return text
 
 func walk_root (pool: #[Sexp]) -> (buf: #[U8]) -> (root: U32) -> (p: U32) -> (stack: own #[U32]): (U32, #[U32]) =>
   stack[0] := root
@@ -152,14 +102,14 @@ func walk_root (pool: #[Sexp]) -> (buf: #[U8]) -> (root: U32) -> (p: U32) -> (st
         break
       let $Sexp { a, b } = pool[cur]
       let tag = b & 3
-      if tag == TAG_SYM:
-        let start = a >> 4
-        let slen = a & 15
-        acc := self + slen + buf[start].to_u32 + p
-      else:
-        if tag == TAG_NUM:
+      case tag of
+        0 =>
+          let start = a >> 4
+          let slen = a & 15
+          acc := self + slen + buf[start].to_u32 + p
+        1 =>
           acc := self + (a ^ p)
-        else:
+        _ =>
           acc := self + 1
           if a != NONE_IDX:
             stack[sp] := a
@@ -168,12 +118,10 @@ func walk_root (pool: #[Sexp]) -> (buf: #[U8]) -> (root: U32) -> (p: U32) -> (st
   return (acc, stack)
 
 io bench (): #[U32] =>
-  let (text, text_len) = build_text ()
-  // ~76 nodes per depth-4 form; pre-size to avoid doubling spike.
-  let pool = @array.fill (BENCH_N * 78) ($Sexp { a: 0, b: 0 })
-  let plen: U32 = 0
-  let roots = @array.fill BENCH_N 0
-  let rlen: U32 = 0
+  let text = build_text ()
+  let text_len = text.length
+  let pool: #[Sexp] = Array.with_capacity (BENCH_N * 78)
+  let roots: #[U32] = Array.with_capacity BENCH_N
   let st_chain = @array.fill 16 NONE_IDX
   let sp: U32 = 0
   let pos: U32 = 0
@@ -183,7 +131,7 @@ io bench (): #[U32] =>
     for ever:
       if pos >= text_len:
         break
-      if text[pos] != 32:
+      if text[pos] != ' ':
         break
       pos := self + 1
     if pos >= text_len:
@@ -191,7 +139,7 @@ io bench (): #[U32] =>
         err_len := 8
       break
     let c = text[pos]
-    if c == 41:
+    if c == ')':
       if sp == 0:
         err_len := 8
         break
@@ -199,75 +147,61 @@ io bench (): #[U32] =>
       let first = st_chain[sp]
       sp := self - 1
       let prev = if sp == 0 then NONE_IDX else st_chain[sp]
-      let idx = plen
-      let (p1, pl1) = push_node pool plen ($Sexp { a: first, b: (prev << 2) | TAG_LIST })
-      pool := p1
-      plen := pl1
+      let idx = pool.length
+      pool := self.push ($Sexp { a: first, b: (prev << 2) | TAG_LIST })
       if sp == 0:
-        if rlen < roots.length:
-          roots[rlen] := idx
-        else:
-          roots := self.push idx
-        rlen := self + 1
+        roots := self.push idx
       else:
         st_chain[sp] := idx
     else:
-      if c == 40:
+      if c == '(':
         pos := self + 1
         sp := self + 1
         st_chain[sp] := NONE_IDX
       else:
         let start = pos
         let prev = if sp == 0 then NONE_IDX else st_chain[sp]
-        let idx = plen
-        if c >= 48 and c <= 57:
+        let idx = pool.length
+        if c >= '0' and c <= '9':
           let v: U32 = 0
           for ever:
             if pos >= text_len:
               break
             let ch = text[pos]
-            if ch >= 48 and ch <= 57:
-              v := self * 10 + (ch - 48).to_u32
+            if ch >= '0' and ch <= '9':
+              v := self * 10 + (ch - '0').to_u32
               pos := self + 1
             else:
               break
-          let (p1, pl1) = push_node pool plen ($Sexp { a: v, b: (prev << 2) | TAG_NUM })
-          pool := p1
-          plen := pl1
+          pool := self.push ($Sexp { a: v, b: (prev << 2) | TAG_NUM })
         else:
           for ever:
             if pos >= text_len:
               break
             let ch = text[pos]
-            if ch != 32 and ch != 40 and ch != 41:
+            if ch != ' ' and ch != '(' and ch != ')':
               pos := self + 1
             else:
               break
           let slen = pos - start
-          let (p1, pl1) = push_node pool plen ($Sexp { a: (start << 4) | slen, b: (prev << 2) | TAG_SYM })
-          pool := p1
-          plen := pl1
+          pool := self.push ($Sexp { a: (start << 4) | slen, b: (prev << 2) | TAG_SYM })
         if sp == 0:
-          if rlen < roots.length:
-            roots[rlen] := idx
-          else:
-            roots := self.push idx
-          rlen := self + 1
+          roots := self.push idx
         else:
           st_chain[sp] := idx
 
-  let total: I64 = 0
+  let total: I64 = 0i64
   let walk_stack = @array.fill 16 0
   for p in 0 .. PASSES:
-    for ri in 0 .. rlen:
+    for ri in 0 .. roots.length:
       let (wsum, ws1) = walk_root pool text roots[ri] p walk_stack
       walk_stack := ws1
       total := self + wsum.to_i64
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self text_len
-  out := rng.emit_u32 self plen
-  out := rng.emit_u32 self rlen
+  out := rng.emit_u32 self pool.length
+  out := rng.emit_u32 self roots.length
   out := rng.emit_u32 self err_len
   out := rng.emit_i64 self total
   return out

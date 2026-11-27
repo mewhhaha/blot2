@@ -1503,9 +1503,9 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
         lget(g, entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
         ltee(g, cap);
-        i32Const(g, blot_direct_runtime::flag_mask);
+        i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
         op(g, OP_i32_and);
-        i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
+        i32Const(g, blot_direct_runtime::live_flag);
         op(g, OP_i32_eq);
         lget(g, need);
         lget(g, cap);
@@ -1810,6 +1810,24 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if rerr != blot_direct_types::Error.none { return result, rerr; }
             lget(g, bytes);
             let nonzero = open(g, f, OP_if_);
+            // Large pre-sized arrays (> 4 MiB) use exact-size stack backing so
+            // they avoid power-of-two heap rounding bloat (e.g. 64M+64M exhausting
+            // a 128 MiB heap), while still growing transparently into the heap via
+            // rt.push / rt.reserve. Small/medium arrays use open_heap so helper
+            // locals are reclaimed on function exit via heap_free.
+            lget(g, bytes);
+            i32Const(g, 4194304);
+            op(g, OP_i32_gt_u);
+            let large_stack = open(g, f, OP_if_);
+            lget(g, bytes);
+            callf(g, rt.stack);
+            i32Const(g, 0);
+            lget(g, bytes);
+            callf(g, rt.open);
+            lset(g, w(g, result, 1));
+            lset(g, w(g, result, 0));
+            popCheckedArraysAt(f, large_stack);
+            op(g, OP_else_);
             lget(g, bytes);
             i32Const(g, 0);
             callf(g, rt.open_heap);
@@ -1817,6 +1835,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_drop);
             lset(g, w(g, result, 1));
             lset(g, w(g, result, 0));
+            close(g, f);
             popCheckedArraysAt(f, nonzero);
             op(g, OP_else_);
             i32Const(g, 0);
@@ -1841,6 +1860,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
             let step, sterr = stride(g, f, element, id);
             if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+            let rt = g.runtime_();
             let cur_len, lerr = lengthOf(g, f, container, id);
             if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
             let need_elems = local32(g, f);
@@ -1851,11 +1871,44 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lget(g, cur_len);
             op(g, OP_i32_lt_u);
             trap(g, f);
-            lget(g, w(g, container, 0));
-            lget(g, w(g, container, 1));
-            lget(g, need_elems);
-            i32Const(g, step);
-            callf(g, g.runtime_().reserve);
+            if !rt.has_fork && step > 0 && step <= 65536 && tagOf(g, container.ty) == blot_direct_types::Tag.array {
+                let entry = ensureCheckedGrow(g, f, container);
+                let max_elems = if blot_direct_runtime::capacity_mask / step < 0x04000000 { blot_direct_runtime::capacity_mask / step } else { 0x04000000 };
+                let need_bytes = emitScaledBytes(g, f, need_elems, step);
+                let cap = local32(g, f);
+                lget(g, entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+                ltee(g, cap);
+                i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
+                op(g, OP_i32_and);
+                i32Const(g, blot_direct_runtime::live_flag);
+                op(g, OP_i32_eq);
+                lget(g, need_elems);
+                i32Const(g, max_elems);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+                lget(g, need_bytes);
+                lget(g, cap);
+                i32Const(g, blot_direct_runtime::capacity_mask);
+                op(g, OP_i32_and);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+                op(g, OP_i32_eqz);
+                let need_grow = open(g, f, OP_if_);
+                lget(g, w(g, container, 0));
+                lget(g, w(g, container, 1));
+                lget(g, need_elems);
+                i32Const(g, step);
+                callf(g, rt.reserve);
+                popCheckedArraysAt(f, need_grow);
+                close(g, f);
+            } else {
+                lget(g, w(g, container, 0));
+                lget(g, w(g, container, 1));
+                lget(g, need_elems);
+                i32Const(g, step);
+                callf(g, rt.reserve);
+            }
             if is_direct && tagOf(g, container.ty) == blot_direct_types::Tag.array {
                 invalidateCheckedOwner(g, f, container);
             } else {
@@ -1875,8 +1928,21 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
             let src_len, slerr = lengthOf(g, f, src, id);
             if slerr != blot_direct_types::Error.none { return neverVal(), slerr; }
-            let dst_len, dlerr = lengthOf(g, f, dst, id);
-            if dlerr != blot_direct_types::Error.none { return neverVal(), dlerr; }
+            let rt = g.runtime_();
+            let fast_eligible = !rt.has_fork && step > 0 && step <= 65536 && tagOf(g, dst.ty) == blot_direct_types::Tag.array;
+            var dst_entry: u32 = 0;
+            var dst_len: u32 = 0;
+            if fast_eligible {
+                dst_entry = ensureCheckedGrow(g, f, dst);
+                dst_len = local32(g, f);
+                lget(g, dst_entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+                lset(g, dst_len);
+            } else {
+                let dl, dlerr = lengthOf(g, f, dst, id);
+                if dlerr != blot_direct_types::Error.none { return neverVal(), dlerr; }
+                dst_len = dl;
+            }
             let next_len = local32(g, f);
             lget(g, dst_len);
             lget(g, src_len);
@@ -1885,22 +1951,55 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lget(g, dst_len);
             op(g, OP_i32_lt_u);
             trap(g, f);
-            let rt = g.runtime_();
-            lget(g, w(g, dst, 0));
-            lget(g, w(g, dst, 1));
-            lget(g, next_len);
-            i32Const(g, step);
-            callf(g, rt.reserve);
+            if fast_eligible {
+                let max_elems = if blot_direct_runtime::capacity_mask / step < 0x04000000 { blot_direct_runtime::capacity_mask / step } else { 0x04000000 };
+                let need_bytes = emitScaledBytes(g, f, next_len, step);
+                let cap = local32(g, f);
+                lget(g, dst_entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+                ltee(g, cap);
+                i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
+                op(g, OP_i32_and);
+                i32Const(g, blot_direct_runtime::live_flag);
+                op(g, OP_i32_eq);
+                lget(g, next_len);
+                i32Const(g, max_elems);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+                lget(g, need_bytes);
+                lget(g, cap);
+                i32Const(g, blot_direct_runtime::capacity_mask);
+                op(g, OP_i32_and);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+                op(g, OP_i32_eqz);
+                let need_grow = open(g, f, OP_if_);
+                lget(g, w(g, dst, 0));
+                lget(g, w(g, dst, 1));
+                lget(g, next_len);
+                i32Const(g, step);
+                callf(g, rt.reserve);
+                popCheckedArraysAt(f, need_grow);
+                close(g, f);
+            } else {
+                lget(g, w(g, dst, 0));
+                lget(g, w(g, dst, 1));
+                lget(g, next_len);
+                i32Const(g, step);
+                callf(g, rt.reserve);
+            }
             if !holdsContainer(g, element, 0) {
                 let non_empty = open(g, f, OP_block);
                 lget(g, src_len);
                 op(g, OP_i32_eqz);
                 opIndex(g, OP_br_if, 0);
-                let dst_entry = local32(g, f);
-                lget(g, w(g, dst, 0));
-                lget(g, w(g, dst, 1));
-                callf(g, rt.check);
-                lset(g, dst_entry);
+                if !fast_eligible {
+                    dst_entry = local32(g, f);
+                    lget(g, w(g, dst, 0));
+                    lget(g, w(g, dst, 1));
+                    callf(g, rt.check);
+                    lset(g, dst_entry);
+                }
                 let dst_base = local32(g, f);
                 lget(g, dst_entry);
                 op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);

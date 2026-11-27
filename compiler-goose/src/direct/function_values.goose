@@ -553,68 +553,10 @@ fn emitU64StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, le
             }
             return true;
         }
-        let mult, shift, add = u64DivParams(d);
-        let xv = local(g, f, VT_i64);
-        pushScalarOperand(g, f, left_id, left);
-        lset(g, xv);
-        if remainder { lget(g, xv); }
-        emitMulHi64(g, f, xv, mult & 0xffffffff, mult >> 32, false);
-        if add {
-            let tv = local(g, f, VT_i64);
-            lset(g, tv);
-            lget(g, xv);
-            lget(g, tv);
-            op(g, OP_i64_sub);
-            i64Const(g, 1);
-            op(g, OP_i64_shr_u);
-            lget(g, tv);
-            op(g, OP_i64_add);
-        }
-        if shift != 0 {
-            i64Const(g, shift as! i64);
-            op(g, OP_i64_shr_u);
-        }
-        if remainder {
-            i64Const(g, d as! i64);
-            op(g, OP_i64_mul);
-            op(g, OP_i64_sub);
-        }
-        return true;
-    }
-    if right.len == 0 || f.loop_reciprocals_u64_len == 0 { return false; }
-    let divisor = w(g, right, 0);
-    let ext_u32, has_ext = findExtU32U64(f, divisor);
-    for at in 0..f.loop_reciprocals_u64_len {
-        let rec = f.loop_reciprocals_u64[at];
-        let matched = (!rec.from_u32 && rec.divisor == divisor) || (rec.from_u32 && has_ext && rec.divisor == ext_u32);
-        if !matched { continue; }
-        if rec.check_at_use {
-            lget(g, divisor);
-            op(g, OP_i64_eqz);
-            trap(g, f);
-        }
-        let xv = local(g, f, VT_i64);
-        pushScalarOperand(g, f, left_id, left);
-        lset(g, xv);
-        if remainder { lget(g, xv); }
-        emitMulHi64(g, f, xv, rec.m_lo as u64, rec.m_hi as u64, true);
-        let tv = local(g, f, VT_i64);
-        lset(g, tv);
-        lget(g, xv);
-        lget(g, tv);
-        op(g, OP_i64_sub);
-        lget(g, rec.sh1);
-        op(g, OP_i64_shr_u);
-        lget(g, tv);
-        op(g, OP_i64_add);
-        lget(g, rec.sh2);
-        op(g, OP_i64_shr_u);
-        if remainder {
-            lget(g, divisor);
-            op(g, OP_i64_mul);
-            op(g, OP_i64_sub);
-        }
-        return true;
+        // Non-power-of-two 64-bit divisors stay on native i64.div_u / i64.rem_u:
+        // Wasm32 lacks a 64x64->128 multiply, and emulating mulhi64 in software
+        // (~30 Wasm ops) is ~45% slower than hardware divq on x86-64.
+        return false;
     }
     return false;
 }

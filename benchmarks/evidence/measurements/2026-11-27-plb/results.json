@@ -1,0 +1,1007 @@
+{
+  "meta": {
+    "date": "2026-11-27",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "single_threaded": true,
+    "problems": [
+      "helloworld",
+      "nsieve",
+      "binarytrees",
+      "merkletrees",
+      "fannkuch-redux",
+      "fasta",
+      "pidigits",
+      "lru",
+      "coro-prime-sieve",
+      "nbody",
+      "spectral-norm",
+      "mandelbrot",
+      "json-serde"
+    ]
+  },
+  "results": {
+    "helloworld": {
+      "blot": {
+        "cpu_ms": 0.551,
+        "cpu_median_ms": 0.551,
+        "wall_ms": 0.722,
+        "peak_rss_bytes": 3964928,
+        "compile_ms": 20.08,
+        "source": "benchmarks/plb/blot/helloworld.blot",
+        "sha256": "8c4799d7815f06e6a43e00b9d31f5447f073b775b6d88681252d1a8ab181f7ab",
+        "samples_cpu_ms": [
+          0.441,
+          0.551,
+          0.54,
+          0.524,
+          0.574,
+          0.561,
+          0.57,
+          0.583,
+          0.551,
+          0.482,
+          0.528,
+          0.401,
+          0.562,
+          0.563,
+          0.542
+        ],
+        "samples_wall_ms": [
+          0.481,
+          0.716,
+          0.722,
+          1.274,
+          0.721,
+          0.768,
+          0.606,
+          3.972,
+          1.087,
+          0.575,
+          1.339,
+          0.637,
+          1.636,
+          1.055,
+          0.605
+        ],
+        "blotc_ms": 16.23,
+        "aot_ms": 3.86,
+        "wasm_bytes": 6887
+      },
+      "go": {
+        "cpu_ms": 0.994,
+        "cpu_median_ms": 0.994,
+        "wall_ms": 1.644,
+        "peak_rss_bytes": 3661824,
+        "compile_ms": 25.3,
+        "source": "PLB/bench/algorithm/helloworld/1.go",
+        "sha256": "8c4799d7815f06e6a43e00b9d31f5447f073b775b6d88681252d1a8ab181f7ab",
+        "samples_cpu_ms": [
+          0.94,
+          0.994,
+          0.944,
+          0.863,
+          1.02,
+          1.152,
+          0.912,
+          1.001,
+          1.055,
+          1.014,
+          1.241,
+          0.991,
+          0.902,
+          0.991,
+          1.035
+        ],
+        "samples_wall_ms": [
+          1.511,
+          1.651,
+          1.229,
+          2.366,
+          1.804,
+          1.594,
+          3.607,
+          1.246,
+          1.644,
+          1.549,
+          2.994,
+          1.683,
+          1.099,
+          2.863,
+          1.214
+        ]
+      },
+      "rust": {
+        "cpu_ms": 0.536,
+        "cpu_median_ms": 0.536,
+        "wall_ms": 0.771,
+        "peak_rss_bytes": 2334720,
+        "compile_ms": 1559.1,
+        "source": "PLB/bench/algorithm/helloworld/1.rs",
+        "sha256": "8c4799d7815f06e6a43e00b9d31f5447f073b775b6d88681252d1a8ab181f7ab",
+        "samples_cpu_ms": [
+          0.549,
+          0.538,
+          0.493,
+          0.537,
+          0.513,
+          0.539,
+          0.557,
+          0.516,
+          0.459,
+          0.524,
+          0.569,
+          0.526,
+          0.564,
+          0.536,
+          0.532
+        ],
+        "samples_wall_ms": [
+          0.716,
+          3.087,
+          0.742,
+          1.81,
+          1.724,
+          2.735,
+          0.782,
+          0.895,
+          0.771,
+          0.701,
+          0.763,
+          0.6,
+          0.651,
+          0.688,
+          0.934
+        ]
+      },
+      "c": {
+        "cpu_ms": 0.407,
+        "cpu_median_ms": 0.407,
+        "wall_ms": 0.803,
+        "peak_rss_bytes": 2129920,
+        "compile_ms": 39.97,
+        "source": "PLB/bench/algorithm/helloworld/1.c",
+        "sha256": "8c4799d7815f06e6a43e00b9d31f5447f073b775b6d88681252d1a8ab181f7ab",
+        "samples_cpu_ms": [
+          0.475,
+          0.402,
+          0.364,
+          0.725,
+          0.429,
+          0.34,
+          0.357,
+          0.432,
+          0.412,
+          0.407,
+          0.384,
+          0.37,
+          0.455,
+          0.38,
+          0.424
+        ],
+        "samples_wall_ms": [
+          0.803,
+          0.837,
+          1.782,
+          2.072,
+          2.109,
+          0.41,
+          1.132,
+          0.685,
+          0.467,
+          1.271,
+          0.472,
+          0.751,
+          1.036,
+          0.492,
+          0.566
+        ]
+      },
+      "cpp": {
+        "cpu_ms": 1.235,
+        "cpu_median_ms": 1.235,
+        "wall_ms": 1.622,
+        "peak_rss_bytes": 4321280,
+        "compile_ms": 49.35,
+        "source": "PLB/bench/algorithm/helloworld/1.cpp",
+        "sha256": "8c4799d7815f06e6a43e00b9d31f5447f073b775b6d88681252d1a8ab181f7ab",
+        "samples_cpu_ms": [
+          1.305,
+          0.907,
+          1.385,
+          1.295,
+          1.58,
+          0.987,
+          1.354,
+          1.125,
+          0.962,
+          0.944,
+          1.235,
+          1.01,
+          1.304,
+          1.054,
+          1.342
+        ],
+        "samples_wall_ms": [
+          1.349,
+          1.744,
+          1.622,
+          1.524,
+          5.877,
+          1.065,
+          2.577,
+          1.174,
+          1.023,
+          1.892,
+          2.806,
+          1.146,
+          1.642,
+          1.636,
+          1.572
+        ]
+      }
+    },
+    "nsieve": {
+      "blot": {
+        "cpu_ms": 315.775,
+        "cpu_median_ms": 357.833,
+        "wall_ms": 324.501,
+        "peak_rss_bytes": 44994560,
+        "compile_ms": 19.44,
+        "source": "benchmarks/plb/blot/nsieve.blot",
+        "sha256": "93b0859b1330b118afbcd27078bbb328fd509c5149ba0173da6298c6b7af8b8c",
+        "samples_cpu_ms": [
+          315.775,
+          357.833,
+          394.424
+        ],
+        "samples_wall_ms": [
+          324.501,
+          366.288,
+          423.564
+        ],
+        "blotc_ms": 15.83,
+        "aot_ms": 3.61,
+        "wasm_bytes": 10278
+      },
+      "go": {
+        "cpu_ms": 283.056,
+        "cpu_median_ms": 296.436,
+        "wall_ms": 287.55,
+        "peak_rss_bytes": 75288576,
+        "compile_ms": 22.43,
+        "source": "PLB/bench/algorithm/nsieve/1.go",
+        "sha256": "93b0859b1330b118afbcd27078bbb328fd509c5149ba0173da6298c6b7af8b8c",
+        "samples_cpu_ms": [
+          283.056,
+          296.436,
+          357.412
+        ],
+        "samples_wall_ms": [
+          287.55,
+          303.422,
+          374.057
+        ]
+      },
+      "rust": {
+        "cpu_ms": 373.985,
+        "cpu_median_ms": 378.3,
+        "wall_ms": 384.922,
+        "peak_rss_bytes": 43433984,
+        "compile_ms": 1646.96,
+        "source": "PLB/bench/algorithm/nsieve/1.rs",
+        "sha256": "93b0859b1330b118afbcd27078bbb328fd509c5149ba0173da6298c6b7af8b8c",
+        "samples_cpu_ms": [
+          378.3,
+          471.016,
+          373.985
+        ],
+        "samples_wall_ms": [
+          405.455,
+          500.708,
+          384.922
+        ]
+      },
+      "c": {
+        "cpu_ms": 243.897,
+        "cpu_median_ms": 360.869,
+        "wall_ms": 253.601,
+        "peak_rss_bytes": 43057152,
+        "compile_ms": 51.56,
+        "source": "PLB/bench/algorithm/nsieve/1.c",
+        "sha256": "93b0859b1330b118afbcd27078bbb328fd509c5149ba0173da6298c6b7af8b8c",
+        "samples_cpu_ms": [
+          360.869,
+          408.182,
+          243.897
+        ],
+        "samples_wall_ms": [
+          385.319,
+          435.676,
+          253.601
+        ]
+      },
+      "cpp": {
+        "cpu_ms": 200.465,
+        "cpu_median_ms": 205.097,
+        "wall_ms": 213.603,
+        "peak_rss_bytes": 9265152,
+        "compile_ms": 312.52,
+        "source": "PLB/bench/algorithm/nsieve/1.cpp",
+        "sha256": "93b0859b1330b118afbcd27078bbb328fd509c5149ba0173da6298c6b7af8b8c",
+        "samples_cpu_ms": [
+          200.465,
+          205.097,
+          206.63
+        ],
+        "samples_wall_ms": [
+          213.603,
+          216.166,
+          236.055
+        ]
+      }
+    },
+    "binarytrees": {
+      "blot": {
+        "cpu_ms": 1064.601,
+        "cpu_median_ms": 1078.286,
+        "wall_ms": 1130.769,
+        "peak_rss_bytes": 25038848,
+        "compile_ms": 21.82,
+        "source": "benchmarks/plb/blot/binarytrees.blot",
+        "sha256": "f48fea57a55f3a99b08d66b5e433df00a76b14cad57814ef8cccf9feb78564cc",
+        "samples_cpu_ms": [
+          1078.286,
+          1084.955,
+          1064.601
+        ],
+        "samples_wall_ms": [
+          1168.685,
+          1145.221,
+          1130.769
+        ],
+        "blotc_ms": 16.62,
+        "aot_ms": 5.19,
+        "wasm_bytes": 18077
+      },
+      "go": {
+        "cpu_ms": 2221.795,
+        "cpu_median_ms": 2231.065,
+        "wall_ms": 2337.963,
+        "peak_rss_bytes": 45776896,
+        "compile_ms": 22.45,
+        "source": "PLB/bench/algorithm/binarytrees/1.go",
+        "sha256": "f48fea57a55f3a99b08d66b5e433df00a76b14cad57814ef8cccf9feb78564cc",
+        "samples_cpu_ms": [
+          2341.942,
+          2221.795,
+          2231.065
+        ],
+        "samples_wall_ms": [
+          2629.62,
+          2337.963,
+          2349.678
+        ]
+      },
+      "rust": {
+        "cpu_ms": 2544.777,
+        "cpu_median_ms": 2710.353,
+        "wall_ms": 2732.095,
+        "peak_rss_bytes": 52662272,
+        "compile_ms": 1553.41,
+        "source": "PLB/bench/algorithm/binarytrees/3.rs",
+        "sha256": "f48fea57a55f3a99b08d66b5e433df00a76b14cad57814ef8cccf9feb78564cc",
+        "samples_cpu_ms": [
+          2710.353,
+          2544.777,
+          2761.916
+        ],
+        "samples_wall_ms": [
+          2984.378,
+          2732.095,
+          3030.739
+        ]
+      }
+    },
+    "merkletrees": {
+      "blot": {
+        "cpu_ms": 1380.844,
+        "cpu_median_ms": 1397.581,
+        "wall_ms": 1427.686,
+        "peak_rss_bytes": 22962176,
+        "compile_ms": 24.68,
+        "source": "benchmarks/plb/blot/merkletrees.blot",
+        "sha256": "fbec70c468e5660ab2202f14f8215e1b452f8b9e7094d3d66528ee5ca0c09da4",
+        "samples_cpu_ms": [
+          1435.986,
+          1380.844,
+          1397.581
+        ],
+        "samples_wall_ms": [
+          1534.48,
+          1427.686,
+          1439.433
+        ],
+        "blotc_ms": 18.11,
+        "aot_ms": 6.57,
+        "wasm_bytes": 27634
+      },
+      "go": {
+        "cpu_ms": 1466.14,
+        "cpu_median_ms": 1543.372,
+        "wall_ms": 1520.344,
+        "peak_rss_bytes": 47386624,
+        "compile_ms": 21.47,
+        "source": "PLB/bench/algorithm/merkletrees/1.go",
+        "sha256": "fbec70c468e5660ab2202f14f8215e1b452f8b9e7094d3d66528ee5ca0c09da4",
+        "samples_cpu_ms": [
+          1577.574,
+          1543.372,
+          1466.14
+        ],
+        "samples_wall_ms": [
+          1642.254,
+          1640.009,
+          1520.344
+        ]
+      },
+      "rust": {
+        "cpu_ms": 1099.854,
+        "cpu_median_ms": 1122.479,
+        "wall_ms": 1151.627,
+        "peak_rss_bytes": 35872768,
+        "compile_ms": 1545.19,
+        "source": "PLB/bench/algorithm/merkletrees/1.rs",
+        "sha256": "fbec70c468e5660ab2202f14f8215e1b452f8b9e7094d3d66528ee5ca0c09da4",
+        "samples_cpu_ms": [
+          1099.854,
+          1122.479,
+          1129.461
+        ],
+        "samples_wall_ms": [
+          1151.627,
+          1244.455,
+          1213.584
+        ]
+      }
+    },
+    "fannkuch-redux": {
+      "blot": {
+        "cpu_ms": 1994.352,
+        "cpu_median_ms": 2300.9,
+        "wall_ms": 2019.327,
+        "peak_rss_bytes": 4136960,
+        "compile_ms": 23.62,
+        "source": "benchmarks/plb/blot/fannkuch_redux.blot",
+        "sha256": "5bcde290050076445edae82a15ecbd298b0d71f5611c0089f7384329ed9d839b",
+        "samples_cpu_ms": [
+          2370.413,
+          1994.352,
+          2300.9
+        ],
+        "samples_wall_ms": [
+          2501.061,
+          2019.327,
+          2624.612
+        ],
+        "blotc_ms": 18.03,
+        "aot_ms": 5.59,
+        "wasm_bytes": 11289
+      },
+      "go": {
+        "cpu_ms": 1576.763,
+        "cpu_median_ms": 1582.36,
+        "wall_ms": 436.385,
+        "peak_rss_bytes": 5947392,
+        "compile_ms": 20.46,
+        "source": "PLB/bench/algorithm/fannkuch-redux/1.go",
+        "sha256": "5bcde290050076445edae82a15ecbd298b0d71f5611c0089f7384329ed9d839b",
+        "samples_cpu_ms": [
+          1582.36,
+          1576.763,
+          1605.779
+        ],
+        "samples_wall_ms": [
+          647.072,
+          436.385,
+          783.821
+        ]
+      },
+      "rust": {
+        "cpu_ms": 1876.884,
+        "cpu_median_ms": 1924.832,
+        "wall_ms": 2047.881,
+        "peak_rss_bytes": 2252800,
+        "compile_ms": 1582.23,
+        "source": "PLB/bench/algorithm/fannkuch-redux/1.rs",
+        "sha256": "5bcde290050076445edae82a15ecbd298b0d71f5611c0089f7384329ed9d839b",
+        "samples_cpu_ms": [
+          1924.832,
+          1876.884,
+          1983.758
+        ],
+        "samples_wall_ms": [
+          2047.881,
+          2093.506,
+          2246.793
+        ]
+      },
+      "cpp": {
+        "cpu_ms": 1013.641,
+        "cpu_median_ms": 1027.541,
+        "wall_ms": 1070.156,
+        "peak_rss_bytes": 4194304,
+        "compile_ms": 416.2,
+        "source": "PLB/bench/algorithm/fannkuch-redux/1-im.cpp",
+        "sha256": "5bcde290050076445edae82a15ecbd298b0d71f5611c0089f7384329ed9d839b",
+        "samples_cpu_ms": [
+          1013.641,
+          1027.791,
+          1027.541
+        ],
+        "samples_wall_ms": [
+          1081.023,
+          1070.156,
+          1097.114
+        ]
+      }
+    },
+    "fasta": {
+      "blot": {
+        "cpu_ms": 159.261,
+        "cpu_median_ms": 164.846,
+        "wall_ms": 164.819,
+        "peak_rss_bytes": 5193728,
+        "compile_ms": 21.42,
+        "source": "benchmarks/plb/blot/fasta.blot",
+        "sha256": "2ff4345816ade2f786ff0088beaef08a699e21e60c9e576514d437553dacb59f",
+        "samples_cpu_ms": [
+          159.261,
+          164.846,
+          170.867
+        ],
+        "samples_wall_ms": [
+          164.819,
+          166.717,
+          172.588
+        ],
+        "blotc_ms": 16.92,
+        "aot_ms": 4.5,
+        "wasm_bytes": 14716
+      },
+      "go": {
+        "cpu_ms": 234.161,
+        "cpu_median_ms": 234.871,
+        "wall_ms": 61.663,
+        "peak_rss_bytes": 16785408,
+        "compile_ms": 21.58,
+        "source": "PLB/bench/algorithm/fasta/3.go",
+        "sha256": "2ff4345816ade2f786ff0088beaef08a699e21e60c9e576514d437553dacb59f",
+        "samples_cpu_ms": [
+          234.871,
+          241.921,
+          234.161
+        ],
+        "samples_wall_ms": [
+          62.298,
+          76.887,
+          61.663
+        ]
+      },
+      "rust": {
+        "cpu_ms": 146.443,
+        "cpu_median_ms": 146.632,
+        "wall_ms": 148.889,
+        "peak_rss_bytes": 2355200,
+        "compile_ms": 1920.48,
+        "source": "PLB/bench/algorithm/fasta/1.rs",
+        "sha256": "2ff4345816ade2f786ff0088beaef08a699e21e60c9e576514d437553dacb59f",
+        "samples_cpu_ms": [
+          151.382,
+          146.443,
+          146.632
+        ],
+        "samples_wall_ms": [
+          155.868,
+          148.889,
+          149.444
+        ]
+      }
+    },
+    "pidigits": {
+      "blot": {
+        "cpu_ms": 2816.496,
+        "cpu_median_ms": 2820.607,
+        "wall_ms": 2832.858,
+        "peak_rss_bytes": 4407296,
+        "compile_ms": 51.51,
+        "source": "benchmarks/plb/blot/pidigits.blot",
+        "sha256": "dc6a598ed0c233895798267022e3c503b0fe0df7bf65e686f7e84d449c811bc2",
+        "samples_cpu_ms": [
+          2848.823,
+          2820.607,
+          2816.496
+        ],
+        "samples_wall_ms": [
+          2871.149,
+          2837.133,
+          2832.858
+        ],
+        "blotc_ms": 28.7,
+        "aot_ms": 22.81,
+        "wasm_bytes": 23812
+      },
+      "go": {
+        "cpu_ms": 656.315,
+        "cpu_median_ms": 663.199,
+        "wall_ms": 663.684,
+        "peak_rss_bytes": 10993664,
+        "compile_ms": 67.48,
+        "source": "PLB/bench/algorithm/pidigits/8.go",
+        "sha256": "dc6a598ed0c233895798267022e3c503b0fe0df7bf65e686f7e84d449c811bc2",
+        "samples_cpu_ms": [
+          663.199,
+          656.315,
+          675.615
+        ],
+        "samples_wall_ms": [
+          666.996,
+          663.684,
+          684.929
+        ]
+      }
+    },
+    "lru": {
+      "blot": {
+        "cpu_ms": 85.738,
+        "cpu_median_ms": 90.537,
+        "wall_ms": 86.063,
+        "peak_rss_bytes": 4132864,
+        "compile_ms": 45.69,
+        "source": "benchmarks/plb/blot/lru.blot",
+        "sha256": "f4ef84a4a56c3b08124eaf1d87db6cb351ca857952e3424a3874ad79b69e8eeb",
+        "samples_cpu_ms": [
+          91.63,
+          85.738,
+          90.537
+        ],
+        "samples_wall_ms": [
+          92.458,
+          86.063,
+          91.17
+        ],
+        "blotc_ms": 33.46,
+        "aot_ms": 12.23,
+        "wasm_bytes": 12111
+      },
+      "go": {
+        "cpu_ms": 222.063,
+        "cpu_median_ms": 226.186,
+        "wall_ms": 223.054,
+        "peak_rss_bytes": 3670016,
+        "compile_ms": 52.92,
+        "source": "PLB/bench/algorithm/lru/3.go",
+        "sha256": "f4ef84a4a56c3b08124eaf1d87db6cb351ca857952e3424a3874ad79b69e8eeb",
+        "samples_cpu_ms": [
+          226.186,
+          222.063,
+          233.683
+        ],
+        "samples_wall_ms": [
+          228.716,
+          223.054,
+          235.481
+        ]
+      }
+    },
+    "coro-prime-sieve": {
+      "blot": {
+        "cpu_ms": 11.139,
+        "cpu_median_ms": 11.241,
+        "wall_ms": 11.248,
+        "peak_rss_bytes": 4128768,
+        "compile_ms": 34.34,
+        "source": "benchmarks/plb/blot/coro_prime_sieve.blot",
+        "sha256": "adda05bf0cd3e120bf2d80bfd64eb838bf1ce7544dd412308422a483bbd1840e",
+        "samples_cpu_ms": [
+          11.241,
+          11.139,
+          11.273
+        ],
+        "samples_wall_ms": [
+          11.511,
+          11.248,
+          13.117
+        ],
+        "blotc_ms": 25.02,
+        "aot_ms": 9.31,
+        "wasm_bytes": 7901
+      },
+      "go": {
+        "cpu_ms": 709.665,
+        "cpu_median_ms": 716.213,
+        "wall_ms": 716.027,
+        "peak_rss_bytes": 14266368,
+        "compile_ms": 68.06,
+        "source": "PLB/bench/algorithm/coro-prime-sieve/1.go",
+        "sha256": "adda05bf0cd3e120bf2d80bfd64eb838bf1ce7544dd412308422a483bbd1840e",
+        "samples_cpu_ms": [
+          735.274,
+          716.213,
+          709.665
+        ],
+        "samples_wall_ms": [
+          741.255,
+          721.411,
+          716.027
+        ]
+      }
+    },
+    "nbody": {
+      "blot": {
+        "cpu_ms": 461.393,
+        "cpu_median_ms": 490.55,
+        "wall_ms": 467.622,
+        "peak_rss_bytes": 4149248,
+        "compile_ms": 47.33,
+        "source": "benchmarks/plb/blot/nbody.blot",
+        "sha256": "55456af5840c81929f30517d84f77674cec04f759f81680abbcf76a0dc8d3b9a",
+        "samples_cpu_ms": [
+          490.55,
+          461.393,
+          518.41
+        ],
+        "samples_wall_ms": [
+          494.052,
+          467.622,
+          522.944
+        ],
+        "blotc_ms": 35.27,
+        "aot_ms": 12.06,
+        "wasm_bytes": 22095
+      },
+      "go": {
+        "cpu_ms": 226.715,
+        "cpu_median_ms": 229.71,
+        "wall_ms": 229.108,
+        "peak_rss_bytes": 3780608,
+        "compile_ms": 54.65,
+        "source": "PLB/bench/algorithm/nbody/1.go",
+        "sha256": "55456af5840c81929f30517d84f77674cec04f759f81680abbcf76a0dc8d3b9a",
+        "samples_cpu_ms": [
+          226.715,
+          231.156,
+          229.71
+        ],
+        "samples_wall_ms": [
+          229.108,
+          232.152,
+          230.65
+        ]
+      },
+      "rust": {
+        "cpu_ms": 180.228,
+        "cpu_median_ms": 183.028,
+        "wall_ms": 181.287,
+        "peak_rss_bytes": 2224128,
+        "compile_ms": 2765.43,
+        "source": "PLB/bench/algorithm/nbody/1.rs",
+        "sha256": "55456af5840c81929f30517d84f77674cec04f759f81680abbcf76a0dc8d3b9a",
+        "samples_cpu_ms": [
+          180.228,
+          184.68,
+          183.028
+        ],
+        "samples_wall_ms": [
+          181.287,
+          186.143,
+          184.049
+        ]
+      },
+      "c": {
+        "cpu_ms": 234.264,
+        "cpu_median_ms": 237.305,
+        "wall_ms": 236.651,
+        "peak_rss_bytes": 2220032,
+        "compile_ms": 108.88,
+        "source": "PLB/bench/algorithm/nbody/2.c",
+        "sha256": "55456af5840c81929f30517d84f77674cec04f759f81680abbcf76a0dc8d3b9a",
+        "samples_cpu_ms": [
+          234.264,
+          237.305,
+          242.325
+        ],
+        "samples_wall_ms": [
+          236.651,
+          238.687,
+          243.108
+        ]
+      },
+      "cpp": {
+        "cpu_ms": 142.247,
+        "cpu_median_ms": 146.437,
+        "wall_ms": 144.142,
+        "peak_rss_bytes": 4263936,
+        "compile_ms": 256.52,
+        "source": "PLB/bench/algorithm/nbody/1.cpp",
+        "sha256": "55456af5840c81929f30517d84f77674cec04f759f81680abbcf76a0dc8d3b9a",
+        "samples_cpu_ms": [
+          142.247,
+          146.437,
+          148.597
+        ],
+        "samples_wall_ms": [
+          144.142,
+          148.897,
+          149.404
+        ]
+      }
+    },
+    "spectral-norm": {
+      "blot": {
+        "cpu_ms": 937.663,
+        "cpu_median_ms": 942.623,
+        "wall_ms": 944.083,
+        "peak_rss_bytes": 4141056,
+        "compile_ms": 41.6,
+        "source": "benchmarks/plb/blot/spectral_norm.blot",
+        "sha256": "9e4ff69cf46dda0f049f39f7f73f7f87313379d42ac50fba025dfbe4422f4af2",
+        "samples_cpu_ms": [
+          942.623,
+          948.308,
+          937.663
+        ],
+        "samples_wall_ms": [
+          948.83,
+          956.579,
+          944.083
+        ],
+        "blotc_ms": 28.51,
+        "aot_ms": 13.1,
+        "wasm_bytes": 11810
+      },
+      "go": {
+        "cpu_ms": 627.982,
+        "cpu_median_ms": 630.877,
+        "wall_ms": 630.641,
+        "peak_rss_bytes": 3764224,
+        "compile_ms": 41.24,
+        "source": "PLB/bench/algorithm/spectral-norm/1.go",
+        "sha256": "9e4ff69cf46dda0f049f39f7f73f7f87313379d42ac50fba025dfbe4422f4af2",
+        "samples_cpu_ms": [
+          627.982,
+          643.017,
+          630.877
+        ],
+        "samples_wall_ms": [
+          630.641,
+          648.632,
+          632.902
+        ]
+      },
+      "rust": {
+        "cpu_ms": 489.872,
+        "cpu_median_ms": 489.955,
+        "wall_ms": 493.085,
+        "peak_rss_bytes": 2457600,
+        "compile_ms": 2687.41,
+        "source": "PLB/bench/algorithm/spectral-norm/2.rs",
+        "sha256": "9e4ff69cf46dda0f049f39f7f73f7f87313379d42ac50fba025dfbe4422f4af2",
+        "samples_cpu_ms": [
+          495.389,
+          489.955,
+          489.872
+        ],
+        "samples_wall_ms": [
+          500.567,
+          494.459,
+          493.085
+        ]
+      },
+      "c": {
+        "cpu_ms": 761.769,
+        "cpu_median_ms": 770.279,
+        "wall_ms": 768.35,
+        "peak_rss_bytes": 2453504,
+        "compile_ms": 134.96,
+        "source": "PLB/bench/algorithm/spectral-norm/3.c",
+        "sha256": "9e4ff69cf46dda0f049f39f7f73f7f87313379d42ac50fba025dfbe4422f4af2",
+        "samples_cpu_ms": [
+          782.629,
+          761.769,
+          770.279
+        ],
+        "samples_wall_ms": [
+          790.52,
+          768.35,
+          774.162
+        ]
+      }
+    },
+    "mandelbrot": {
+      "blot": {
+        "cpu_ms": 1384.773,
+        "cpu_median_ms": 1387.433,
+        "wall_ms": 1393.58,
+        "peak_rss_bytes": 7577600,
+        "compile_ms": 42.67,
+        "source": "benchmarks/plb/blot/mandelbrot.blot",
+        "sha256": "b88bf391856490742e27bdb48177a39de75e1648a94169207f2946317d0ed5d1",
+        "samples_cpu_ms": [
+          1384.773,
+          1387.433,
+          1397.016
+        ],
+        "samples_wall_ms": [
+          1393.58,
+          1398.227,
+          1403.643
+        ],
+        "blotc_ms": 29.05,
+        "aot_ms": 13.62,
+        "wasm_bytes": 18663
+      },
+      "go": {
+        "cpu_ms": 1627.513,
+        "cpu_median_ms": 1698.729,
+        "wall_ms": 1635.214,
+        "peak_rss_bytes": 8232960,
+        "compile_ms": 53.65,
+        "source": "PLB/bench/algorithm/mandelbrot/1.go",
+        "sha256": "b88bf391856490742e27bdb48177a39de75e1648a94169207f2946317d0ed5d1",
+        "samples_cpu_ms": [
+          1627.513,
+          1707.469,
+          1698.729
+        ],
+        "samples_wall_ms": [
+          1635.214,
+          1722.968,
+          1714.5
+        ]
+      }
+    },
+    "json-serde": {
+      "blot": {
+        "cpu_ms": 567.925,
+        "cpu_median_ms": 582.766,
+        "wall_ms": 571.317,
+        "peak_rss_bytes": 56487936,
+        "compile_ms": 97.65,
+        "source": "benchmarks/plb/blot/json_serde.blot",
+        "sha256": "cd6c92b0fc20a7d529555e5b15a4f892ba519e4ea2c4059853be5aabd5dbe50e",
+        "samples_cpu_ms": [
+          582.766,
+          819.297,
+          567.925
+        ],
+        "samples_wall_ms": [
+          592.604,
+          840.668,
+          571.317
+        ],
+        "blotc_ms": 36.0,
+        "aot_ms": 61.65,
+        "wasm_bytes": 69382
+      },
+      "go": {
+        "cpu_ms": 324.056,
+        "cpu_median_ms": 335.98,
+        "wall_ms": 326.535,
+        "peak_rss_bytes": 145170432,
+        "compile_ms": 54.01,
+        "source": "PLB/bench/algorithm/json-serde/1.go",
+        "sha256": "cd6c92b0fc20a7d529555e5b15a4f892ba519e4ea2c4059853be5aabd5dbe50e",
+        "samples_cpu_ms": [
+          324.056,
+          479.008,
+          335.98
+        ],
+        "samples_wall_ms": [
+          326.535,
+          489.25,
+          338.937
+        ]
+      }
+    }
+  }
+}

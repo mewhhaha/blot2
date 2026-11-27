@@ -11,11 +11,12 @@ func build_csr (): (#[U32], #[U32]) =>
   let esrc = @array.fill ne 0
   let edst = @array.fill ne 0
   let start = @array.fill (BENCH_N + 1) 0
-  let r: U64 = 12345
+  let r: U64 = 12345u64
+  let n64 = BENCH_N.to_u64
   for e in 0 .. ne:
     r := rng.xs_next self
-    let u = rng.xs_mod r BENCH_N
-    let v = rng.xs_mod (r >> 24) BENCH_N
+    let u = (r % n64).to_u32
+    let v = ((r >> 24u64) % n64).to_u32
     esrc[e] := u
     edst[e] := v
     start[u + 1] := self + 1

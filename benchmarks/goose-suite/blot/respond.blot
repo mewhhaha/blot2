@@ -1,89 +1,68 @@
 // Streaming JSON response serializer with FNV-1a 64-bit checksum per response.
+// Uses static const byte strings (b"...") with bulk Array.extend, pre-sized
+// Array.with_capacity, and a stack-inlined 10-byte digit buffer.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 400000 // BENCH_N
+
+const K_ID: #[U8] = b"{\"id\":"
+const K_USER: #[U8] = b",\"user\":"
+const K_ITEMS: #[U8] = b",\"items\":["
+const K_SKU: #[U8] = b"{\"sku\":"
+const K_QTY: #[U8] = b",\"qty\":"
+const K_PRICE: #[U8] = b",\"price\":"
+const K_TOTAL: #[U8] = b"],\"total\":"
 
 type HandleRes is data = $HandleRes { hash: U64, len: U32 }
 
 func emit_uint (buf: own #[U8]) -> (v: U32): #[U8] =>
   if v == 0:
-    buf := self.push 48
+    buf := self.push '0'
     return buf
-  let d0: U32 = 0
-  let d1: U32 = 0
-  let d2: U32 = 0
-  let d3: U32 = 0
-  let d4: U32 = 0
-  let d5: U32 = 0
-  let d6: U32 = 0
-  let d7: U32 = 0
+  let digits = @array.fill 10 0u8
   let n: U32 = 0
   let x = v
   for ever:
     if x == 0:
       break
-    let dig = 48 + (x % 10)
-    if n == 0:
-      d0 := dig
-    else:
-      if n == 1:
-        d1 := dig
-      else:
-        if n == 2:
-          d2 := dig
-        else:
-          if n == 3:
-            d3 := dig
-          else:
-            if n == 4:
-              d4 := dig
-            else:
-              if n == 5:
-                d5 := dig
-              else:
-                if n == 6:
-                  d6 := dig
-                else:
-                  d7 := dig
+    digits[n] := (48 + (x % 10)).to_u8
     n := self + 1
     x := self / 10
   for ever:
     if n == 0:
       break
     n := self - 1
-    let ch = if n == 0 then d0 else if n == 1 then d1 else if n == 2 then d2 else if n == 3 then d3 else if n == 4 then d4 else if n == 5 then d5 else if n == 6 then d6 else d7
-    buf := self.push ch.to_u8
+    buf := self.push digits[n]
   return buf
 
 func emit_name (buf: own #[U8]) -> (seed: U64): #[U8] =>
   let r = rng.xs_next seed
-  let n = 3 + rng.xs_mod r 8
-  let odd = rng.xs_mod (r >> 8) 8 == 0
-  buf := self.push 34
+  let n = 3 + (r & 7u64).to_u32
+  let odd = ((r >> 8u64) & 7u64) == 0u64
+  buf := self.push '\"'
   for i in 0 .. n:
     r := rng.xs_next self
     if odd and i == 1:
-      buf := self.push 92
-      let q: U8 = if rng.xs_mod r 2 == 0 then 34 else 92
+      buf := self.push '\\'
+      let q: U8 = if (r & 1u64) == 0u64 then '\"' else '\\'
       buf := self.push q
     else:
-      buf := self.push (97 + rng.xs_mod r 26).to_u8
-  buf := self.push 34
+      buf := self.push (97 + (r % 26u64).to_u32).to_u8
+  buf := self.push '\"'
   return buf
 
 func emit_sku (buf: own #[U8]) -> (seed: U64): #[U8] =>
   let r = rng.xs_next seed
-  buf := self.push 34
-  buf := self.push (65 + rng.xs_mod r 26).to_u8
-  buf := self.push (65 + rng.xs_mod (r >> 8) 26).to_u8
+  buf := self.push '\"'
+  buf := self.push (65 + (r % 26u64).to_u32).to_u8
+  buf := self.push (65 + ((r >> 8u64) % 26u64).to_u32).to_u8
   for _ in 0 .. 4:
     r := rng.xs_next self
-    buf := self.push (48 + rng.xs_mod r 10).to_u8
-  buf := self.push 34
+    buf := self.push (48 + (r % 10u64).to_u32).to_u8
+  buf := self.push '\"'
   return buf
 
 func fnv_buf (buf: #[U8]): U64 =>
-  // 14695981039346656037 = 0xCBF29CE484222325
   let h: U64 = rng.FNV_OFFSET
   for i in 0 .. buf.length:
     h := rng.fnv_step self buf[i]
@@ -91,103 +70,45 @@ func fnv_buf (buf: #[U8]): U64 =>
 
 func handle (seed: U64): HandleRes =>
   let r0 = rng.xs_next seed
-  let n = 1 + rng.xs_mod r0 8
-  let buf: #[U8] = #[]
-  // {"id":
-  buf := self.push 123
-  buf := self.push 34
-  buf := self.push 105
-  buf := self.push 100
-  buf := self.push 34
-  buf := self.push 58
-  buf := emit_uint self (rng.xs_mod (r0 >> 4) 1000000)
-  // ,"user":
-  buf := self.push 44
-  buf := self.push 34
-  buf := self.push 117
-  buf := self.push 115
-  buf := self.push 101
-  buf := self.push 114
-  buf := self.push 34
-  buf := self.push 58
-  buf := emit_name self (r0 >> 8)
-  // ,"items":[
-  buf := self.push 44
-  buf := self.push 34
-  buf := self.push 105
-  buf := self.push 116
-  buf := self.push 101
-  buf := self.push 109
-  buf := self.push 115
-  buf := self.push 34
-  buf := self.push 58
-  buf := self.push 91
+  let n = 1 + (r0 & 7u64).to_u32
+  let buf: #[U8] = Array.with_capacity 512
+  buf := Array.extend self K_ID
+  buf := emit_uint self (((r0 >> 4u64) % 1000000u64).to_u32)
+  buf := Array.extend self K_USER
+  buf := emit_name self (r0 >> 8u64)
+  buf := Array.extend self K_ITEMS
 
   let total: U32 = 0
-  let r = r0 >> 16
+  let r = r0 >> 16u64
   for i in 0 .. n:
     r := rng.xs_next self
     if i > 0:
-      buf := self.push 44
-    let qty = 1 + rng.xs_mod (r >> 8) 5
-    let price = 100 + rng.xs_mod (r >> 16) 99900
-    // {"sku":
-    buf := self.push 123
-    buf := self.push 34
-    buf := self.push 115
-    buf := self.push 107
-    buf := self.push 117
-    buf := self.push 34
-    buf := self.push 58
+      buf := self.push ','
+    let qty = 1 + ((r >> 8u64) % 5u64).to_u32
+    let price = 100 + ((r >> 16u64) % 99900u64).to_u32
+    buf := Array.extend self K_SKU
     buf := emit_sku self r
-    // ,"qty":
-    buf := self.push 44
-    buf := self.push 34
-    buf := self.push 113
-    buf := self.push 116
-    buf := self.push 121
-    buf := self.push 34
-    buf := self.push 58
+    buf := Array.extend self K_QTY
     buf := emit_uint self qty
-    // ,"price":
-    buf := self.push 44
-    buf := self.push 34
-    buf := self.push 112
-    buf := self.push 114
-    buf := self.push 105
-    buf := self.push 99
-    buf := self.push 101
-    buf := self.push 34
-    buf := self.push 58
+    buf := Array.extend self K_PRICE
     buf := emit_uint self price
-    // }
-    buf := self.push 125
+    buf := self.push '}'
     total := self + qty * price
 
-  // ],"total":
-  buf := self.push 93
-  buf := self.push 44
-  buf := self.push 34
-  buf := self.push 116
-  buf := self.push 111
-  buf := self.push 116
-  buf := self.push 97
-  buf := self.push 108
-  buf := self.push 34
-  buf := self.push 58
+  buf := Array.extend self K_TOTAL
   buf := emit_uint self total
-  buf := self.push 125
+  buf := self.push '}'
 
   return $HandleRes { hash: fnv_buf buf, len: buf.length }
 
 io bench (): #[U32] =>
-  let seed: U64 = 12345
-  let h: U64 = 0
-  let bytes: I64 = 0
+  let seed: U64 = 12345u64
+  let h: U64 = 0u64
+  let bytes: I64 = 0i64
   for i in 0 .. BENCH_N:
     seed := rng.xs_next self
     let $HandleRes { hash: hh, len: l } = handle seed
-    let term = hh * 31 + i.to_u64
+    let term = hh * 31u64 + i.to_u64
     h := self ^ term
     bytes := self + l.to_i64
 

@@ -1,0 +1,144 @@
+// PLB spectral-norm: F64x2 SIMD matrix-vector products computing 2 rows x 4
+// columns per single f64x2.div (8 terms per vector division) using incremental
+// denominator updates.
+import * as simd from "std/simd"
+
+func push_f64_9 (out: own #[U8]) -> (val: F64): #[U8] =>
+  let x = val
+  if x < 0.0f64:
+    out := self.push '-'
+    x := 0.0f64 - self
+  let scaled = F64.to_u64 (x * 1000000000.0f64 + 0.5f64)
+  let int_part = scaled / 1000000000u64
+  let frac_part = scaled % 1000000000u64
+  if int_part == 0u64:
+    out := self.push '0'
+  else:
+    let digs = @array.fill 20 0u8
+    let n: U32 = 0
+    let t = int_part
+    for ever:
+      if t == 0u64:
+        break
+      digs[n] := (48u64 + (t % 10u64)).to_u8
+      n := self + 1
+      t := self / 10u64
+    for ever:
+      if n == 0:
+        break
+      n := self - 1
+      out := self.push digs[n]
+  out := self.push '.'
+  let fdigs = @array.fill 9 0u8
+  let f = frac_part
+  for i in 0 .. 9:
+    fdigs[8 - i] := (48u64 + (f % 10u64)).to_u8
+    f := self / 10u64
+  for i in 0 .. 9:
+    out := self.push fdigs[i]
+  out := self.push '\n'
+  return out
+
+func times (dst: own #[F64]) -> (src: #[F64]) -> (transposed: Bool): #[F64] =>
+  let n = src.length
+  let four = simd.f64_splat 4.0f64
+  let eight = simd.f64_splat 8.0f64
+  let twelve = simd.f64_splat 12.0f64
+  let sixteen = simd.f64_splat 16.0f64
+  let one = simd.f64_splat 1.0f64
+  let s_init = simd.f64_splat src[0]
+
+  let i: U32 = 0
+  for ever:
+    if i + 2 > n:
+      break
+    let r0 = i.to_f64
+    let r1 = (i + 1).to_f64
+    let a0_init = r0 * (r0 + 1.0f64) * 0.5f64 + 1.0f64 + (if transposed then 0.0f64 else r0)
+    let a1_init = r1 * (r1 + 1.0f64) * 0.5f64 + 1.0f64 + (if transposed then 0.0f64 else r1)
+    let st0 = r0 + (if transposed then 2.0f64 else 1.0f64)
+    let st1 = r1 + (if transposed then 2.0f64 else 1.0f64)
+
+    let a: simd.F64x2 = (a0_init, a1_init)
+    let d0: simd.F64x2 = (st0, st1)
+    let d1: simd.F64x2 = (2.0f64 * st0 + 1.0f64, 2.0f64 * st1 + 1.0f64)
+    let d2: simd.F64x2 = (3.0f64 * st0 + 3.0f64, 3.0f64 * st1 + 3.0f64)
+    let d3: simd.F64x2 = (4.0f64 * st0 + 6.0f64, 4.0f64 * st1 + 6.0f64)
+    let sum = simd.f64_div s_init a
+
+    let j: U32 = 1
+    for ever:
+      if j + 4 > n:
+        break
+      let s0 = simd.f64_splat src[j]
+      let s1 = simd.f64_splat src[j + 1]
+      let s2 = simd.f64_splat src[j + 2]
+      let s3 = simd.f64_splat src[j + 3]
+
+      let av0 = simd.f64_add a d0
+      let av1 = simd.f64_add a d1
+      let av2 = simd.f64_add a d2
+      let av3 = simd.f64_add a d3
+      a := av3
+      d0 := simd.f64_add self four
+      d1 := simd.f64_add self eight
+      d2 := simd.f64_add self twelve
+      d3 := simd.f64_add self sixteen
+
+      // s0/av0 + s1/av1 + s2/av2 + s3/av3 over av0*av1*av2*av3
+      let p01 = simd.f64_mul av0 av1
+      let p012 = simd.f64_mul p01 av2
+      let n01 = simd.f64_add (simd.f64_mul s0 av1) (simd.f64_mul s1 av0)
+      let n012 = simd.f64_add (simd.f64_mul n01 av2) (simd.f64_mul s2 p01)
+      let num = simd.f64_add (simd.f64_mul n012 av3) (simd.f64_mul s3 p012)
+      let den = simd.f64_mul p012 av3
+      sum := simd.f64_add self (simd.f64_div num den)
+      j := self + 4
+
+    for ever:
+      if j >= n:
+        break
+      let sj = simd.f64_splat src[j]
+      a := simd.f64_add self d0
+      d0 := simd.f64_add self one
+      sum := simd.f64_add self (simd.f64_div sj a)
+      j := self + 1
+
+    dst := simd.store_f64x2 i sum self
+    i := self + 2
+
+  // Odd trailing row if n is odd
+  if i < n:
+    let r = i.to_f64
+    let a = r * (r + 1.0f64) * 0.5f64 + 1.0f64 + (if transposed then 0.0f64 else r)
+    let step = r + (if transposed then 2.0f64 else 1.0f64)
+    let sum = src[0] / a
+    for j in 1 .. n:
+      a := self + step
+      step := self + 1.0f64
+      sum := self + src[j] / a
+    dst[i] := sum
+
+  return dst
+
+io bench (inp: #[U32]): #[U8] =>
+  let n = inp[0]
+  let u = @array.fill n 1.0f64
+  let v = @array.fill n 0.0f64
+  let tmp = @array.fill n 0.0f64
+
+  for _ in 0 .. 10:
+    tmp := times self u false
+    v := times self tmp true
+    tmp := times self v false
+    u := times self tmp true
+
+  let vbv: F64 = 0.0f64
+  let vv: F64 = 0.0f64
+  for i in 0 .. n:
+    vbv := self + u[i] * v[i]
+    vv := self + v[i] * v[i]
+
+  let out: #[U8] = Array.with_capacity 24
+  out := push_f64_9 self (F64.sqrt (vbv / vv))
+  return out

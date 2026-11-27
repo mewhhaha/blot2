@@ -38,7 +38,7 @@ BLOTC_DEFAULT = ROOT / "compiler-goose/build/blotc-goose"
 STD_ROOT = ROOT / "std"
 PRELUDE_PATH = STD_ROOT / "prelude.blot"
 WORK_DIR = ROOT / "build/goose-suite-work"
-OUT_JSON_DEFAULT = ROOT / "benchmarks/evidence/measurements/2026-11-26-goose-suite/results.json"
+OUT_JSON_DEFAULT = ROOT / "benchmarks/evidence/measurements/2026-11-27-goose-suite/results.json"
 
 STACK_RESERVE = "GS_STACK_RESERVE=2147483648ull"
 SIZE_NAMES = ["small", "medium", "large"]
@@ -284,7 +284,7 @@ BENCHMARKS = [
         what="16 passes of a 3x3 blur over a WxW 8-bit image.",
         param="W",
         sizes=[1024, 2048, 8192],
-        blot=[dict(label="blot sliding 3-col, #[U8]", file="blur.blot")],
+        blot=[dict(label="blot 16-wide U8x16 SIMD", file="blur.blot")],
         goose=[dict(label="goose flat indexing", file="blur.goose")],
         cpp=[
             dict(label="cpp flat indexing", file="blur.cpp", variant=0, tier="idiomatic"),

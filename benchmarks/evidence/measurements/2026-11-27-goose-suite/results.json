@@ -1,0 +1,2795 @@
+{
+  "benchmarks": {
+    "sum": {
+      "what": "Build a flat 32-bit array, then scan it 8 times.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 16000000,
+          "rows": {
+            "blot grow array": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 92.764,
+              "wall_ms": 97.312,
+              "median_ms": 95.723,
+              "all_ms": [
+                92.764,
+                95.723,
+                99.69
+              ],
+              "all_wall_ms": [
+                97.312,
+                98.937,
+                100.928
+              ],
+              "peak_bytes": 68042752,
+              "peak_mb": 64.89,
+              "compile_ms": 23.36,
+              "stdout": [
+                "16000000",
+                "63945983872"
+              ],
+              "blotc_ms": 16.97,
+              "aot_ms": 6.38,
+              "wasm_bytes": 5873
+            },
+            "goose grow-only array": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 54.93,
+              "wall_ms": 56.634,
+              "median_ms": 55.749,
+              "all_ms": [
+                54.93,
+                55.749,
+                56.058
+              ],
+              "all_wall_ms": [
+                56.634,
+                56.93,
+                57.263
+              ],
+              "peak_bytes": 68591616,
+              "peak_mb": 65.41,
+              "compile_ms": 132.32,
+              "stdout": [
+                "16000000",
+                "63945983872"
+              ]
+            },
+            "cpp vector": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 59.245,
+              "wall_ms": 59.535,
+              "median_ms": 62.076,
+              "all_ms": [
+                59.245,
+                62.076,
+                64.837
+              ],
+              "all_wall_ms": [
+                59.535,
+                63.872,
+                65.424
+              ],
+              "peak_bytes": 72097792,
+              "peak_mb": 68.76,
+              "compile_ms": 177.01,
+              "stdout": [
+                "16000000",
+                "63945983872"
+              ]
+            },
+            "cpp vector+reserve": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 52.267,
+              "wall_ms": 52.678,
+              "median_ms": 52.803,
+              "all_ms": [
+                52.267,
+                52.803,
+                56.12
+              ],
+              "all_wall_ms": [
+                52.678,
+                53.185,
+                56.679
+              ],
+              "peak_bytes": 68182016,
+              "peak_mb": 65.02,
+              "compile_ms": 183.84,
+              "stdout": [
+                "16000000",
+                "63945983872"
+              ]
+            },
+            "rust Vec, collect": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 49.038,
+              "wall_ms": 49.285,
+              "median_ms": 50.237,
+              "all_ms": [
+                49.038,
+                50.237,
+                50.495
+              ],
+              "all_wall_ms": [
+                49.285,
+                50.966,
+                51.043
+              ],
+              "peak_bytes": 66564096,
+              "peak_mb": 63.48,
+              "compile_ms": 80.37,
+              "stdout": [
+                "16000000",
+                "63945983872"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "push": {
+      "what": "Push N records while keeping links/indices to every 64th one.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 16000000,
+          "rows": {
+            "blot array+reserve, indices": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 68.552,
+              "wall_ms": 69.339,
+              "median_ms": 68.631,
+              "all_ms": [
+                68.552,
+                68.631,
+                77.066
+              ],
+              "all_wall_ms": [
+                69.339,
+                70.755,
+                78.349
+              ],
+              "peak_bytes": 132976640,
+              "peak_mb": 126.82,
+              "compile_ms": 26.76,
+              "stdout": [
+                "16000000",
+                "250000",
+                "7999220817282",
+                "12000142"
+              ],
+              "blotc_ms": 18.98,
+              "aot_ms": 7.78,
+              "wasm_bytes": 7386
+            },
+            "goose array, typed references": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 43.454,
+              "wall_ms": 43.994,
+              "median_ms": 43.627,
+              "all_ms": [
+                43.454,
+                43.627,
+                45.859
+              ],
+              "all_wall_ms": [
+                43.994,
+                45.568,
+                48.124
+              ],
+              "peak_bytes": 133230592,
+              "peak_mb": 127.06,
+              "compile_ms": 128.3,
+              "stdout": [
+                "16000000",
+                "250000",
+                "7999220817282",
+                "12000142"
+              ]
+            },
+            "cpp vector, indices": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 56.165,
+              "wall_ms": 56.785,
+              "median_ms": 58.484,
+              "all_ms": [
+                56.165,
+                58.484,
+                60.272
+              ],
+              "all_wall_ms": [
+                56.785,
+                59.589,
+                61.341
+              ],
+              "peak_bytes": 141225984,
+              "peak_mb": 134.68,
+              "compile_ms": 194.93,
+              "stdout": [
+                "16000000",
+                "250000",
+                "7999220817282",
+                "12000142"
+              ]
+            },
+            "cpp vector+reserve, indices": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 46.362,
+              "wall_ms": 46.666,
+              "median_ms": 48.278,
+              "all_ms": [
+                46.362,
+                48.278,
+                64.666
+              ],
+              "all_wall_ms": [
+                46.666,
+                49.541,
+                66.802
+              ],
+              "peak_bytes": 134217728,
+              "peak_mb": 128.0,
+              "compile_ms": 223.48,
+              "stdout": [
+                "16000000",
+                "250000",
+                "7999220817282",
+                "12000142"
+              ]
+            },
+            "rust Vec+reserve, indices": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 42.411,
+              "wall_ms": 42.602,
+              "median_ms": 42.457,
+              "all_ms": [
+                42.411,
+                42.457,
+                43.668
+              ],
+              "all_wall_ms": [
+                42.602,
+                43.087,
+                43.99
+              ],
+              "peak_bytes": 132698112,
+              "peak_mb": 126.55,
+              "compile_ms": 79.84,
+              "stdout": [
+                "16000000",
+                "250000",
+                "7999220817282",
+                "12000142"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "strlist": {
+      "what": "Split a text into N words, store them, scan 4 times.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 2000000,
+          "rows": {
+            "blot packed bytes + offsets": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 109.963,
+              "wall_ms": 111.889,
+              "median_ms": 122.047,
+              "all_ms": [
+                109.963,
+                122.047,
+                152.105
+              ],
+              "all_wall_ms": [
+                111.889,
+                123.927,
+                153.083
+              ],
+              "peak_bytes": 45043712,
+              "peak_mb": 42.96,
+              "compile_ms": 26.15,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ],
+              "blotc_ms": 18.08,
+              "aot_ms": 8.07,
+              "wasm_bytes": 7097
+            },
+            "goose inline strings, owned": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 78.326,
+              "wall_ms": 79.036,
+              "median_ms": 91.213,
+              "all_ms": [
+                78.326,
+                91.213,
+                96.967
+              ],
+              "all_wall_ms": [
+                79.036,
+                92.492,
+                97.739
+              ],
+              "peak_bytes": 60067840,
+              "peak_mb": 57.29,
+              "compile_ms": 146.92,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ]
+            },
+            "cpp vector<string>": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 118.555,
+              "wall_ms": 119.553,
+              "median_ms": 120.699,
+              "all_ms": [
+                118.555,
+                120.699,
+                130.762
+              ],
+              "all_wall_ms": [
+                119.553,
+                122.495,
+                132.097
+              ],
+              "peak_bytes": 113201152,
+              "peak_mb": 107.96,
+              "compile_ms": 254.94,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ]
+            },
+            "cpp flat offsets": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 77.811,
+              "wall_ms": 78.201,
+              "median_ms": 79.441,
+              "all_ms": [
+                77.811,
+                79.441,
+                81.574
+              ],
+              "all_wall_ms": [
+                78.201,
+                80.007,
+                82.265
+              ],
+              "peak_bytes": 62914560,
+              "peak_mb": 60.0,
+              "compile_ms": 263.53,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ]
+            },
+            "rust Vec<String>": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 153.024,
+              "wall_ms": 153.946,
+              "median_ms": 154.628,
+              "all_ms": [
+                153.024,
+                154.628,
+                172.55
+              ],
+              "all_wall_ms": [
+                153.946,
+                155.796,
+                173.899
+              ],
+              "peak_bytes": 141713408,
+              "peak_mb": 135.15,
+              "compile_ms": 109.85,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ]
+            },
+            "rust Vec<&str>": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 94.798,
+              "wall_ms": 96.389,
+              "median_ms": 106.324,
+              "all_ms": [
+                94.798,
+                106.324,
+                106.407
+              ],
+              "all_wall_ms": [
+                96.389,
+                107.454,
+                108.04
+              ],
+              "peak_bytes": 62660608,
+              "peak_mb": 59.76,
+              "compile_ms": 105.63,
+              "stdout": [
+                "2000000",
+                "1843958476"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "records": {
+      "what": "Build a log of N variant records, aggregate 4 times.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 4000000,
+          "rows": {
+            "blot packed records + text pool": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 131.0,
+              "wall_ms": 131.845,
+              "median_ms": 134.735,
+              "all_ms": [
+                131.0,
+                134.735,
+                136.571
+              ],
+              "all_wall_ms": [
+                131.845,
+                135.702,
+                139.168
+              ],
+              "peak_bytes": 78905344,
+              "peak_mb": 75.25,
+              "compile_ms": 28.92,
+              "stdout": [
+                "4000000",
+                "701055136604"
+              ],
+              "blotc_ms": 20.34,
+              "aot_ms": 8.58,
+              "wasm_bytes": 7702
+            },
+            "goose variable enum": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 109.729,
+              "wall_ms": 110.608,
+              "median_ms": 111.56,
+              "all_ms": [
+                109.729,
+                111.56,
+                115.477
+              ],
+              "all_wall_ms": [
+                110.608,
+                113.041,
+                116.928
+              ],
+              "peak_bytes": 41074688,
+              "peak_mb": 39.17,
+              "compile_ms": 125.8,
+              "stdout": [
+                "4000000",
+                "701055136604"
+              ]
+            },
+            "cpp variant + string": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 165.423,
+              "wall_ms": 166.741,
+              "median_ms": 165.567,
+              "all_ms": [
+                165.423,
+                165.567,
+                166.173
+              ],
+              "all_wall_ms": [
+                166.741,
+                166.82,
+                169.035
+              ],
+              "peak_bytes": 206348288,
+              "peak_mb": 196.79,
+              "compile_ms": 404.85,
+              "stdout": [
+                "4000000",
+                "701055136604"
+              ]
+            },
+            "cpp variant + buffer": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 133.878,
+              "wall_ms": 135.173,
+              "median_ms": 142.151,
+              "all_ms": [
+                133.878,
+                142.151,
+                148.786
+              ],
+              "all_wall_ms": [
+                135.173,
+                143.977,
+                156.609
+              ],
+              "peak_bytes": 105873408,
+              "peak_mb": 100.97,
+              "compile_ms": 385.18,
+              "stdout": [
+                "4000000",
+                "701055136604"
+              ]
+            },
+            "rust enum + String": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 180.807,
+              "wall_ms": 182.506,
+              "median_ms": 181.338,
+              "all_ms": [
+                180.807,
+                181.338,
+                183.579
+              ],
+              "all_wall_ms": [
+                182.506,
+                184.164,
+                185.659
+              ],
+              "peak_bytes": 163954688,
+              "peak_mb": 156.36,
+              "compile_ms": 100.89,
+              "stdout": [
+                "4000000",
+                "701055136604"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "tree": {
+      "what": "Build a complete binary tree of depth D, sum it 8 times.",
+      "param": "depth",
+      "sizes": {
+        "medium": {
+          "n": 20,
+          "rows": {
+            "blot arena + indices": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 106.848,
+              "wall_ms": 107.652,
+              "median_ms": 110.921,
+              "all_ms": [
+                106.848,
+                110.921,
+                113.917
+              ],
+              "all_wall_ms": [
+                107.652,
+                113.936,
+                115.428
+              ],
+              "peak_bytes": 29274112,
+              "peak_mb": 27.92,
+              "compile_ms": 28.84,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ],
+              "blotc_ms": 19.51,
+              "aot_ms": 9.33,
+              "wasm_bytes": 8732
+            },
+            "goose pool + typed relative refs": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 26.983,
+              "wall_ms": 27.187,
+              "median_ms": 27.005,
+              "all_ms": [
+                26.983,
+                27.005,
+                29.19
+              ],
+              "all_wall_ms": [
+                27.187,
+                27.211,
+                29.388
+              ],
+              "peak_bytes": 27439104,
+              "peak_mb": 26.17,
+              "compile_ms": 123.82,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ]
+            },
+            "cpp unique_ptr": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 145.087,
+              "wall_ms": 147.965,
+              "median_ms": 153.227,
+              "all_ms": [
+                145.087,
+                153.227,
+                162.186
+              ],
+              "all_wall_ms": [
+                147.965,
+                157.541,
+                165.625
+              ],
+              "peak_bytes": 71442432,
+              "peak_mb": 68.13,
+              "compile_ms": 324.33,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ]
+            },
+            "cpp arena + indices": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 30.07,
+              "wall_ms": 30.377,
+              "median_ms": 32.125,
+              "all_ms": [
+                30.07,
+                32.125,
+                32.922
+              ],
+              "all_wall_ms": [
+                30.377,
+                32.716,
+                33.869
+              ],
+              "peak_bytes": 29286400,
+              "peak_mb": 27.93,
+              "compile_ms": 324.93,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ]
+            },
+            "rust Box nodes": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 84.285,
+              "wall_ms": 86.488,
+              "median_ms": 95.926,
+              "all_ms": [
+                84.285,
+                95.926,
+                100.175
+              ],
+              "all_wall_ms": [
+                86.488,
+                98.222,
+                103.032
+              ],
+              "peak_bytes": 69529600,
+              "peak_mb": 66.31,
+              "compile_ms": 78.3,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ]
+            },
+            "rust arena + indices": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 33.338,
+              "wall_ms": 33.7,
+              "median_ms": 50.467,
+              "all_ms": [
+                33.338,
+                50.467,
+                57.845
+              ],
+              "all_wall_ms": [
+                33.7,
+                51.287,
+                58.752
+              ],
+              "peak_bytes": 27701248,
+              "peak_mb": 26.42,
+              "compile_ms": 86.97,
+              "stdout": [
+                "2097151",
+                "8377899684"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "interp": {
+      "what": "Build an expression tree of depth D, evaluate it 8 times.",
+      "param": "depth",
+      "sizes": {
+        "medium": {
+          "n": 20,
+          "rows": {
+            "blot arena + tag dispatch": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 18.947,
+              "wall_ms": 19.23,
+              "median_ms": 22.827,
+              "all_ms": [
+                18.947,
+                22.827,
+                23.448
+              ],
+              "all_wall_ms": [
+                19.23,
+                23.267,
+                23.772
+              ],
+              "peak_bytes": 9740288,
+              "peak_mb": 9.29,
+              "compile_ms": 31.44,
+              "stdout": [
+                "294997",
+                "950682"
+              ],
+              "blotc_ms": 20.92,
+              "aot_ms": 10.51,
+              "wasm_bytes": 11308
+            },
+            "goose case functions + relative refs": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 10.826,
+              "wall_ms": 11.368,
+              "median_ms": 11.206,
+              "all_ms": [
+                10.826,
+                11.206,
+                11.774
+              ],
+              "all_wall_ms": [
+                11.368,
+                11.665,
+                11.911
+              ],
+              "peak_bytes": 4370432,
+              "peak_mb": 4.17,
+              "compile_ms": 144.19,
+              "stdout": [
+                "294997",
+                "950682"
+              ]
+            },
+            "cpp virtual + unique_ptr": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 14.245,
+              "wall_ms": 14.57,
+              "median_ms": 16.902,
+              "all_ms": [
+                14.245,
+                16.902,
+                18.793
+              ],
+              "all_wall_ms": [
+                14.57,
+                17.477,
+                19.161
+              ],
+              "peak_bytes": 13766656,
+              "peak_mb": 13.13,
+              "compile_ms": 429.06,
+              "stdout": [
+                "294997",
+                "950682"
+              ]
+            },
+            "cpp tagged union + arena": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 12.27,
+              "wall_ms": 18.37,
+              "median_ms": 13.676,
+              "all_ms": [
+                12.27,
+                13.676,
+                14.756
+              ],
+              "all_wall_ms": [
+                18.37,
+                27.118,
+                30.079
+              ],
+              "peak_bytes": 11997184,
+              "peak_mb": 11.44,
+              "compile_ms": 319.3,
+              "stdout": [
+                "294997",
+                "950682"
+              ]
+            },
+            "rust enum + Box": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 30.531,
+              "wall_ms": 31.203,
+              "median_ms": 35.382,
+              "all_ms": [
+                30.531,
+                35.382,
+                50.386
+              ],
+              "all_wall_ms": [
+                31.203,
+                36.631,
+                74.489
+              ],
+              "peak_bytes": 12034048,
+              "peak_mb": 11.48,
+              "compile_ms": 100.24,
+              "stdout": [
+                "294997",
+                "950682"
+              ]
+            },
+            "rust enum + arena indices": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 15.24,
+              "wall_ms": 19.373,
+              "median_ms": 15.892,
+              "all_ms": [
+                15.24,
+                15.892,
+                21.069
+              ],
+              "all_wall_ms": [
+                19.373,
+                20.147,
+                24.858
+              ],
+              "peak_bytes": 8175616,
+              "peak_mb": 7.8,
+              "compile_ms": 108.66,
+              "stdout": [
+                "294997",
+                "950682"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "graph": {
+      "what": "Build CSR adjacency for V vertices / 8V edges, BFS from 4 sources.",
+      "param": "V",
+      "sizes": {
+        "medium": {
+          "n": 500000,
+          "rows": {
+            "blot CSR two-pass": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 100.419,
+              "wall_ms": 100.943,
+              "median_ms": 137.663,
+              "all_ms": [
+                100.419,
+                137.663,
+                137.777
+              ],
+              "all_wall_ms": [
+                100.943,
+                138.293,
+                139.911
+              ],
+              "peak_bytes": 61628416,
+              "peak_mb": 58.77,
+              "compile_ms": 35.73,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ],
+              "blotc_ms": 25.92,
+              "aot_ms": 9.8,
+              "wasm_bytes": 8701
+            },
+            "goose CSR two-pass": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 72.775,
+              "wall_ms": 73.405,
+              "median_ms": 73.604,
+              "all_ms": [
+                72.775,
+                73.604,
+                74.148
+              ],
+              "all_wall_ms": [
+                73.405,
+                74.102,
+                74.834
+              ],
+              "peak_bytes": 61665280,
+              "peak_mb": 58.81,
+              "compile_ms": 125.62,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ]
+            },
+            "cpp vector<vector>": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 163.969,
+              "wall_ms": 164.948,
+              "median_ms": 170.347,
+              "all_ms": [
+                163.969,
+                170.347,
+                170.441
+              ],
+              "all_wall_ms": [
+                164.948,
+                171.518,
+                171.873
+              ],
+              "peak_bytes": 54390784,
+              "peak_mb": 51.87,
+              "compile_ms": 640.01,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ]
+            },
+            "cpp CSR two-pass": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 83.809,
+              "wall_ms": 84.529,
+              "median_ms": 85.691,
+              "all_ms": [
+                83.809,
+                85.691,
+                88.98
+              ],
+              "all_wall_ms": [
+                84.529,
+                86.518,
+                90.076
+              ],
+              "peak_bytes": 60051456,
+              "peak_mb": 57.27,
+              "compile_ms": 166.3,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ]
+            },
+            "rust Vec<Vec>": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 150.896,
+              "wall_ms": 153.519,
+              "median_ms": 152.257,
+              "all_ms": [
+                150.896,
+                152.257,
+                152.359
+              ],
+              "all_wall_ms": [
+                153.519,
+                153.56,
+                154.039
+              ],
+              "peak_bytes": 53792768,
+              "peak_mb": 51.3,
+              "compile_ms": 90.23,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ]
+            },
+            "rust CSR two-pass": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 81.274,
+              "wall_ms": 81.83,
+              "median_ms": 84.25,
+              "all_ms": [
+                81.274,
+                84.25,
+                86.373
+              ],
+              "all_wall_ms": [
+                81.83,
+                84.921,
+                87.658
+              ],
+              "peak_bytes": 58564608,
+              "peak_mb": 55.85,
+              "compile_ms": 93.44,
+              "stdout": [
+                "4500000",
+                "12991077"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "words": {
+      "what": "Count word frequencies over a text of N words.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 4000000,
+          "rows": {
+            "blot packed bytes + open addressing": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 254.333,
+              "wall_ms": 255.551,
+              "median_ms": 277.3,
+              "all_ms": [
+                254.333,
+                277.3,
+                297.795
+              ],
+              "all_wall_ms": [
+                255.551,
+                279.583,
+                300.221
+              ],
+              "peak_bytes": 82644992,
+              "peak_mb": 78.82,
+              "compile_ms": 26.78,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ],
+              "blotc_ms": 17.27,
+              "aot_ms": 9.51,
+              "wasm_bytes": 9798
+            },
+            "goose slices + open addressing": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 126.172,
+              "wall_ms": 126.774,
+              "median_ms": 127.963,
+              "all_ms": [
+                126.172,
+                127.963,
+                136.842
+              ],
+              "all_wall_ms": [
+                126.774,
+                128.57,
+                137.901
+              ],
+              "peak_bytes": 144957440,
+              "peak_mb": 138.24,
+              "compile_ms": 137.55,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ]
+            },
+            "cpp unordered_map<string>": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 290.168,
+              "wall_ms": 291.602,
+              "median_ms": 291.422,
+              "all_ms": [
+                290.168,
+                291.422,
+                291.955
+              ],
+              "all_wall_ms": [
+                291.602,
+                292.907,
+                293.377
+              ],
+              "peak_bytes": 155987968,
+              "peak_mb": 148.76,
+              "compile_ms": 304.41,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ]
+            },
+            "cpp open addressing": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 166.733,
+              "wall_ms": 167.975,
+              "median_ms": 168.474,
+              "all_ms": [
+                166.733,
+                168.474,
+                168.839
+              ],
+              "all_wall_ms": [
+                167.975,
+                169.265,
+                170.466
+              ],
+              "peak_bytes": 204206080,
+              "peak_mb": 194.75,
+              "compile_ms": 277.8,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ]
+            },
+            "rust HashMap<&str>": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 258.418,
+              "wall_ms": 260.235,
+              "median_ms": 271.174,
+              "all_ms": [
+                258.418,
+                271.174,
+                271.637
+              ],
+              "all_wall_ms": [
+                260.235,
+                273.242,
+                274.527
+              ],
+              "peak_bytes": 149041152,
+              "peak_mb": 142.14,
+              "compile_ms": 148.81,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ]
+            },
+            "rust open addressing": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 183.877,
+              "wall_ms": 185.338,
+              "median_ms": 185.567,
+              "all_ms": [
+                183.877,
+                185.567,
+                189.984
+              ],
+              "all_wall_ms": [
+                185.338,
+                186.912,
+                191.587
+              ],
+              "peak_bytes": 179986432,
+              "peak_mb": 171.65,
+              "compile_ms": 117.28,
+              "stdout": [
+                "4000000",
+                "287555",
+                "472050912"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "particles": {
+      "what": "Integrate N particles for 200 steps of exact binary32 vector math.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 1000000,
+          "rows": {
+            "blot SoA, 4-wide SIMD": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 186.138,
+              "wall_ms": 187.891,
+              "median_ms": 186.688,
+              "all_ms": [
+                186.138,
+                186.688,
+                187.985
+              ],
+              "all_wall_ms": [
+                187.891,
+                188.542,
+                190.217
+              ],
+              "peak_bytes": 28061696,
+              "peak_mb": 26.76,
+              "compile_ms": 26.18,
+              "stdout": [
+                "1000000",
+                "19381529234"
+              ],
+              "blotc_ms": 17.22,
+              "aot_ms": 8.96,
+              "wasm_bytes": 10597
+            },
+            "goose AoS, per component": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 192.721,
+              "wall_ms": 194.014,
+              "median_ms": 193.793,
+              "all_ms": [
+                192.721,
+                193.793,
+                195.801
+              ],
+              "all_wall_ms": [
+                194.014,
+                196.521,
+                197.25
+              ],
+              "peak_bytes": 26460160,
+              "peak_mb": 25.23,
+              "compile_ms": 110.84,
+              "stdout": [
+                "1000000",
+                "19381529234"
+              ]
+            },
+            "cpp AoS, elementwise": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 216.848,
+              "wall_ms": 217.928,
+              "median_ms": 218.92,
+              "all_ms": [
+                216.848,
+                218.92,
+                222.757
+              ],
+              "all_wall_ms": [
+                217.928,
+                220.793,
+                224.817
+              ],
+              "peak_bytes": 28090368,
+              "peak_mb": 26.79,
+              "compile_ms": 157.57,
+              "stdout": [
+                "1000000",
+                "19381529234"
+              ]
+            },
+            "cpp AoS, per component": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 186.336,
+              "wall_ms": 188.228,
+              "median_ms": 186.455,
+              "all_ms": [
+                186.336,
+                186.455,
+                203.245
+              ],
+              "all_wall_ms": [
+                188.228,
+                188.814,
+                204.823
+              ],
+              "peak_bytes": 28143616,
+              "peak_mb": 26.84,
+              "compile_ms": 155.67,
+              "stdout": [
+                "1000000",
+                "19381529234"
+              ]
+            },
+            "rust AoS, per component": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 187.524,
+              "wall_ms": 188.675,
+              "median_ms": 191.331,
+              "all_ms": [
+                187.524,
+                191.331,
+                191.356
+              ],
+              "all_wall_ms": [
+                188.675,
+                193.169,
+                193.696
+              ],
+              "peak_bytes": 26587136,
+              "peak_mb": 25.36,
+              "compile_ms": 74.75,
+              "stdout": [
+                "1000000",
+                "19381529234"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "sexp": {
+      "what": "Generate N s-expression forms, parse into a tree, walk 4 times.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 100000,
+          "rows": {
+            "blot 8B arena + packed text": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 608.848,
+              "wall_ms": 616.213,
+              "median_ms": 613.018,
+              "all_ms": [
+                608.848,
+                613.018,
+                655.224
+              ],
+              "all_wall_ms": [
+                616.213,
+                617.846,
+                661.217
+              ],
+              "peak_bytes": 115007488,
+              "peak_mb": 109.68,
+              "compile_ms": 27.91,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ],
+              "blotc_ms": 16.68,
+              "aot_ms": 11.23,
+              "wasm_bytes": 15011
+            },
+            "goose pool + refs, inline text": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 440.11,
+              "wall_ms": 443.951,
+              "median_ms": 441.481,
+              "all_ms": [
+                440.11,
+                441.481,
+                446.179
+              ],
+              "all_wall_ms": [
+                443.951,
+                444.293,
+                448.126
+              ],
+              "peak_bytes": 134025216,
+              "peak_mb": 127.82,
+              "compile_ms": 139.6,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ]
+            },
+            "cpp unique_ptr + string": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 1201.415,
+              "wall_ms": 1207.011,
+              "median_ms": 1212.567,
+              "all_ms": [
+                1201.415,
+                1212.567,
+                1237.055
+              ],
+              "all_wall_ms": [
+                1207.011,
+                1220.865,
+                1244.285
+              ],
+              "peak_bytes": 662884352,
+              "peak_mb": 632.18,
+              "compile_ms": 333.9,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ]
+            },
+            "cpp arena + string_view": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 452.109,
+              "wall_ms": 454.667,
+              "median_ms": 454.766,
+              "all_ms": [
+                452.109,
+                454.766,
+                483.025
+              ],
+              "all_wall_ms": [
+                454.667,
+                458.468,
+                489.286
+              ],
+              "peak_bytes": 304189440,
+              "peak_mb": 290.1,
+              "compile_ms": 299.37,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ]
+            },
+            "rust enum + Box + String": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 927.173,
+              "wall_ms": 940.71,
+              "median_ms": 946.966,
+              "all_ms": [
+                927.173,
+                946.966,
+                979.407
+              ],
+              "all_wall_ms": [
+                940.71,
+                955.465,
+                992.84
+              ],
+              "peak_bytes": 504979456,
+              "peak_mb": 481.59,
+              "compile_ms": 102.67,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ]
+            },
+            "rust arena + &str": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 448.258,
+              "wall_ms": 451.501,
+              "median_ms": 462.382,
+              "all_ms": [
+                448.258,
+                462.382,
+                463.534
+              ],
+              "all_wall_ms": [
+                451.501,
+                466.385,
+                467.4
+              ],
+              "peak_bytes": 235769856,
+              "peak_mb": 224.85,
+              "compile_ms": 117.87,
+              "stdout": [
+                "47939902",
+                "7609503",
+                "100000",
+                "0",
+                "547350405826"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "lru": {
+      "what": "LRU cache of capacity N/8 under N skewed lookups & invalidations.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 8000000,
+          "rows": {
+            "blot open addressing + arena": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 388.243,
+              "wall_ms": 393.509,
+              "median_ms": 390.504,
+              "all_ms": [
+                388.243,
+                390.504,
+                465.29
+              ],
+              "all_wall_ms": [
+                393.509,
+                393.976,
+                472.881
+              ],
+              "peak_bytes": 40828928,
+              "peak_mb": 38.94,
+              "compile_ms": 27.14,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ],
+              "blotc_ms": 16.98,
+              "aot_ms": 10.16,
+              "wasm_bytes": 13891
+            },
+            "goose reusable pool + pool-relative refs": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 118.987,
+              "wall_ms": 119.52,
+              "median_ms": 120.446,
+              "all_ms": [
+                118.987,
+                120.446,
+                123.008
+              ],
+              "all_wall_ms": [
+                119.52,
+                121.102,
+                123.634
+              ],
+              "peak_bytes": 35811328,
+              "peak_mb": 34.15,
+              "compile_ms": 141.95,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ]
+            },
+            "cpp list + unordered_map": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 807.01,
+              "wall_ms": 815.909,
+              "median_ms": 856.178,
+              "all_ms": [
+                807.01,
+                856.178,
+                961.908
+              ],
+              "all_wall_ms": [
+                815.909,
+                864.444,
+                975.151
+              ],
+              "peak_bytes": 79044608,
+              "peak_mb": 75.38,
+              "compile_ms": 198.63,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ]
+            },
+            "cpp arena + open addressing": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 135.015,
+              "wall_ms": 137.893,
+              "median_ms": 138.339,
+              "all_ms": [
+                135.015,
+                138.339,
+                139.95
+              ],
+              "all_wall_ms": [
+                137.893,
+                139.342,
+                141.062
+              ],
+              "peak_bytes": 38395904,
+              "peak_mb": 36.62,
+              "compile_ms": 181.06,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ]
+            },
+            "rust HashMap + arena": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 279.811,
+              "wall_ms": 282.173,
+              "median_ms": 282.561,
+              "all_ms": [
+                279.811,
+                282.561,
+                287.932
+              ],
+              "all_wall_ms": [
+                282.173,
+                284.336,
+                291.195
+              ],
+              "peak_bytes": 47222784,
+              "peak_mb": 45.04,
+              "compile_ms": 147.11,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ]
+            },
+            "rust open addressing + arena": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 142.176,
+              "wall_ms": 143.946,
+              "median_ms": 143.629,
+              "all_ms": [
+                142.176,
+                143.629,
+                145.958
+              ],
+              "all_wall_ms": [
+                143.946,
+                145.538,
+                147.344
+              ],
+              "peak_bytes": 35835904,
+              "peak_mb": 34.18,
+              "compile_ms": 94.72,
+              "stdout": [
+                "4937489",
+                "2561689",
+                "329505",
+                "1000000",
+                "1009107182135619685",
+                "501925078"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "scene": {
+      "what": "Build a depth-D scene graph, animate & update transforms for 16 frames.",
+      "param": "depth",
+      "sizes": {
+        "medium": {
+          "n": 14,
+          "rows": {
+            "blot arena + inline transforms": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 99.919,
+              "wall_ms": 101.135,
+              "median_ms": 102.327,
+              "all_ms": [
+                99.919,
+                102.327,
+                102.996
+              ],
+              "all_wall_ms": [
+                101.135,
+                103.654,
+                106.332
+              ],
+              "peak_bytes": 59518976,
+              "peak_mb": 56.76,
+              "compile_ms": 26.48,
+              "stdout": [
+                "254401",
+                "16563864"
+              ],
+              "blotc_ms": 15.9,
+              "aot_ms": 10.58,
+              "wasm_bytes": 15470
+            },
+            "goose pool + inline child refs": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 42.335,
+              "wall_ms": 42.596,
+              "median_ms": 44.004,
+              "all_ms": [
+                42.335,
+                44.004,
+                45.177
+              ],
+              "all_wall_ms": [
+                42.596,
+                44.356,
+                47.065
+              ],
+              "peak_bytes": 33824768,
+              "peak_mb": 32.26,
+              "compile_ms": 119.52,
+              "stdout": [
+                "254401",
+                "16563864"
+              ]
+            },
+            "cpp unique_ptr children": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 85.716,
+              "wall_ms": 86.143,
+              "median_ms": 87.418,
+              "all_ms": [
+                85.716,
+                87.418,
+                91.751
+              ],
+              "all_wall_ms": [
+                86.143,
+                87.968,
+                92.905
+              ],
+              "peak_bytes": 45101056,
+              "peak_mb": 43.01,
+              "compile_ms": 303.34,
+              "stdout": [
+                "254401",
+                "16563864"
+              ]
+            },
+            "cpp arena + child indices": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 47.419,
+              "wall_ms": 47.573,
+              "median_ms": 47.765,
+              "all_ms": [
+                47.419,
+                47.765,
+                50.779
+              ],
+              "all_wall_ms": [
+                47.573,
+                48.598,
+                54.41
+              ],
+              "peak_bytes": 36700160,
+              "peak_mb": 35.0,
+              "compile_ms": 277.0,
+              "stdout": [
+                "254401",
+                "16563864"
+              ]
+            },
+            "rust Box children": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 79.008,
+              "wall_ms": 79.914,
+              "median_ms": 79.629,
+              "all_ms": [
+                79.008,
+                79.629,
+                81.613
+              ],
+              "all_wall_ms": [
+                79.914,
+                80.57,
+                82.089
+              ],
+              "peak_bytes": 43872256,
+              "peak_mb": 41.84,
+              "compile_ms": 89.88,
+              "stdout": [
+                "254401",
+                "16563864"
+              ]
+            },
+            "rust arena + child indices": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 42.041,
+              "wall_ms": 42.401,
+              "median_ms": 43.536,
+              "all_ms": [
+                42.041,
+                43.536,
+                64.268
+              ],
+              "all_wall_ms": [
+                42.401,
+                43.77,
+                65.918
+              ],
+              "peak_bytes": 33959936,
+              "peak_mb": 32.39,
+              "compile_ms": 87.61,
+              "stdout": [
+                "254401",
+                "16563864"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "calc": {
+      "what": "Generate, parse and evaluate N arithmetic expressions (1/3 malformed).",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 400000,
+          "rows": {
+            "blot arena + error codes": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 352.529,
+              "wall_ms": 354.302,
+              "median_ms": 355.741,
+              "all_ms": [
+                352.529,
+                355.741,
+                359.067
+              ],
+              "all_wall_ms": [
+                354.302,
+                358.194,
+                364.623
+              ],
+              "peak_bytes": 4100096,
+              "peak_mb": 3.91,
+              "compile_ms": 35.48,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ],
+              "blotc_ms": 17.51,
+              "aot_ms": 17.96,
+              "wasm_bytes": 28249
+            },
+            "goose local pool + return from": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 121.665,
+              "wall_ms": 122.197,
+              "median_ms": 123.573,
+              "all_ms": [
+                121.665,
+                123.573,
+                123.877
+              ],
+              "all_wall_ms": [
+                122.197,
+                124.093,
+                124.724
+              ],
+              "peak_bytes": 2416640,
+              "peak_mb": 2.3,
+              "compile_ms": 140.52,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ]
+            },
+            "cpp unique_ptr + exceptions": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 398.161,
+              "wall_ms": 399.962,
+              "median_ms": 401.216,
+              "all_ms": [
+                398.161,
+                401.216,
+                435.169
+              ],
+              "all_wall_ms": [
+                399.962,
+                407.287,
+                438.76
+              ],
+              "peak_bytes": 4444160,
+              "peak_mb": 4.24,
+              "compile_ms": 307.07,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ]
+            },
+            "cpp arena + error codes": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 120.993,
+              "wall_ms": 121.461,
+              "median_ms": 124.334,
+              "all_ms": [
+                120.993,
+                124.334,
+                128.407
+              ],
+              "all_wall_ms": [
+                121.461,
+                125.123,
+                129.678
+              ],
+              "peak_bytes": 4325376,
+              "peak_mb": 4.12,
+              "compile_ms": 300.9,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ]
+            },
+            "rust Box + Result": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 212.488,
+              "wall_ms": 213.306,
+              "median_ms": 214.328,
+              "all_ms": [
+                212.488,
+                214.328,
+                217.879
+              ],
+              "all_wall_ms": [
+                213.306,
+                216.652,
+                219.688
+              ],
+              "peak_bytes": 2564096,
+              "peak_mb": 2.45,
+              "compile_ms": 99.23,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ]
+            },
+            "rust arena + Result": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 112.393,
+              "wall_ms": 113.033,
+              "median_ms": 113.774,
+              "all_ms": [
+                112.393,
+                113.774,
+                116.156
+              ],
+              "all_wall_ms": [
+                113.033,
+                115.286,
+                116.956
+              ],
+              "peak_bytes": 2625536,
+              "peak_mb": 2.5,
+              "compile_ms": 100.24,
+              "stdout": [
+                "16589727",
+                "6746064",
+                "259281",
+                "5627",
+                "61247",
+                "57752",
+                "16093",
+                "17094074625383217522"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "bintrees": {
+      "what": "Benchmarks Game binary-trees: build, check & discard trees up to depth D.",
+      "param": "depth",
+      "sizes": {
+        "medium": {
+          "n": 17,
+          "rows": {
+            "blot arena per tree": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 312.928,
+              "wall_ms": 314.457,
+              "median_ms": 319.063,
+              "all_ms": [
+                312.928,
+                319.063,
+                325.023
+              ],
+              "all_wall_ms": [
+                314.457,
+                321.117,
+                327.232
+              ],
+              "peak_bytes": 11665408,
+              "peak_mb": 11.12,
+              "compile_ms": 27.33,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ],
+              "blotc_ms": 17.15,
+              "aot_ms": 10.18,
+              "wasm_bytes": 12918
+            },
+            "goose local pool per tree": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 50.648,
+              "wall_ms": 50.85,
+              "median_ms": 51.287,
+              "all_ms": [
+                50.648,
+                51.287,
+                51.788
+              ],
+              "all_wall_ms": [
+                50.85,
+                51.625,
+                52.056
+              ],
+              "peak_bytes": 8409088,
+              "peak_mb": 8.02,
+              "compile_ms": 109.87,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ]
+            },
+            "cpp new/delete": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 470.372,
+              "wall_ms": 474.414,
+              "median_ms": 475.041,
+              "all_ms": [
+                470.372,
+                475.041,
+                479.062
+              ],
+              "all_wall_ms": [
+                474.414,
+                480.178,
+                482.838
+              ],
+              "peak_bytes": 20971520,
+              "peak_mb": 20.0,
+              "compile_ms": 147.12,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ]
+            },
+            "cpp vector arena": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 81.32,
+              "wall_ms": 82.191,
+              "median_ms": 86.662,
+              "all_ms": [
+                81.32,
+                86.662,
+                86.952
+              ],
+              "all_wall_ms": [
+                82.191,
+                87.591,
+                87.924
+              ],
+              "peak_bytes": 12443648,
+              "peak_mb": 11.87,
+              "compile_ms": 164.48,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ]
+            },
+            "rust Box": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 555.948,
+              "wall_ms": 565.349,
+              "median_ms": 568.363,
+              "all_ms": [
+                555.948,
+                568.363,
+                592.841
+              ],
+              "all_wall_ms": [
+                565.349,
+                574.013,
+                602.381
+              ],
+              "peak_bytes": 19218432,
+              "peak_mb": 18.33,
+              "compile_ms": 71.52,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ]
+            },
+            "rust Vec arena": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 69.671,
+              "wall_ms": 69.906,
+              "median_ms": 71.713,
+              "all_ms": [
+                69.671,
+                71.713,
+                73.26
+              ],
+              "all_wall_ms": [
+                69.906,
+                72.078,
+                73.612
+              ],
+              "peak_bytes": 8974336,
+              "peak_mb": 8.56,
+              "compile_ms": 74.93,
+              "stdout": [
+                "524287",
+                "131072",
+                "4",
+                "4063232",
+                "32768",
+                "6",
+                "4161536",
+                "8192",
+                "8",
+                "4186112",
+                "2048",
+                "10",
+                "4192256",
+                "512",
+                "12",
+                "4193792",
+                "128",
+                "14",
+                "4194176",
+                "32",
+                "16",
+                "4194272",
+                "262143"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "respond": {
+      "what": "Build & render N JSON responses with FNV-1a checksum.",
+      "param": "N",
+      "sizes": {
+        "medium": {
+          "n": 400000,
+          "rows": {
+            "blot streaming": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 258.651,
+              "wall_ms": 261.27,
+              "median_ms": 260.965,
+              "all_ms": [
+                258.651,
+                260.965,
+                265.064
+              ],
+              "all_wall_ms": [
+                261.27,
+                262.533,
+                268.565
+              ],
+              "peak_bytes": 4096000,
+              "peak_mb": 3.91,
+              "compile_ms": 30.03,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ],
+              "blotc_ms": 16.97,
+              "aot_ms": 13.06,
+              "wasm_bytes": 14759
+            },
+            "goose inline DTO": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 139.352,
+              "wall_ms": 139.892,
+              "median_ms": 141.089,
+              "all_ms": [
+                139.352,
+                141.089,
+                142.104
+              ],
+              "all_wall_ms": [
+                139.892,
+                141.664,
+                143.486
+              ],
+              "peak_bytes": 2416640,
+              "peak_mb": 2.3,
+              "compile_ms": 182.46,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            },
+            "goose streaming": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 110.254,
+              "wall_ms": 110.87,
+              "median_ms": 110.707,
+              "all_ms": [
+                110.254,
+                110.707,
+                123.356
+              ],
+              "all_wall_ms": [
+                110.87,
+                111.346,
+                124.697
+              ],
+              "peak_bytes": 2256896,
+              "peak_mb": 2.15,
+              "compile_ms": 146.55,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            },
+            "cpp DTO + string": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 174.506,
+              "wall_ms": 176.605,
+              "median_ms": 175.705,
+              "all_ms": [
+                174.506,
+                175.705,
+                176.263
+              ],
+              "all_wall_ms": [
+                176.605,
+                177.749,
+                179.562
+              ],
+              "peak_bytes": 4440064,
+              "peak_mb": 4.23,
+              "compile_ms": 321.1,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            },
+            "cpp streaming": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 134.306,
+              "wall_ms": 136.561,
+              "median_ms": 171.116,
+              "all_ms": [
+                134.306,
+                171.116,
+                173.894
+              ],
+              "all_wall_ms": [
+                136.561,
+                198.578,
+                261.084
+              ],
+              "peak_bytes": 4317184,
+              "peak_mb": 4.12,
+              "compile_ms": 264.24,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            },
+            "rust DTO + String": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 270.76,
+              "wall_ms": 273.438,
+              "median_ms": 279.296,
+              "all_ms": [
+                270.76,
+                279.296,
+                302.433
+              ],
+              "all_wall_ms": [
+                273.438,
+                282.562,
+                338.54
+              ],
+              "peak_bytes": 2752512,
+              "peak_mb": 2.62,
+              "compile_ms": 130.56,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            },
+            "rust streaming": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 157.843,
+              "wall_ms": 158.592,
+              "median_ms": 158.316,
+              "all_ms": [
+                157.843,
+                158.316,
+                158.978
+              ],
+              "all_wall_ms": [
+                158.592,
+                161.571,
+                161.699
+              ],
+              "peak_bytes": 2478080,
+              "peak_mb": 2.36,
+              "compile_ms": 108.84,
+              "stdout": [
+                "400000",
+                "91800236",
+                "8685297199210497210"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "blur": {
+      "what": "16 passes of a 3x3 blur over a WxW 8-bit image.",
+      "param": "W",
+      "sizes": {
+        "medium": {
+          "n": 2048,
+          "rows": {
+            "blot 16-wide U8x16 SIMD": {
+              "kind": "blot",
+              "tier": null,
+              "ok": true,
+              "ms": 32.079,
+              "wall_ms": 32.204,
+              "median_ms": 33.023,
+              "all_ms": [
+                32.079,
+                33.023,
+                34.586
+              ],
+              "all_wall_ms": [
+                32.204,
+                33.383,
+                35.153
+              ],
+              "peak_bytes": 12521472,
+              "peak_mb": 11.94,
+              "compile_ms": 27.71,
+              "stdout": [
+                "2048",
+                "502239988"
+              ],
+              "blotc_ms": 18.85,
+              "aot_ms": 8.87,
+              "wasm_bytes": 8581
+            },
+            "goose flat indexing": {
+              "kind": "goose",
+              "tier": null,
+              "ok": true,
+              "ms": 18.702,
+              "wall_ms": 18.891,
+              "median_ms": 19.636,
+              "all_ms": [
+                18.702,
+                19.636,
+                19.888
+              ],
+              "all_wall_ms": [
+                18.891,
+                19.776,
+                20.122
+              ],
+              "peak_bytes": 11804672,
+              "peak_mb": 11.26,
+              "compile_ms": 121.56,
+              "stdout": [
+                "2048",
+                "502239988"
+              ]
+            },
+            "cpp flat indexing": {
+              "kind": "cpp",
+              "tier": "idiomatic",
+              "ok": true,
+              "ms": 21.918,
+              "wall_ms": 22.064,
+              "median_ms": 22.685,
+              "all_ms": [
+                21.918,
+                22.685,
+                23.238
+              ],
+              "all_wall_ms": [
+                22.064,
+                23.081,
+                23.546
+              ],
+              "peak_bytes": 13541376,
+              "peak_mb": 12.91,
+              "compile_ms": 175.47,
+              "stdout": [
+                "2048",
+                "502239988"
+              ]
+            },
+            "cpp row pointers": {
+              "kind": "cpp",
+              "tier": "expert",
+              "ok": true,
+              "ms": 23.505,
+              "wall_ms": 23.715,
+              "median_ms": 23.607,
+              "all_ms": [
+                23.505,
+                23.607,
+                25.188
+              ],
+              "all_wall_ms": [
+                23.715,
+                23.803,
+                25.605
+              ],
+              "peak_bytes": 12513280,
+              "peak_mb": 11.93,
+              "compile_ms": 161.96,
+              "stdout": [
+                "2048",
+                "502239988"
+              ]
+            },
+            "rust flat indexing": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 20.537,
+              "wall_ms": 20.655,
+              "median_ms": 21.059,
+              "all_ms": [
+                20.537,
+                21.059,
+                21.978
+              ],
+              "all_wall_ms": [
+                20.655,
+                21.382,
+                22.095
+              ],
+              "peak_bytes": 10862592,
+              "peak_mb": 10.36,
+              "compile_ms": 83.95,
+              "stdout": [
+                "2048",
+                "502239988"
+              ]
+            },
+            "rust row slices": {
+              "kind": "rust",
+              "tier": null,
+              "ok": true,
+              "ms": 20.186,
+              "wall_ms": 20.365,
+              "median_ms": 20.666,
+              "all_ms": [
+                20.186,
+                20.666,
+                21.361
+              ],
+              "all_wall_ms": [
+                20.365,
+                20.86,
+                21.636
+              ],
+              "peak_bytes": 10997760,
+              "peak_mb": 10.49,
+              "compile_ms": 80.95,
+              "stdout": [
+                "2048",
+                "502239988"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "generated_at": "2026-11-27T03:19:04.966501+00:00",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "os": "Linux 7.3.5-2-cachyos (x86_64)",
+    "clang": "clang version 23.1.5",
+    "rust": "rustc 1.96.0-nightly (3645249d7 2026-03-16)",
+    "wtime_aot": "/home/mewhhaha/src/wtime/tools/wtime-aot/target/release/wtime-aot",
+    "blotc": "/home/mewhhaha/src/blot2/compiler-goose/build/blotc-goose",
+    "goose": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
+    "reps": 3,
+    "warmups": 2,
+    "sizes": [
+      "medium"
+    ]
+  }
+}

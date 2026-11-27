@@ -9695,11 +9695,6 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         scalar, associated, logical => {
             let divisor = invariantDivisor(g, f, m, id, input_locals);
             if divisor != 0xffffffff { emitLoopReciprocal(g, f, divisor, divisor == mandatory, index, end); }
-            if n.tag == blot_check_core::Tag.scalar && (n.op == blot_check_core::Op.div || n.op == blot_check_core::Op.rem) &&
-                m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.unsigned64 {
-                let d64, from_u32 = invariantU64DivisorExpr(g, f, m, n.b, input_locals);
-                if d64 != 0xffffffff { emitLoopReciprocalU64(g, f, d64, from_u32); }
-            }
             collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget);
             collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
         },
@@ -9715,36 +9710,6 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         },
         call => {
             let ci = m.call(id);
-            let target = g.resolve(m, ci.target);
-            if g.hasUnit(target.unit) && canInlineTarget(g, target, f.inline_depth) {
-                let tm .= g.units[target.unit - 1];
-                let tbody .= tm.body(target.binding);
-                if tbody && tbody.is_function {
-                    let tparams = tm.bodyParameters(tbody);
-                    if tparams.len == ci.arguments.len {
-                        for arg, ai in ci.arguments {
-                            let ab = localRef(m, arg);
-                            if ab == 0 { continue; }
-                            let av, aok = bindGet(g, f, ab);
-                            let _, is_cell = withCellType(g, f, ab);
-                            if !aok || is_cell { continue; }
-                            if av.ty == blot_direct_types::u32_ {
-                                let loc = w(g, av, 0);
-                                let _, is_c = constU32(f, loc);
-                                if loc < input_locals && !is_c && calleeUsesParamAsU64Divisor(tm, tbody.root, tparams[ai].binding) {
-                                    emitLoopReciprocalU64(g, f, loc, true);
-                                }
-                            } else if av.ty == blot_direct_types::u64_ {
-                                let loc = w(g, av, 0);
-                                let _, is_c = constU64(f, loc);
-                                if loc < input_locals && !is_c && calleeUsesParamAsU64Divisor(tm, tbody.root, tparams[ai].binding) {
-                                    emitLoopReciprocalU64(g, f, loc, false);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             for arg in ci.arguments { collectLoopReciprocals(g, f, arg, input_locals, mandatory, index, end, budget); }
         },
         match_ => {
