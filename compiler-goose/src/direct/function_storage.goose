@@ -1810,32 +1810,42 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if rerr != blot_direct_types::Error.none { return result, rerr; }
             lget(g, bytes);
             let nonzero = open(g, f, OP_if_);
-            // Large pre-sized arrays (> 4 MiB) use exact-size stack backing so
-            // they avoid power-of-two heap rounding bloat (e.g. 64M+64M exhausting
-            // a 128 MiB heap), while still growing transparently into the heap via
-            // rt.push / rt.reserve. Small/medium arrays use open_heap so helper
-            // locals are reclaimed on function exit via heap_free.
-            lget(g, bytes);
-            i32Const(g, 4194304);
-            op(g, OP_i32_gt_u);
-            let large_stack = open(g, f, OP_if_);
-            lget(g, bytes);
-            callf(g, rt.stack);
-            i32Const(g, 0);
-            lget(g, bytes);
-            callf(g, rt.open);
-            lset(g, w(g, result, 1));
-            lset(g, w(g, result, 0));
-            popCheckedArraysAt(f, large_stack);
-            op(g, OP_else_);
-            lget(g, bytes);
-            i32Const(g, 0);
-            callf(g, rt.open_heap);
-            op(g, OP_drop);
-            op(g, OP_drop);
-            lset(g, w(g, result, 1));
-            lset(g, w(g, result, 0));
-            close(g, f);
+            // Top-level (non-loop, non-inlined) pre-sized arrays and large
+            // (> 4 MiB) arrays use exact-size stack backing so they avoid
+            // heap_alloc/heap_free overhead and power-of-two rounding bloat,
+            // rewinding in one store on function exit while still growing
+            // transparently onto the heap via rt.push / rt.reserve if needed.
+            if f.inline_depth == 0 && f.loop_depth == 0 {
+                lget(g, bytes);
+                callf(g, rt.stack);
+                i32Const(g, 0);
+                lget(g, bytes);
+                callf(g, rt.open);
+                lset(g, w(g, result, 1));
+                lset(g, w(g, result, 0));
+            } else {
+                lget(g, bytes);
+                i32Const(g, 4194304);
+                op(g, OP_i32_gt_u);
+                let large_stack = open(g, f, OP_if_);
+                lget(g, bytes);
+                callf(g, rt.stack);
+                i32Const(g, 0);
+                lget(g, bytes);
+                callf(g, rt.open);
+                lset(g, w(g, result, 1));
+                lset(g, w(g, result, 0));
+                popCheckedArraysAt(f, large_stack);
+                op(g, OP_else_);
+                lget(g, bytes);
+                i32Const(g, 0);
+                callf(g, rt.open_heap);
+                op(g, OP_drop);
+                op(g, OP_drop);
+                lset(g, w(g, result, 1));
+                lset(g, w(g, result, 0));
+                close(g, f);
+            }
             popCheckedArraysAt(f, nonzero);
             op(g, OP_else_);
             i32Const(g, 0);

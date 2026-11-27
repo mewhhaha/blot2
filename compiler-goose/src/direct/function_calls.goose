@@ -721,7 +721,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
     }
     var elide_args = false;
     var elide_vector_args = false;
-    if arguments.len >= 1 && arguments.len <= 3 && g.hasUnit(target.unit) {
+    if arguments.len >= 1 && arguments.len <= 4 && g.hasUnit(target.unit) {
         let resolved_prim = followAliasTarget(g, target);
         if g.hasUnit(resolved_prim.unit) {
             let rtm .= g.units[resolved_prim.unit - 1];
@@ -730,14 +730,21 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
                 let root = forwardingRoot(rtm, body.root);
                 let node = rtm.node(root);
                 elide_vector_args = node.tag == blot_check_core::Tag.scalar && node.c == 0 &&
-                    isF32x4CoreExpr(rtm, node.a) &&
+                    (isF32x4CoreExpr(rtm, node.a) || isF64x2CoreExpr(rtm, node.a)) &&
                     (isCanonicalF32Consumer(node.op) || canonicalV128Producer(node.op)) &&
                     simdForwardingOperands(rtm, body, node.a, node.b);
+                if !elide_vector_args && !body.exported {
+                    var nb: i64 = 96;
+                    if bodyOnlyCanonicalFloatOps(g, rtm, body.root, false, nb) {
+                        elide_vector_args = true;
+                        elide_args = true;
+                    }
+                }
             }
             let palias, has_palias = primitiveAlias(rtm, resolved_prim.binding);
             if has_palias {
                 let pinfo = rtm.primitive(palias);
-                if pinfo.kind == blot_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) && isF32CoreExpr(g, f, m, arguments[0]) {
+                if pinfo.kind == blot_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) && isFloatCoreExpr(g, f, m, arguments[0]) {
                     elide_args = true;
                 }
             }
@@ -753,7 +760,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
             g.s.vals[values.start + at] = neverVal();
             continue;
         }
-        if elide_args || (elide_vector_args && isF32x4CoreExpr(m, argument)) {
+        if elide_args || (elide_vector_args && (isF32x4CoreExpr(m, argument) || isF64x2CoreExpr(m, argument))) {
             f.elide_f32_nan_node = argument;
         }
         let value, error = expr(g, f, argument);
@@ -1599,7 +1606,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             has_value = was_forwarded;
         }
         if !has_value && !skip_inline_for_tco && f.inline_depth < 3 && evidence_context == 0 {
-            let inlined, was_inlined, ierr = inlineSmall(g, f, target, direct, callee, after, id);
+            let inlined, was_inlined, ierr = inlineSmall(g, f, target, direct, callee, after, id, elide_nan);
             if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
             if was_inlined {
                 g.recordInlined(target.unit, target.binding);
@@ -1906,7 +1913,7 @@ fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool
     return (mask & bit) != 0;
 }
 
-recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals, callee: Ty, after: Ty, id: u32) -> Val, bool, Error {
+recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals, callee: Ty, after: Ty, id: u32, elide_nan: bool = false) -> Val, bool, Error {
     if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
         return neverVal(), false, blot_direct_types::Error.none;
     }
@@ -2075,13 +2082,33 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.evidence_context = 0;
     f.inline_depth += 1;
 
+    var own_param_mask: u32 = 0;
+    var defer_inline_nan = false;
+    {
+        let tm .= g.units[target.unit - 1];
+        let body .= tm.body(target.binding);
+        if body {
+            own_param_mask = tm.binding(body.binding).capability_parameters.own;
+            if elide_nan && !f.defer_f32_nan {
+                var nb: i64 = 96;
+                defer_inline_nan = bodyOnlyCanonicalFloatOps(g, tm, body_root, false, nb);
+            }
+        }
+    }
+    let saved_defer_nan = f.defer_f32_nan;
+    if defer_inline_nan { f.defer_f32_nan = true; }
     for at in 0..param_count {
-        bindPut(g, f, param_bindings[at], g.s.vals[direct.start + at]);
+        let aval = g.s.vals[direct.start + at];
+        bindPut(g, f, param_bindings[at], aval);
         if (unique_arg_mask & ((1 as u32) << (at as u32))) != 0 {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
+        }
+        if at < 32 && ((own_param_mask >> (at as u32)) & 1) != 0 {
             blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
     }
     let body_val, b_err = stmt(g, f, body_root);
+    f.defer_f32_nan = saved_defer_nan;
     var final_err = b_err;
     if final_err == blot_direct_types::Error.none {
         let derr = deliver(g, f, body_val, slot, body_root);
@@ -2124,7 +2151,23 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.evidence_context = saved_evidence_context;
 
     if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
-    return g.s.slots[slot].value, true, blot_direct_types::Error.none;
+    let ret_val = g.s.slots[slot].value;
+    if tagOf(g, ret_val.ty) == blot_direct_types::Tag.array {
+        let tm .= g.units[target.unit - 1];
+        for at in 0..param_count {
+            let aval = g.s.vals[direct.start + at];
+            if tagOf(g, aval.ty) != blot_direct_types::Tag.array { continue; }
+            if calleeReturnsParamHandle(g, tm, body_root, param_bindings[at], 0) {
+                if knownMutable(g, f, aval) { recordMutable(g, f, ret_val); }
+                let ca = findCheckedArray(f, w(g, aval, 0), w(g, aval, 1));
+                if ca >= 0 {
+                    recordCheckedArray(f, w(g, ret_val, 0), w(g, ret_val, 1), f.checked_arrays[ca].base, f.checked_arrays[ca].length);
+                }
+                break;
+            }
+        }
+    }
+    return ret_val, true, blot_direct_types::Error.none;
 }
 
 fn forwardingRoot(tm: const Module&, body_root: u32) -> u32 {
@@ -2446,7 +2489,7 @@ fn curried(g: Generator&, arguments: Vals, result: Ty) -> Ty, Error {
 recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    let elide_children = n.op != blot_check_core::Op.none && isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    let elide_children = n.op != blot_check_core::Op.none && isCanonicalF32Consumer(n.op) && isFloatCoreExpr(g, f, m, n.a);
     if elide_children { f.elide_f32_nan_node = n.a; }
     let left, error = expr(g, f, n.a);
     f.elide_f32_nan_node = 0;

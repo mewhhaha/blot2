@@ -20,7 +20,7 @@ fn isCanonicalF32Op(op_: Op) -> bool {
     return op_ == blot_check_core::Op.add || op_ == blot_check_core::Op.sub || op_ == blot_check_core::Op.mul || op_ == blot_check_core::Op.div || op_ == blot_check_core::Op.sqrt || op_ == blot_check_core::Op.floor || op_ == blot_check_core::Op.ceil || op_ == blot_check_core::Op.trunc;
 }
 fn isCanonicalF32Consumer(op_: Op) -> bool {
-    return isCanonicalF32Op(op_) || isComparisonOp(op_) || op_ == blot_check_core::Op.convert_f32_u32 || op_ == blot_check_core::Op.convert_f32_i32;
+    return isCanonicalF32Op(op_) || isComparisonOp(op_) || op_ == blot_check_core::Op.convert_f32_u32 || op_ == blot_check_core::Op.convert_f32_i32 || op_ == blot_check_core::Op.numeric_convert;
 }
 fn canonicalV128Producer(op_: Op) -> bool {
     return isCanonicalF32Op(op_) || op_ == blot_check_core::Op.relaxed_madd || op_ == blot_check_core::Op.relaxed_nmadd;
@@ -55,6 +55,16 @@ fn isF32CoreExpr(g: Generator&, f: const Fn&, m: const Module&, expr_id: u32) ->
     let ty, err = g.types.lower(m, raw, f.env);
     if err != blot_direct_types::Error.none { g.dropFailure(); return false; }
     return tagOf(g, ty) == blot_direct_types::Tag.f32_;
+}
+fn isFloatCoreExpr(g: Generator&, f: const Fn&, m: const Module&, expr_id: u32) -> bool {
+    if expr_id == 0 { return false; }
+    let raw = m.typeOf(expr_id);
+    if raw == blot_check_types::f32_type || raw == blot_check_types::f64_type { return true; }
+    if raw <= blot_check_types::never { return false; }
+    let ty, err = g.types.lower(m, raw, f.env);
+    if err != blot_direct_types::Error.none { g.dropFailure(); return false; }
+    let tag = tagOf(g, ty);
+    return tag == blot_direct_types::Tag.f32_ || tag == blot_direct_types::Tag.f64_;
 }
 // Proves `expr_id` evaluates to a finite non-NaN F32 with |x| <= 2^33.
 // Closed under int->f32 conversions, small finite literals, neg/abs, and
@@ -193,7 +203,7 @@ fn scalarI64(g: Generator&, f: const Fn&, operation: Op, signed: bool, id: u32) 
     op(g, code);
     return blot_direct_types::Error.none;
 }
-fn scalarF64(g: Generator&, f: const Fn&, operation: Op, id: u32) -> Error {
+fn scalarF64(g: Generator&, f: const Fn&, operation: Op, id: u32, canonicalize: bool = true) -> Error {
     var code: u8 = 0;
     match operation {
         add => { code = OP_f64_add; },
@@ -218,7 +228,7 @@ fn scalarF64(g: Generator&, f: const Fn&, operation: Op, id: u32) -> Error {
         _ => { return g.fail(g.units[f.unit - 1], id, "unsupported F64 operation"); },
     }
     op(g, code);
-    if isCanonicalF32Op(operation) || operation == blot_check_core::Op.min || operation == blot_check_core::Op.max { canonicalizeF64Stack(g, f); }
+    if canonicalize && (isCanonicalF32Op(operation) || operation == blot_check_core::Op.min || operation == blot_check_core::Op.max) { canonicalizeF64Stack(g, f); }
     return blot_direct_types::Error.none;
 }
 fn convertScalar(g: Generator&, f: const Fn&, input: Ty, output: Ty, id: u32) -> Error {
@@ -564,10 +574,10 @@ fn emitU64StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, le
 recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, stack_result: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    // Peephole-elide NaN canonicalization on direct F32 operands ONLY when this
+    // Peephole-elide NaN canonicalization on direct F32/F64 operands ONLY when this
     // operation itself canonicalizes or ignores NaN payloads (arithmetic/rounding,
-    // float comparisons, F32.to_u32 / F32.to_i32).
-    let scalar_children = isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    // float comparisons, float->int trunc_sat / float->float conversions).
+    let scalar_children = isCanonicalF32Consumer(n.op) && isFloatCoreExpr(g, f, m, n.a);
     let vector_children = (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)) && (isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a));
     let elide_children = scalar_children || vector_children;
     if elide_children { f.elide_f32_nan_node = n.a; }
@@ -700,7 +710,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
         machine = member;
     }
     var skip_nan = elide_nan;
-    if !skip_nan && f.defer_f32_nan && tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && isCanonicalF32Op(machine) {
+    if !skip_nan && f.defer_f32_nan && (tagOf(g, left.ty) == blot_direct_types::Tag.f32_ || tagOf(g, left.ty) == blot_direct_types::Tag.f64_) && isCanonicalF32Op(machine) {
         skip_nan = true;
     }
     if !skip_nan && tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && has_right &&
@@ -1133,7 +1143,7 @@ fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, i
         if op_ == blot_check_core::Op.any_true || op_ == blot_check_core::Op.all_true || op_ == blot_check_core::Op.i8x16_bitmask {
             return pop(g, f, result_ty, id);
         }
-        if !elide_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f64 {
+        if !elide_nan && !f.defer_f32_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f64 {
             canonicalizeF64x2(g, f);
         }
         return popV128(g, f, result_ty), blot_direct_types::Error.none;
@@ -1192,15 +1202,15 @@ fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, i
     if op_ == blot_check_core::Op.any_true || op_ == blot_check_core::Op.all_true {
         return pop(g, f, result_ty, id);
     }
-    if !elide_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f32 {
+    if !elide_nan && !f.defer_f32_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f32 {
         canonicalizeF32x4(g, f, 0xffffffff);
     }
     return popV128(g, f, result_ty), blot_direct_types::Error.none;
 }
 // Emits the machine operation for `op` on operands already on the stack.
-// F32 arithmetic & rounding producers (+, -, *, /, sqrt, floor, ceil, trunc)
-// canonicalize NaN outputs to positive quiet NaN 0x7fc00000 unless `canonicalize`
-// is false (peephole-elided directly into a canonicalizing consumer).
+// F32/F64 arithmetic & rounding producers (+, -, *, /, sqrt, floor, ceil, trunc)
+// canonicalize NaN outputs unless `canonicalize` is false (peephole-elided into
+// a canonicalizing or NaN-payload-ignoring consumer).
 fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonicalize: bool = true, result: Ty = 0) -> Error {
     let m .= g.units[f.unit - 1];
     let tag = g.types.node(operand).tag;
@@ -1216,7 +1226,7 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonica
         return g.failClose();
     }
     if op_ == blot_check_core::Op.numeric_convert { return convertScalar(g, f, operand, result, id); }
-    if tag == blot_direct_types::Tag.f64_ { return scalarF64(g, f, op_, id); }
+    if tag == blot_direct_types::Tag.f64_ { return scalarF64(g, f, op_, id, canonicalize); }
     if tag == blot_direct_types::Tag.u64_ || tag == blot_direct_types::Tag.i64_ {
         return scalarI64(g, f, op_, tag == blot_direct_types::Tag.i64_, id);
     }

@@ -3857,9 +3857,11 @@ fn assign(g: Generator&, f: Fn&, values: Vals, targets: Vals, id: u32) -> Error 
         let staged_val = g.s.vals[staged.start + at];
         let target = g.s.vals[targets.start + at];
         if sameWords(g, staged_val, target) { continue; }
+        let src_mutable = knownMutable(g, f, staged_val);
         let copied = copy(g, f, staged_val, target, id);
         if copied != blot_direct_types::Error.none { return copied; }
         invalidateCheckedArrayVal(g, f, target);
+        if src_mutable { recordMutable(g, f, target); }
     }
     return blot_direct_types::Error.none;
 }
@@ -4271,6 +4273,57 @@ recursive fn patternContainsResized(m: const Module&, pid: u32, resized: const u
 // (bind of reference/update, nested loop carries, and if/match branch merges).
 // Returns false conservatively if a resized binding originates from an untracked
 // expression shape or overflows the 16-entry set.
+fn resizedRhsOrigin(m: const Module&, id: u32) -> u32, bool {
+    var cur = id;
+    for step in 0..8 {
+        if cur == 0 { return 0, false; }
+        let n = m.node(cur);
+        match n.tag {
+            reference => {
+                let rb = localRef(m, cur);
+                return rb, rb != 0;
+            },
+            update => {
+                let rb = localRef(m, m.updateInfo(cur).root);
+                return rb, rb != 0;
+            },
+            array => { return 0, true; },
+            storage => {
+                let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+                if ok != blot_error::Error.none { return 0, false; }
+                if op_kind == blot_check_storage_ops::Op.with_capacity || op_kind == blot_check_storage_ops::Op.copy { return 0, true; }
+                let ch = m.children(cur);
+                if ch.len > 0 && (op_kind == blot_check_storage_ops::Op.push || op_kind == blot_check_storage_ops::Op.reserve || op_kind == blot_check_storage_ops::Op.extend) {
+                    let rb = localRef(m, ch[0]);
+                    return rb, rb != 0;
+                }
+                return 0, false;
+            },
+            apply => {
+                if m.node(n.a).tag == blot_check_core::Tag.project {
+                    let proj_n = m.node(n.a);
+                    let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+                    if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend") {
+                        let rb = localRef(m, proj_n.a);
+                        return rb, rb != 0;
+                    }
+                }
+                return 0, false;
+            },
+            return_ => { cur = n.a; },
+            block_, suite => {
+                let ch = m.children(cur);
+                if ch.len == 0 { return 0, false; }
+                for ci in 0..(ch.len - 1) {
+                    if m.node(ch[ci]).tag != blot_check_core::Tag.bind { return 0, false; }
+                }
+                cur = ch[ch.len - 1];
+            },
+            _ => { return 0, false; },
+        }
+    }
+    return 0, false;
+}
 recursive fn propagateResizedAliases(m: const Module&, id: u32, resized: u32[16]&, resized_len: i64&, changed: bool&, left: i64&) -> bool {
     if id == 0 { return true; }
     if left <= 0 { return false; }
@@ -4285,18 +4338,9 @@ recursive fn propagateResizedAliases(m: const Module&, id: u32, resized: u32[16]
         },
         bind => {
             if inResizedSet(resized, resized_len, n.a) {
-                let rhs = m.node(n.b);
-                if rhs.tag == blot_check_core::Tag.reference {
-                    let rb = localRef(m, n.b);
-                    if rb == 0 { return false; }
-                    if !addResizedSetTracked(resized, resized_len, rb, changed) { return false; }
-                } else if rhs.tag == blot_check_core::Tag.update {
-                    let rb = localRef(m, m.updateInfo(n.b).root);
-                    if rb == 0 { return false; }
-                    if !addResizedSetTracked(resized, resized_len, rb, changed) { return false; }
-                } else if rhs.tag != blot_check_core::Tag.array {
-                    return false;
-                }
+                let rb, ok = resizedRhsOrigin(m, n.b);
+                if !ok { return false; }
+                if rb != 0 && !addResizedSetTracked(resized, resized_len, rb, changed) { return false; }
             }
             return propagateResizedAliases(m, n.b, resized, resized_len, changed, left);
         },
@@ -4467,7 +4511,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                     }
                     return true;
                 },
-                push, pop, truncate => {
+                push, pop, truncate, reserve, extend => {
                     if ch.len == 0 { return false; }
                     let target_b = localRef(m, ch[0]);
                     if target_b == 0 || m.types.node(m.typeOf(ch[0])).tag != blot_check_types::Tag.array { return false; }
@@ -4499,9 +4543,9 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             if !body || !body.is_function || body.exported { return false; }
             let params = tm.bodyParameters(body);
             if params.len != call.arguments.len { return false; }
-            var ibudget: i64 = 72;
+            var ibudget: i64 = 256;
             if !canInlineBody(g, tm, body.root, target, ibudget) { return false; }
-            var cbudget: i64 = 128;
+            var cbudget: i64 = 512;
             if noStorageResize(g, tm, body.root, cbudget) { return true; }
             // Callee has no effects/closures and may only resize its `own` parameters.
             let own_mask = tm.binding(body.binding).capability_parameters.own;
@@ -4518,10 +4562,21 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
         },
         apply => {
             if m.node(n.a).tag == blot_check_core::Tag.project {
-                let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
-                if sp.present && sp.value == "at" {
-                    return scanLoopResize(g, m, m.node(n.a).a, resized, resized_len, left) &&
-                        scanLoopResize(g, m, n.b, resized, resized_len, left);
+                let proj_n = m.node(n.a);
+                let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+                if sp.present {
+                    if sp.value == "at" {
+                        return scanLoopResize(g, m, proj_n.a, resized, resized_len, left) &&
+                            scanLoopResize(g, m, n.b, resized, resized_len, left);
+                    }
+                    if (sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend") &&
+                        m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                        let target_b = localRef(m, proj_n.a);
+                        if target_b == 0 { return false; }
+                        if !addResizedSet(resized, resized_len, target_b) { return false; }
+                        return scanLoopResize(g, m, proj_n.a, resized, resized_len, left) &&
+                            scanLoopResize(g, m, n.b, resized, resized_len, left);
+                    }
                 }
             }
             return false;
@@ -4733,10 +4788,16 @@ recursive fn exprPreservesHandle(
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
+        return_ => {
+            return exprPreservesHandle(g, m, n.a, same, same_len, depth + 1, allow_calls, call_depth);
+        },
         block_, suite => {
             let ch = m.children(id);
-            if ch.len == 1 { return exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth); }
-            return false;
+            if ch.len == 0 { return false; }
+            for ci in 0..(ch.len - 1) {
+                if m.node(ch[ci]).tag != blot_check_core::Tag.bind { return false; }
+            }
+            return exprPreservesHandle(g, m, ch[ch.len - 1], same, same_len, depth + 1, allow_calls, call_depth);
         },
         call => {
             if !allow_calls || call_depth >= 2 { return false; }
@@ -4753,6 +4814,17 @@ recursive fn exprPreservesHandle(
                     if calleeReturnsParamHandle(g, tm, body.root, params[ai].binding, call_depth + 1) {
                         return true;
                     }
+                }
+            }
+            return false;
+        },
+        apply => {
+            if m.node(n.a).tag == blot_check_core::Tag.project {
+                let proj_n = m.node(n.a);
+                let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+                if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend") &&
+                    m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                    return exprPreservesHandle(g, m, proj_n.a, same, same_len, depth + 1, allow_calls, call_depth);
                 }
             }
             return false;
@@ -5516,8 +5588,14 @@ fn addHoistCandidate(out: u32[8]&, len: i64&, b: u32) {
     out[len] = b;
     len += 1;
 }
-recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: i64&, left: i64&) {
-    if id == 0 || left <= 0 || len >= 8 { return; }
+fn addLoopArrayCandidate(out: u32[16]&, len: i64&, b: u32) {
+    if b == 0 || len >= 16 { return; }
+    for i in 0..len { if out[i] == b { return; } }
+    out[len] = b;
+    len += 1;
+}
+recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[16]&, len: i64&, left: i64&) {
+    if id == 0 || left <= 0 || len >= 16 { return; }
     left -= 1;
     let n = m.node(id);
     match n.tag {
@@ -5546,14 +5624,14 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
             let linfo = m.loopInfo(id);
             collectLoopArrayUses(m, linfo.first, out, len, left);
             collectLoopArrayUses(m, linfo.end, out, len, left);
-            for nc in m.loopCarries(id) { addHoistCandidate(out, len, nc.incoming); }
+            for nc in m.loopCarries(id) { addLoopArrayCandidate(out, len, nc.incoming); }
             collectLoopArrayUses(m, linfo.body, out, len, left);
         },
         update => {
             let change = m.updateInfo(id);
             let sels = m.updateSelectors(id);
             if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index {
-                addHoistCandidate(out, len, localRef(m, change.root));
+                addLoopArrayCandidate(out, len, localRef(m, change.root));
             }
             collectLoopArrayUses(m, change.root, out, len, left);
             collectLoopArrayUses(m, change.value, out, len, left);
@@ -5567,7 +5645,7 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
             let ch = m.children(id);
             match m.arrayOperation(id) {
                 get, length => {
-                    if ch.len > 0 { addHoistCandidate(out, len, localRef(m, ch[0])); }
+                    if ch.len > 0 { addLoopArrayCandidate(out, len, localRef(m, ch[0])); }
                 },
                 _ => {},
             }
@@ -5578,8 +5656,8 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
             if ok == blot_error::Error.none {
                 match op_kind {
-                    read, length => {
-                        if ch.len > 0 { addHoistCandidate(out, len, localRef(m, ch[0])); }
+                    read, length, push, pop, truncate, reserve, extend => {
+                        if ch.len > 0 { addLoopArrayCandidate(out, len, localRef(m, ch[0])); }
                     },
                     _ => {},
                 }
@@ -5594,10 +5672,22 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
             for arg in m.call(id).arguments {
                 let atag = m.types.node(m.typeOf(arg)).tag;
                 if atag == blot_check_types::Tag.array || atag == blot_check_types::Tag.usage {
-                    addHoistCandidate(out, len, localRef(m, arg));
+                    addLoopArrayCandidate(out, len, localRef(m, arg));
                 }
                 collectLoopArrayUses(m, arg, out, len, left);
             }
+        },
+        apply => {
+            if m.node(n.a).tag == blot_check_core::Tag.project {
+                let proj_n = m.node(n.a);
+                let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+                if sp.present && (sp.value == "at" || sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend") &&
+                    m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                    addLoopArrayCandidate(out, len, localRef(m, proj_n.a));
+                }
+            }
+            collectLoopArrayUses(m, n.a, out, len, left);
+            collectLoopArrayUses(m, n.b, out, len, left);
         },
         spark => {
             let sinfo = m.sparkInfo(id);
@@ -6990,7 +7080,108 @@ recursive fn bodyValidDeferF32Nan(
         _ => { return false; },
     }
 }
+fn isCanonicalFloatRhs(m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.scalar && n.tag != blot_check_core::Tag.associated { return false; }
+    if n.op == blot_check_core::Op.none || !isCanonicalF32Op(n.op) { return false; }
+    let t = m.types.node(m.typeOf(n.a)).tag;
+    return t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+}
+recursive fn scanScalarFloatDeferBody(
+    g: const Generator&,
+    m: const Module&,
+    id: u32,
+    top_level: bool,
+    carry_backs: const u32[48]&,
+    carry_seen: bool[48]&,
+    carry_len: i64,
+    budget: i64&,
+) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, reference => { return true; },
+        suite, block_ => {
+            for child in m.children(id) {
+                if !scanScalarFloatDeferBody(g, m, child, top_level, carry_backs, carry_seen, carry_len, budget) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if n.c >= 2 { return false; }
+            if !scanScalarFloatDeferBody(g, m, n.b, false, carry_backs, carry_seen, carry_len, budget) { return false; }
+            if top_level {
+                for ci in 0..carry_len {
+                    if carry_backs[ci] == n.a {
+                        if !isCanonicalFloatRhs(m, n.b) { return false; }
+                        carry_seen[ci] = true;
+                    }
+                }
+            }
+            return true;
+        },
+        pattern_bind => {
+            if n.c != 0 { return false; }
+            return scanScalarFloatDeferBody(g, m, n.b, false, carry_backs, carry_seen, carry_len, budget);
+        },
+        product => {
+            for child in m.children(id) {
+                if !scanScalarFloatDeferBody(g, m, child, false, carry_backs, carry_seen, carry_len, budget) { return false; }
+            }
+            return true;
+        },
+        scalar => {
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            let is_v = isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a);
+            let ok = (is_f && isCanonicalF32Consumer(n.op)) || (is_v && (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)));
+            if !ok { return false; }
+            return scanScalarFloatDeferBody(g, m, n.a, false, carry_backs, carry_seen, carry_len, budget) &&
+                (n.b == 0 || scanScalarFloatDeferBody(g, m, n.b, false, carry_backs, carry_seen, carry_len, budget));
+        },
+        associated => {
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            if n.op == blot_check_core::Op.none || !is_f || !isCanonicalF32Consumer(n.op) { return false; }
+            return scanScalarFloatDeferBody(g, m, n.a, false, carry_backs, carry_seen, carry_len, budget) &&
+                (n.b == 0 || scanScalarFloatDeferBody(g, m, n.b, false, carry_backs, carry_seen, carry_len, budget));
+        },
+        call => {
+            if !callIsCanonicalFloatConsumer(g, m, id, true) { return false; }
+            for arg in m.call(id).arguments {
+                if !scanScalarFloatDeferBody(g, m, arg, false, carry_backs, carry_seen, carry_len, budget) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+fn canDeferScalarFloatLoop(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: blot_check_core::LoopInfo) -> bool {
+    if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return false; }
+    if info.pattern != 0 && m.pattern(info.pattern).tag != blot_check_core::PatternTag.wildcard { return false; }
+    let carries = m.loopCarries(loop_id);
+    if carries.len == 0 || carries.len > 48 { return false; }
+    var carry_backs: u32[48] = [0; 48];
+    var carry_seen: bool[48] = [false; 48];
+    for carry, ci in carries {
+        let cv, cok = bindGet(g, f, carry.iteration);
+        if !cok { return false; }
+        let tag = tagOf(g, cv.ty);
+        if tag != blot_direct_types::Tag.f32_ && tag != blot_direct_types::Tag.f64_ { return false; }
+        carry_backs[ci] = carry.backedge;
+    }
+    var budget: i64 = 2048;
+    if !scanScalarFloatDeferBody(g, m, info.body, true, carry_backs, carry_seen, carries.len, budget) { return false; }
+    for ci in 0..carries.len {
+        if !carry_seen[ci] { return false; }
+    }
+    return true;
+}
 fn canDeferLoopF32Nan(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: blot_check_core::LoopInfo) -> bool {
+    if canDeferScalarFloatLoop(g, f, m, loop_id, info) { return true; }
     if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return false; }
     if info.pattern != 0 && m.pattern(info.pattern).tag != blot_check_core::PatternTag.wildcard { return false; }
     let carries = m.loopCarries(loop_id);
@@ -9976,7 +10167,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let ctag = tagOf(g, value.ty);
             var in_place = false;
             if !held && ctag == blot_direct_types::Tag.array {
-                var cbudget: i64 = 512;
+                var cbudget: i64 = 2048;
                 in_place = carryStaysInPlace(g, m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
             }
             if in_place {
@@ -10047,20 +10238,20 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var source = neverVal();
     var source_view_base: u32 = 0xffffffff;
     var range = CheckedRange {};
-    var body_no_resize_budget: i64 = 512;
+    var body_no_resize_budget: i64 = 2048;
     let body_no_resize = noStorageResize(g, m, info.body, body_no_resize_budget);
     var resized_bindings: u32[16] = [0; 16];
     var resized_len: i64 = 0;
     var selective_resize = body_no_resize;
     if !body_no_resize {
-        var sel_budget: i64 = 512;
+        var sel_budget: i64 = 2048;
         selective_resize = scanLoopResize(g, m, info.body, resized_bindings, resized_len, sel_budget);
         if selective_resize && resized_len > 0 {
             var prop_iter: i64 = 0;
             var prop_changed = true;
             while prop_changed && selective_resize && prop_iter < 16 {
                 prop_changed = false;
-                var pbudget: i64 = 512;
+                var pbudget: i64 = 2048;
                 selective_resize = propagateResizedAliases(m, info.body, resized_bindings, resized_len, prop_changed, pbudget);
                 if selective_resize {
                     for carry in carries {
@@ -10112,7 +10303,33 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let reciprocal_inputs = if selective_resize { input_locals } else { 0 };
     if !selective_resize {
         f.const_u32_len = 0;
-        f.known_mutable_len = 0;
+        // A handle's non-static status (`slot < persistent_split`) is invariant
+        // as long as its (slot, gen) locals are not overwritten by a non-in-place
+        // loop carry; drop only entries belonging to non-in-place carries.
+        if carries.len > 64 {
+            f.known_mutable_len = 0;
+        } else if f.known_mutable_len != 0 {
+            var kept: i64 = 0;
+            for at in 0..f.known_mutable_len {
+                let fact = f.known_mutable[at];
+                var clobbered = false;
+                for ci in 0..carries.len {
+                    if carry_in_place[ci] { continue; }
+                    let iv = g.s.vals[iteration.start + ci];
+                    let ov = g.s.vals[outgoing.start + ci];
+                    if hasWord(g, iv, fact.slot) || hasWord(g, iv, fact.generation) ||
+                        hasWord(g, ov, fact.slot) || hasWord(g, ov, fact.generation) {
+                        clobbered = true;
+                        break;
+                    }
+                }
+                if !clobbered {
+                    f.known_mutable[kept] = fact;
+                    kept += 1;
+                }
+            }
+            f.known_mutable_len = kept;
+        }
     }
     match info.kind {
         forever => {},
@@ -10229,9 +10446,9 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         },
     }
     if selective_resize && f.checked_arrays_len < 14 {
-        var hoist_ids: u32[8] = [0; 8];
+        var hoist_ids: u32[16] = [0; 16];
         var hoist_len: i64 = 0;
-        var hoist_budget: i64 = 512;
+        var hoist_budget: i64 = 2048;
         collectLoopArrayUses(m, info.body, hoist_ids, hoist_len, hoist_budget);
         for hi in 0..hoist_len {
             let b = hoist_ids[hi];
@@ -10254,6 +10471,22 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if f.checked_arrays_len >= 14 { continue; }
             if findCheckedArray(f, w(g, val, 0), w(g, val, 1)) >= 0 { continue; }
             let _ec1, _ec2 = ensureCheckedArray(g, f, val);
+        }
+        // Also hoist in-place array carries directly (a `self`-rebinding like
+        // `arr := self.push x` references the inner synthetic `self` binding
+        // rather than `carry.iteration`, so `collectLoopArrayUses` won't find
+        // `carry.iteration` by binding ID before the body is emitted).
+        for carry, ci in carries {
+            if ci >= 64 || !carry_in_place[ci] { continue; }
+            let iv = g.s.vals[iteration.start + ci];
+            if tagOf(g, iv.ty) != blot_direct_types::Tag.array { continue; }
+            if bindingResizedInLoop(m, id, carry.iteration, resized_bindings, resized_len) {
+                if f.checked_grows_len < 8 {
+                    let _ = ensureCheckedGrow(g, f, iv);
+                }
+            } else if f.checked_arrays_len < 14 && findCheckedArray(f, w(g, iv, 0), w(g, iv, 1)) < 0 {
+                let _ec1, _ec2 = ensureCheckedArray(g, f, iv);
+            }
         }
     }
     if body_no_resize && info.kind == blot_check_core::LoopKind.range {
@@ -10962,7 +11195,26 @@ recursive fn collectOwnedPatternBindings(m: const Module&, pattern_id: u32, out:
 
 recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = g.units[f.unit - 1].node(id);
+    if n.c == 0 {
+        let pm .= g.units[f.unit - 1];
+        if isF64x2CoreExpr(pm, n.b) || isF32x4CoreExpr(pm, n.b) {
+            let pat = pm.pattern(n.a);
+            if pat.tag == blot_check_core::PatternTag.product {
+                var all_ignore = true;
+                for child in pm.patternChildren(n.a) {
+                    let cp = pm.pattern(child);
+                    if cp.tag == blot_check_core::PatternTag.wildcard { continue; }
+                    if cp.tag != blot_check_core::PatternTag.bind || !bindingIgnoresNanPayload(g, f, cp.a) {
+                        all_ignore = false;
+                        break;
+                    }
+                }
+                if all_ignore { f.elide_f32_nan_node = n.b; }
+            }
+        }
+    }
     let value, error = expr(g, f, n.b);
+    f.elide_f32_nan_node = 0;
     if error != blot_direct_types::Error.none { return value, error; }
     if n.c == 0 {
         let tested = test_(g, f, n.a, value, false, 0, id);

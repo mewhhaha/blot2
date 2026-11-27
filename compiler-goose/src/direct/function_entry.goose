@@ -591,7 +591,8 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         let body_parameters = m.bodyParameters(body);
         let own_mask = m.binding(body.binding).capability_parameters.own;
         for parameter, at in body_parameters {
-            bindPut(g, f, parameter.binding, g.s.vals[inputs.start + at]);
+            let pval = g.s.vals[inputs.start + at];
+            bindPut(g, f, parameter.binding, pval);
             if at < 32 && ((own_mask >> (at as u32)) & 1) != 0 {
                 blot_support_zigmap::put(g.s.map_pool, f.unique_owned, parameter.binding, 1);
             }

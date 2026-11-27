@@ -1397,7 +1397,7 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             // Nothing reads an unused local, so its open types are Unit.
             if uses(g, f, n.a) == 0 { defaultUnused(g, f, bnd.ty, 0); }
         }
-        if n.c < 2 && (bnd.ty == blot_check_types::f32_type || (bnd.ty > blot_check_types::never && m.types.node(bnd.ty).tag == blot_check_types::Tag.floating32)) && bindingIgnoresNanPayload(g, f, n.a) {
+        if n.c < 2 && isFloatOrVecCoreType(m, bnd.ty) && bindingIgnoresNanPayload(g, f, n.a) {
             f.elide_f32_nan_node = n.b;
         }
         let prev_noop = f.boxed_noop_alias;
@@ -1800,9 +1800,110 @@ fn isNanObserved(g: const Generator&, f: const Fn&, b: u32) -> bool {
     let v, ok = blot_support_zigmap::get(g.s.map_pool, f.nan_observed, b);
     return ok && v != 0;
 }
-fn addNanEdge(src_arr: u32[256]&, dst_arr: u32[256]&, len: i64&, src: u32, dst: u32) -> bool {
+fn isFloatOrVecCoreType(m: const Module&, ty: TId) -> bool {
+    if ty == blot_check_types::f32_type || ty == blot_check_types::f64_type { return true; }
+    if ty <= blot_check_types::never { return false; }
+    let n = m.types.node(ty);
+    if n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.floating64 { return true; }
+    if n.tag == blot_check_types::Tag.product {
+        if n.b == 2 {
+            return m.types.extra[n.a] == blot_check_types::f64_type && m.types.extra[n.a + 1] == blot_check_types::f64_type;
+        }
+        if n.b == 4 {
+            for lane in 0..4 {
+                if m.types.extra[n.a + lane] != blot_check_types::f32_type { return false; }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+fn callIsCanonicalFloatConsumer(g: const Generator&, m: const Module&, call_id: u32, allow_body: bool) -> bool {
+    let info = m.call(call_id);
+    let arguments = info.arguments;
+    if arguments.len == 0 || arguments.len > 4 { return false; }
+    let target = g.resolve(m, info.target);
+    if !g.hasUnit(target.unit) { return false; }
+    let resolved = followAliasTarget(g, target);
+    if !g.hasUnit(resolved.unit) { return false; }
+    let rtm .= g.units[resolved.unit - 1];
+    let palias, has_palias = primitiveAlias(rtm, resolved.binding);
+    if has_palias {
+        let pinfo = rtm.primitive(palias);
+        if pinfo.kind == blot_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) {
+            let atag = m.types.node(m.typeOf(arguments[0])).tag;
+            if atag == blot_check_types::Tag.floating32 || atag == blot_check_types::Tag.floating64 { return true; }
+        }
+    }
+    let body .= rtm.body(resolved.binding);
+    if !body || !body.is_function || rtm.bodyParameters(body).len != arguments.len { return false; }
+    let root = forwardingRoot(rtm, body.root);
+    let node = rtm.node(root);
+    if node.tag == blot_check_core::Tag.scalar && node.c == 0 &&
+        (isF32x4CoreExpr(rtm, node.a) || isF64x2CoreExpr(rtm, node.a)) &&
+        (isCanonicalF32Consumer(node.op) || canonicalV128Producer(node.op)) &&
+        simdForwardingOperands(rtm, body, node.a, node.b) {
+        return true;
+    }
+    if allow_body && !body.exported {
+        var budget: i64 = 96;
+        return bodyOnlyCanonicalFloatOps(g, rtm, body.root, false, budget);
+    }
+    return false;
+}
+// True when `id` contains only pure canonical float/SIMD arithmetic/rounding/
+// comparison/conversion operations and never exposes any reference's raw NaN
+// bits (no `bits`, memory stores, closures, or pass-through returns).
+recursive fn bodyOnlyCanonicalFloatOps(g: const Generator&, m: const Module&, id: u32, safe_ref: bool, left: i64&) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return true; },
+        reference => { return safe_ref; },
+        suite, block_ => {
+            for child in m.children(id) {
+                if !bodyOnlyCanonicalFloatOps(g, m, child, false, left) { return false; }
+            }
+            return true;
+        },
+        return_ => { return bodyOnlyCanonicalFloatOps(g, m, n.a, false, left); },
+        bind => { return n.c < 2 && bodyOnlyCanonicalFloatOps(g, m, n.b, false, left); },
+        product => {
+            if !safe_ref { return false; }
+            for child in m.children(id) {
+                if !bodyOnlyCanonicalFloatOps(g, m, child, true, left) { return false; }
+            }
+            return true;
+        },
+        scalar => {
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            let is_v = isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a);
+            let ok = (is_f && isCanonicalF32Consumer(n.op)) || (is_v && (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)));
+            if !ok { return false; }
+            return bodyOnlyCanonicalFloatOps(g, m, n.a, true, left) && (n.b == 0 || bodyOnlyCanonicalFloatOps(g, m, n.b, true, left));
+        },
+        associated => {
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            if n.op == blot_check_core::Op.none || !is_f || !isCanonicalF32Consumer(n.op) { return false; }
+            return bodyOnlyCanonicalFloatOps(g, m, n.a, true, left) && (n.b == 0 || bodyOnlyCanonicalFloatOps(g, m, n.b, true, left));
+        },
+        call => {
+            if !callIsCanonicalFloatConsumer(g, m, id, false) { return false; }
+            for arg in m.call(id).arguments {
+                if !bodyOnlyCanonicalFloatOps(g, m, arg, true, left) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+fn addNanEdge(src_arr: u32[512]&, dst_arr: u32[512]&, len: i64&, src: u32, dst: u32) -> bool {
     if src == 0 || dst == 0 || src == dst { return true; }
-    if len >= 256 { return false; }
+    if len >= 512 { return false; }
     src_arr[len] = src;
     dst_arr[len] = dst;
     len += 1;
@@ -1814,8 +1915,8 @@ recursive fn scanNanUses(
     m: const Module&,
     id: u32,
     safe_ref: bool,
-    edge_src: u32[256]&,
-    edge_dst: u32[256]&,
+    edge_src: u32[512]&,
+    edge_dst: u32[512]&,
     edge_len: i64&,
     overflow: bool&,
     left: i64&,
@@ -1831,7 +1932,10 @@ recursive fn scanNanUses(
             if b != 0 && !safe_ref { markNanObserved(g, f, b); }
         },
         scalar => {
-            let consumer = isCanonicalF32Consumer(n.op) && m.types.node(m.typeOf(n.a)).tag == blot_check_types::Tag.floating32;
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            let is_v = isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a);
+            let consumer = (is_f && isCanonicalF32Consumer(n.op)) || (is_v && (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)));
             scanNanUses(g, f, m, n.a, consumer, edge_src, edge_dst, edge_len, overflow, left);
             if n.b != 0 { scanNanUses(g, f, m, n.b, consumer, edge_src, edge_dst, edge_len, overflow, left); }
         },
@@ -1919,7 +2023,12 @@ recursive fn scanNanUses(
         construct => {
             scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
         },
-        product, record, array, array_op, storage => {
+        product => {
+            for child in m.children(id) {
+                scanNanUses(g, f, m, child, safe_ref, edge_src, edge_dst, edge_len, overflow, left);
+            }
+        },
+        record, array, array_op, storage => {
             for child in m.children(id) {
                 scanNanUses(g, f, m, child, false, edge_src, edge_dst, edge_len, overflow, left);
             }
@@ -1934,13 +2043,21 @@ recursive fn scanNanUses(
                 }
             }
         },
-        associated, logical, apply => {
+        associated => {
+            let t = m.types.node(m.typeOf(n.a)).tag;
+            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            let consumer = n.op != blot_check_core::Op.none && is_f && isCanonicalF32Consumer(n.op);
+            scanNanUses(g, f, m, n.a, consumer, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, n.b, consumer, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        logical, apply => {
             scanNanUses(g, f, m, n.a, false, edge_src, edge_dst, edge_len, overflow, left);
             scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
         },
         call => {
+            let consumer = callIsCanonicalFloatConsumer(g, m, id, true);
             for arg in m.call(id).arguments {
-                scanNanUses(g, f, m, arg, false, edge_src, edge_dst, edge_len, overflow, left);
+                scanNanUses(g, f, m, arg, consumer, edge_src, edge_dst, edge_len, overflow, left);
             }
         },
         closure => {
@@ -1966,11 +2083,11 @@ fn bindingIgnoresNanPayload(g: Generator&, f: Fn&, binding: u32) -> bool {
             markNanObserved(g, f, 0xffffffff);
             return false;
         }
-        var edge_src: u32[256] = [0; 256];
-        var edge_dst: u32[256] = [0; 256];
+        var edge_src: u32[512] = [0; 512];
+        var edge_dst: u32[512] = [0; 512];
         var edge_len: i64 = 0;
         var overflow = false;
-        var budget: i64 = 2048;
+        var budget: i64 = 4096;
         scanNanUses(g, f, m, body.root, false, edge_src, edge_dst, edge_len, overflow, budget);
         if overflow {
             markNanObserved(g, f, 0xffffffff);

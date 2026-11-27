@@ -3887,7 +3887,29 @@ recursive fn prepareGlobalBody(self_:Engine&,binding:u32,before:Global,owner:u32
 fn finishPreparedGlobal(self_:Engine&,binding:u32,before:Global)->blot_error::Error {return self_.finishPreparedGlobalOwner(binding,before,self_.current);}
 fn finishPreparedGlobalOwner(self_:Engine&,binding:u32,before:Global,owner:u32)->blot_error::Error {let state .= self_.global_states.get(binding);assert(state);let after=state;if owner!=0 && after.on_stack {let current .= self_.global_states.get(owner);assert(current);var low=after.index;if before.state==State.pending {low=after.low;}current.low=min(current.low,low);}return blot_error::Error.none;}
 recursive fn globalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Error {if binding==self_.current && self_.bindings[binding].kind==blot_reuse_principal_interface::Kind.global && self_.tree.node(self_.bindings[binding].declaration).tag==blot_parse_ast::tag_value_decl {let attributes=checkedAstList(self_.tree,self_.tree.value_decl(self_.bindings[binding].declaration).attributes);if (attributes.len as i64)!=0 {let err=self_.diagnostic(Code.recursive_tag,self_.tree.list(attributes)[0]);if err!=blot_error::Error.none {return 0,err;}self_.resolved[id]=binding;return self_.types.fresh();}}let err=self_.prepareGlobal(binding);if err!=blot_error::Error.none {return 0,err;}return self_.preparedGlobalReference(binding,id);}
-fn preparedGlobalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Error {if self_.bindings[binding].kind==blot_reuse_principal_interface::Kind.global && self_.bindings[binding].scheme.root==0 {self_.qualification_uses.push(QualificationUse{scope:self_.qualification_scope,owner:self_.current,target:binding,source:id, ..});}self_.resolved[id]=binding;return self_.instantiate(binding,id);}
+fn preparedGlobalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Error {
+ if self_.bindings[binding].kind==blot_reuse_principal_interface::Kind.global && self_.bindings[binding].scheme.root==0 {
+  self_.qualification_uses.push(QualificationUse{scope:self_.qualification_scope,owner:self_.current,target:binding,source:id, ..});
+  if self_.bindings[binding].named_function && self_.bindings[binding].capability_parameters.own!=0 && self_.types.node(self_.types.head(self_.bindings[binding].ty,0)).tag==blot_check_types::Tag.variable {
+   let own_mask=self_.bindings[binding].capability_parameters.own;
+   var last_own:u32=0;var bit_i:u32=0;
+   while bit_i<32 {if ((own_mask>>bit_i)&1)!=0 {last_own=bit_i;}bit_i+=1;}
+   let ret,rerr=self_.types.fresh();if rerr!=blot_error::Error.none {return 0,rerr;}
+   var skel=ret;var pi:u32=last_own+1;
+   while pi>0 {
+    pi-=1;
+    let p,perr=self_.types.fresh();if perr!=blot_error::Error.none {return 0,perr;}
+    var pt=p;
+    if ((own_mask>>pi)&1)!=0 {let w,werr=self_.types.usage(p,blot_parse_ast::usagekind_own,0);if werr!=blot_error::Error.none {return 0,werr;}pt=w;}
+    let eff,eerr=self_.types.freshEffects();if eerr!=blot_error::Error.none {return 0,eerr;}
+    let fn_ty,ferr=self_.types.functionWithEffects(pt,skel,eff);if ferr!=blot_error::Error.none {return 0,ferr;}
+    skel=fn_ty;
+   }
+   let cerr=self_.constrainRaw(self_.bindings[binding].ty,skel,id);if cerr!=blot_error::Error.none {return 0,cerr;}
+  }
+ }
+ self_.resolved[id]=binding;return self_.instantiate(binding,id);
+}
 fn startsBytes(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len && text[..prefix.len]==prefix;}
 fn scalarIntrinsicSpec(name:const u8[:])->u8 {
  if name.len<7 || name[0]!=64 || name[4]!=46 {return 0;}
