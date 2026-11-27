@@ -4,7 +4,7 @@
 //   ~[T]  (Seq T)    — Design H reversible generative SIMD-RRB sequence with focus gap & packed leaves
 //
 // Usage:
-//   deno run -A benchmarks/tools/bench_collections_3way.ts [--compiler <path>] [--samples <n>]
+//   deno run -A benchmarks/tools/bench_collections_3way.ts [--compiler <path>] [--samples <n>] [--warmup <n>] [--wtime-aot [path]]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -13,11 +13,24 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 let compilerPath = resolve(
   new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
 );
+let wtimeAotPath: string | null = null;
+const defaultWtimeAotPath = resolve(
+  new URL(
+    "../../../wtime/tools/wtime-aot/target/release/wtime-aot",
+    import.meta.url,
+  ).pathname,
+);
 let samples = 11;
 let warmup = 3;
 for (let i = 0; i < Deno.args.length; i++) {
   if (Deno.args[i] === "--compiler" && Deno.args[i + 1]) {
     compilerPath = resolve(Deno.args[++i]);
+  } else if (Deno.args[i] === "--wtime-aot") {
+    if (Deno.args[i + 1] && !Deno.args[i + 1].startsWith("--")) {
+      wtimeAotPath = resolve(Deno.args[++i]);
+    } else {
+      wtimeAotPath = defaultWtimeAotPath;
+    }
   } else if (Deno.args[i] === "--samples" && Deno.args[i + 1]) {
     samples = Number(Deno.args[++i]);
   } else if (Deno.args[i] === "--warmup" && Deno.args[i + 1]) {
@@ -38,6 +51,199 @@ interface VariantResult {
   memBytes: number;
   checksum: number;
   wasmBytes: number;
+}
+
+const WTIME_RUNNER_C = `
+#define _POSIX_C_SOURCE 200809L
+#include <dlfcn.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+typedef void *(*fn_new)(void *, const void *, uint64_t, uint8_t *);
+typedef void (*fn_drop)(void *);
+typedef int32_t (*fn_call_export)(void *, const uint8_t *, size_t, uint64_t, uint64_t *, uint8_t *);
+typedef int32_t (*fn_call_finish)(void *, int32_t *, uint8_t *);
+typedef void (*fn_mem_data)(void *, uint8_t **, size_t *);
+
+static double now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec * 1e-6;
+}
+
+static int cmp_double(const void *a, const void *b) {
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    return (da > db) - (da < db);
+}
+
+static uint32_t read_u32_first(fn_mem_data mem_fn, void *h, uint64_t res, size_t *out_mem) {
+    uint8_t *mem = NULL;
+    size_t mem_len = 0;
+    mem_fn(h, &mem, &mem_len);
+    if (out_mem) *out_mem = mem_len;
+    uint32_t ptr = (uint32_t)res;
+    if (!mem || (size_t)ptr + 8 > mem_len) {
+        fprintf(stderr, "invalid result ptr %u (mem_len=%zu)\\n", ptr, mem_len);
+        exit(5);
+    }
+    uint32_t val = 0;
+    memcpy(&val, mem + ptr + 4, 4);
+    return val;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 6) return 2;
+    const char *so_path = argv[1];
+    uint64_t arg = (uint64_t)strtoull(argv[2], NULL, 10);
+    int warmup = atoi(argv[3]);
+    int samples = atoi(argv[4]);
+    int fresh = atoi(argv[5]);
+    void *dl = dlopen(so_path, RTLD_NOW | RTLD_LOCAL);
+    if (!dl) { fprintf(stderr, "dlopen: %s\\n", dlerror()); return 2; }
+    fn_new f_new = (fn_new)dlsym(dl, "blot_aot_new");
+    fn_drop f_drop = (fn_drop)dlsym(dl, "blot_aot_drop");
+    fn_call_export f_call = (fn_call_export)dlsym(dl, "blot_aot_call_export");
+    fn_call_finish f_fin = (fn_call_finish)dlsym(dl, "blot_aot_call_finish_invocation");
+    fn_mem_data f_mem = (fn_mem_data)dlsym(dl, "blot_aot_mem_data");
+    if (!f_new || !f_drop || !f_call || !f_mem) return 2;
+
+    uint8_t trap = 0;
+    uint64_t res = 0;
+    size_t mem_bytes = 0;
+    void *h0 = f_new(NULL, NULL, 0, &trap);
+    if (!h0) return 3;
+    if (f_call(h0, (const uint8_t *)"run", 3, arg, &res, &trap) != 0) return 4;
+    uint32_t checksum = read_u32_first(f_mem, h0, res, &mem_bytes);
+    if (f_fin) { int32_t fin = 0; f_fin(h0, &fin, &trap); }
+    f_drop(h0);
+
+    double *times = (double *)malloc(sizeof(double) * (size_t)samples);
+    if (fresh) {
+        for (int i = 0; i < warmup + samples; i++) {
+            void *h = f_new(NULL, NULL, 0, &trap);
+            if (!h) return 3;
+            double t0 = now_ms();
+            int32_t rc = f_call(h, (const uint8_t *)"run", 3, arg, &res, &trap);
+            double dt = now_ms() - t0;
+            if (rc != 0) return 4;
+            uint32_t r = read_u32_first(f_mem, h, res, NULL);
+            if (r != checksum) { fprintf(stderr, "checksum mismatch\\n"); return 6; }
+            if (f_fin) { int32_t fin = 0; f_fin(h, &fin, &trap); }
+            f_drop(h);
+            if (i >= warmup) times[i - warmup] = dt;
+        }
+    } else {
+        void *h = f_new(NULL, NULL, 0, &trap);
+        if (!h) return 3;
+        for (int i = 0; i < warmup; i++) {
+            if (f_call(h, (const uint8_t *)"run", 3, arg, &res, &trap) != 0) return 4;
+            if (read_u32_first(f_mem, h, res, NULL) != checksum) return 6;
+            if (f_fin) { int32_t fin = 0; f_fin(h, &fin, &trap); }
+        }
+        for (int i = 0; i < samples; i++) {
+            double t0 = now_ms();
+            int32_t rc = f_call(h, (const uint8_t *)"run", 3, arg, &res, &trap);
+            double dt = now_ms() - t0;
+            if (rc != 0) return 4;
+            if (read_u32_first(f_mem, h, res, NULL) != checksum) return 6;
+            if (f_fin) { int32_t fin = 0; f_fin(h, &fin, &trap); }
+            times[i] = dt;
+        }
+        f_drop(h);
+    }
+    qsort(times, (size_t)samples, sizeof(double), cmp_double);
+    double med = times[samples / 2];
+    printf("%.6f %zu %" PRIu32 "\\n", med, mem_bytes, checksum);
+    free(times);
+    dlclose(dl);
+    return 0;
+}
+`;
+
+let wtimeWorkDir: string | null = null;
+let wtimeRunnerBin: string | null = null;
+
+async function ensureWtimeRunner(): Promise<string> {
+  if (wtimeRunnerBin) return wtimeRunnerBin;
+  wtimeWorkDir = await Deno.makeTempDir({ prefix: "squid-bench3-wtime-" });
+  const cPath = `${wtimeWorkDir}/runner.c`;
+  const binPath = `${wtimeWorkDir}/runner`;
+  await Deno.writeTextFile(cPath, WTIME_RUNNER_C);
+  const cc = await new Deno.Command("cc", {
+    args: ["-O2", cPath, "-ldl", "-o", binPath],
+  }).output();
+  assert(
+    cc.success,
+    `Failed to compile native wtime runner: ${
+      new TextDecoder().decode(cc.stderr)
+    }`,
+  );
+  wtimeRunnerBin = binPath;
+  return binPath;
+}
+
+async function measureVariantWtimeAot(
+  bytes: Uint8Array,
+  arg: number | null,
+  opts: { freshPerSample?: boolean } = {},
+): Promise<VariantResult> {
+  assert(wtimeAotPath, "wtimeAotPath not set");
+  const runner = await ensureWtimeRunner();
+  const dir = await Deno.makeTempDir({ prefix: "squid-bench3-so-" });
+  try {
+    const wasmPath = `${dir}/mod.wasm`;
+    const soPath = `${dir}/mod.so`;
+    await Deno.writeFile(wasmPath, bytes);
+    const aot = await new Deno.Command(wtimeAotPath, {
+      args: [
+        wasmPath,
+        "-o",
+        soPath,
+        "--backend",
+        "x64",
+        "--target-cpu",
+        "native",
+        "--guard-pages",
+        "--blot-cdylib",
+      ],
+    }).output();
+    assert(
+      aot.success,
+      `wtime-aot failed: ${new TextDecoder().decode(aot.stderr)}`,
+    );
+    const run = await new Deno.Command(runner, {
+      args: [
+        soPath,
+        String(arg ?? 0),
+        String(warmup),
+        String(samples),
+        opts.freshPerSample ? "1" : "0",
+      ],
+    }).output();
+    assert(
+      run.success,
+      `wtime runner failed (${run.code}): ${
+        new TextDecoder().decode(run.stderr)
+      }`,
+    );
+    const [msStr, memStr, chkStr] = new TextDecoder()
+      .decode(run.stdout)
+      .trim()
+      .split(/\s+/);
+    return {
+      ms: Number(msStr),
+      memBytes: Number(memStr),
+      checksum: Number(chkStr),
+      wasmBytes: bytes.length,
+    };
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 }
 
 async function compileModule(source: string): Promise<Uint8Array> {
@@ -628,7 +834,22 @@ function fmtMem(r?: VariantResult): string {
 }
 
 console.log(`Compiler: ${compilerPath}`);
+console.log(
+  `Runtime: ${wtimeAotPath ? `wtime-aot (${wtimeAotPath})` : "Deno/V8"}`,
+);
 console.log(`Samples: ${samples} (warmup: ${warmup})\n`);
+
+async function runMeasure(
+  bytes: Uint8Array,
+  exportName: string,
+  arg: number | null,
+  opts: { freshPerSample?: boolean } = {},
+): Promise<VariantResult> {
+  if (wtimeAotPath) {
+    return await measureVariantWtimeAot(bytes, arg, opts);
+  }
+  return await measureVariant(bytes, exportName, arg, opts);
+}
 
 interface Row {
   id: string;
@@ -639,46 +860,54 @@ interface Row {
 }
 
 const rows: Row[] = [];
-for (const b of benchmarks) {
-  const row: Row = { id: b.id, label: b.label };
-  if (b.arraySource) {
-    const bytes = await compileModule(b.arraySource);
-    row.arr = await measureVariant(bytes, "run", b.arg, {
-      freshPerSample: b.freshPerSample,
-    });
-  }
-  if (b.packedSource) {
-    const bytes = await compileModule(b.packedSource);
-    row.packed = await measureVariant(bytes, "run", b.arg, {
-      freshPerSample: b.freshPerSample,
-    });
-  }
-  if (b.seqSource) {
-    const bytes = await compileModule(b.seqSource);
-    row.seq = await measureVariant(bytes, "run", b.arg, {
-      freshPerSample: b.freshPerSample,
-    });
-  }
-  if (row.arr && row.seq) {
-    assert.equal(
-      row.arr.checksum,
-      row.seq.checksum,
-      `Checksum mismatch on ${b.id} (#[] vs ~[]): ${row.arr.checksum} vs ${row.seq.checksum}`,
+try {
+  for (const b of benchmarks) {
+    const row: Row = { id: b.id, label: b.label };
+    if (b.arraySource) {
+      const bytes = await compileModule(b.arraySource);
+      row.arr = await runMeasure(bytes, "run", b.arg, {
+        freshPerSample: b.freshPerSample,
+      });
+    }
+    if (b.packedSource) {
+      const bytes = await compileModule(b.packedSource);
+      row.packed = await runMeasure(bytes, "run", b.arg, {
+        freshPerSample: b.freshPerSample,
+      });
+    }
+    if (b.seqSource) {
+      const bytes = await compileModule(b.seqSource);
+      row.seq = await runMeasure(bytes, "run", b.arg, {
+        freshPerSample: b.freshPerSample,
+      });
+    }
+    if (row.arr && row.seq) {
+      assert.equal(
+        row.arr.checksum,
+        row.seq.checksum,
+        `Checksum mismatch on ${b.id} (#[] vs ~[]): ${row.arr.checksum} vs ${row.seq.checksum}`,
+      );
+    }
+    if (row.arr && row.packed && b.id !== "snapshot_cow") {
+      assert.equal(
+        row.arr.checksum,
+        row.packed.checksum,
+        `Checksum mismatch on ${b.id} (#[] vs %[]): ${row.arr.checksum} vs ${row.packed.checksum}`,
+      );
+    }
+    rows.push(row);
+    console.log(
+      `${b.label}\n  #[T]: ${fmtMs(row.arr)} (${fmtMem(row.arr)})  |  %[T]: ${
+        fmtMs(row.packed)
+      } (${fmtMem(row.packed)})  |  ~[T]: ${fmtMs(row.seq)} (${
+        fmtMem(row.seq)
+      })`,
     );
   }
-  if (row.arr && row.packed && b.id !== "snapshot_cow") {
-    assert.equal(
-      row.arr.checksum,
-      row.packed.checksum,
-      `Checksum mismatch on ${b.id} (#[] vs %[]): ${row.arr.checksum} vs ${row.packed.checksum}`,
-    );
+} finally {
+  if (wtimeWorkDir) {
+    await Deno.remove(wtimeWorkDir, { recursive: true });
   }
-  rows.push(row);
-  console.log(
-    `${b.label}\n  #[T]: ${fmtMs(row.arr)} (${fmtMem(row.arr)})  |  %[T]: ${
-      fmtMs(row.packed)
-    } (${fmtMem(row.packed)})  |  ~[T]: ${fmtMs(row.seq)} (${fmtMem(row.seq)})`,
-  );
 }
 
 console.log("\n=== MARKDOWN SUMMARY TABLE ===");

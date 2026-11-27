@@ -1112,3 +1112,183 @@ io main (): U32 =>
     "mutating aliased inner array through shallow Seq.copy",
   );
 });
+
+Deno.test("Seq ~[]: 2-level specialized loops (break/continue across leaves, radix-16 + push_leaf, dirty-focus flush, Sum/SoA repeats)", async () => {
+  await compileAndRun(
+    `
+type BigEvent is data =
+  | $Tick
+  | $Big { a: U64, b: U64, c: U64, d: U64, e: U64, f: U64, g: U64, h: U64 }
+
+type Entity = {
+  id: U32,
+  hp: U32,
+  x: F64,
+  y: F64,
+  z: F64,
+  vx: F64,
+  vy: F64,
+  vz: F64,
+  mass: F64,
+  flags: U32,
+}
+
+io test_two_level_loops_and_radix (): #[U32] =>
+  // 1. Flat U32 > 5,000 items (leaf_cap = 256 -> >20 leaves, height-2 dense radix-16 + push_leaf!)
+  let xs: ~[U32] = ~[]
+  for i in 0..5000:
+    xs := xs.push i
+  // Dirty focus has 5000 % 256 = 136 elements; scan TWICE to test once-only mutable flush!
+  let s1: U32 = 0
+  for _ in 0..2:
+    for x in xs:
+      s1 := self + x
+
+  // Continue right on leaf boundaries (255, 256, 511, 512) and break mid-leaf (600)
+  let cb_sum: U32 = 0
+  for x in xs:
+    if x == 255 or x == 256 or x == 511 or x == 512:
+      continue
+    if x == 600:
+      break
+    cb_sum := self + x
+
+  // Dense radix-16 random lookups, then middle insert (forces non-power-of-2 relaxed fallback) + verify!
+  let radix_mismatch: U32 = 0
+  for i in 0..500:
+    let idx = (i * 97) % 5000
+    if xs[idx] != idx:
+      radix_mismatch := self + 1
+  xs := xs.insert 1000 999999
+  let after_ins_ok = if xs[999] == 999 and xs[1000] == 999999 and xs[1001] == 1000 and xs[4999] == 4998 and xs[5000] == 4999 then 1 else 0
+
+  // 2. Wide 72B Entity SoA (leaf_cap = 64 -> >5 leaves) with continue/break across leaf boundaries + dirty focus + frozen repeat scan
+  let ents: ~[Entity] = ~[]
+  for i in 0..350:
+    ents := ents.push { id: i, hp: i * 2 + 1, x: 1.0f64, y: 2.0f64, z: 3.0f64, vx: 4.0f64, vy: 5.0f64, vz: 6.0f64, mass: 7.0f64, flags: 1 }
+  let frz_ents = freeze (ents.copy)
+  let soa_cb: U32 = 0
+  for { id, hp } in ents:
+    if id == 63 or id == 64 or id == 127 or id == 128:
+      continue
+    if id == 200:
+      break
+    soa_cb := self + id + hp
+  let soa_frz_sum: U32 = 0
+  for _ in 0..2:
+    for { id, hp } in frz_ents:
+      soa_frz_sum := self + id + hp
+  // Reversed SoA with continue/break
+  let soa_rev_cb: U32 = 0
+  for { id } in ents.reverse:
+    if id == 300:
+      continue
+    if id == 290:
+      break
+    soa_rev_cb := self + id
+
+  // 3. Skewed Sum (leaf_cap = 32) with continue/break + Seq.repeat of $Big (2000 repeats -> tests reusable stack slot!)
+  let evs: ~[BigEvent] = ~[]
+  for i in 0..200:
+    if i % 25 == 0:
+      let v = i.to_u64
+      evs := evs.push ($Big { a: v, b: 1u64, c: 2u64, d: 3u64, e: 4u64, f: 5u64, g: 6u64, h: 1u64 })
+    else:
+      evs := evs.push $Tick
+  let sum_cb: U32 = 0
+  let seen: U32 = 0
+  for ev in evs:
+    case ev of
+      $Tick =>
+        seen := self + 1
+        if seen == 32 or seen == 64:
+          continue
+        sum_cb := self + 1
+      $Big { a, h } =>
+        if a.to_u32 == 150:
+          break
+        sum_cb := self + a.to_u32 + h.to_u32
+
+  let rep_big = Seq.repeat 2000 ($Big { a: 3u64, b: 0u64, c: 0u64, d: 0u64, e: 0u64, f: 0u64, g: 0u64, h: 4u64 })
+  let rep_big_sum: U32 = 0
+  for ev in rep_big:
+    case ev of
+      $Tick =>
+        rep_big_sum := self + 1
+      $Big { a, h } =>
+        rep_big_sum := self + a.to_u32 + h.to_u32
+
+  // 4. push_front 600 + pop_front 600 down to empty + push_front 10 (crosses 256-elem FocusGap boundary!)
+  let dq: ~[U32] = ~[]
+  for i in 0..600:
+    dq := dq.push_front i
+  let dq_sum: U32 = 0
+  for _ in 0..600:
+    let (ndq, v) = dq.pop_front
+    dq := ndq
+    dq_sum := self + v
+  let dq_empty_len = dq.length
+  for i in 0..10:
+    dq := dq.push_front (100 + i)
+  let dq_head = dq[0]
+  let dq_tail = dq[9]
+
+  return #[
+    s1,
+    cb_sum,
+    radix_mismatch,
+    after_ins_ok,
+    soa_cb,
+    soa_frz_sum,
+    soa_rev_cb,
+    sum_cb,
+    rep_big_sum,
+    dq_sum,
+    dq_empty_len,
+    dq_head,
+    dq_tail,
+  ]
+`,
+    (guest) => {
+      const s1 = 2 * ((4999 * 5000) / 2);
+      const cbSum = (599 * 600) / 2 - 255 - 256 - 511 - 512;
+      let soaCb = 0;
+      for (let i = 0; i < 200; i++) {
+        if (i === 63 || i === 64 || i === 127 || i === 128) continue;
+        soaCb += i + (i * 2 + 1);
+      }
+      let soaAll = 0;
+      for (let i = 0; i < 350; i++) soaAll += i + (i * 2 + 1);
+      // ents.reverse: 349, 348, ..., 301, (skip 300), 299, ..., 291, (break at 290)
+      let soaRevCb = 0;
+      for (let i = 349; i > 290; i--) {
+        if (i === 300) continue;
+        soaRevCb += i;
+      }
+      // evs[0..149]: $Big at 0, 25, 50, 75, 100, 125 (6 items -> sum(a+1) = 0+25+50+75+100+125 + 6 = 381),
+      // $Tick count = 144, minus 2 skipped (seen == 32 and seen == 64) = 142 => total 523
+      const sumCb = 381 + 142;
+      const dqSum = (599 * 600) / 2;
+      assert.deepEqual(
+        Array.from(
+          guest.call("test_two_level_loops_and_radix", null) as Uint32Array,
+        ),
+        [
+          s1,
+          cbSum,
+          0, // radix_mismatch
+          1, // after_ins_ok
+          soaCb,
+          soaAll * 2,
+          soaRevCb,
+          sumCb,
+          2000 * 7,
+          dqSum,
+          0,
+          109,
+          100,
+        ],
+      );
+    },
+  );
+});

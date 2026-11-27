@@ -4657,6 +4657,44 @@ recursive fn propagateResizedAliases(g: const Generator&, m: const Module&, id: 
 }
 // Selective loop-resize scan: returns `true` when `id` contains no opaque
 // non-inlined resizing calls or untracked field-array resizes, collecting into
+fn isCheckMutableContainer(m: const Module&, tid: TId) -> bool {
+    var cur = tid;
+    for _ in 0..4 {
+        let n = m.types.node(cur);
+        if n.tag == squid_check_types::Tag.array { return true; }
+        if n.tag != squid_check_types::Tag.nominal { return false; }
+        let kind = squid_check_storage_types::identity(n.a, n.b);
+        if !kind.present { return false; }
+        if kind.value == squid_check_storage_types::packed || kind.value == squid_check_storage_types::seq || squid_check_storage_types::isSized(kind.value) {
+            return true;
+        }
+        if kind.value == squid_check_storage_types::shared {
+            let args = m.types.nominalArguments(n);
+            if args.len == 1 { cur = args[0]; continue; }
+        }
+        return false;
+    }
+    return false;
+}
+fn isCheckReadContainer(m: const Module&, tid: TId) -> bool {
+    var cur = tid;
+    for _ in 0..4 {
+        let n = m.types.node(cur);
+        if n.tag == squid_check_types::Tag.array { return true; }
+        if n.tag != squid_check_types::Tag.nominal { return false; }
+        let kind = squid_check_storage_types::identity(n.a, n.b);
+        if !kind.present { return false; }
+        if kind.value == squid_check_storage_types::seq || squid_check_storage_types::isSized(kind.value) {
+            return true;
+        }
+        if kind.value == squid_check_storage_types::shared {
+            let args = m.types.nominalArguments(n);
+            if args.len == 1 { cur = args[0]; continue; }
+        }
+        return false;
+    }
+    return false;
+}
 // `resized` every direct local `Tag.array` binding that may be pushed/popped/truncated.
 recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resized: u32[16]&, resized_len: i64&, left: i64&) -> bool {
     if id == 0 { return true; }
@@ -4754,8 +4792,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                 push, pop, truncate, reserve, extend, push_front, pop_front, insert, remove => {
                     if ch.len == 0 { return false; }
                     let target_b = localRef(m, ch[0]);
-                    let ttag = m.types.node(m.typeOf(ch[0])).tag;
-                    if target_b == 0 || (ttag != squid_check_types::Tag.array && ttag != squid_check_types::Tag.packed && ttag != squid_check_types::Tag.seq) { return false; }
+                    if target_b == 0 || !isCheckMutableContainer(m, m.typeOf(ch[0])) { return false; }
                     if !addResizedSet(resized, resized_len, target_b) { return false; }
                     for child in ch {
                         if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
@@ -4795,8 +4832,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                 if (own_mask & ((1 as u64) << (pi as u64))) != 0 {
                     let arg_id = call.arguments[pi];
                     let arg_b = localRef(m, arg_id);
-                    let atag = m.types.node(m.typeOf(arg_id)).tag;
-                    if arg_b == 0 || (atag != squid_check_types::Tag.array && atag != squid_check_types::Tag.packed && atag != squid_check_types::Tag.seq) { return false; }
+                    if arg_b == 0 || !isCheckMutableContainer(m, m.typeOf(arg_id)) { return false; }
                     if !addResizedSet(resized, resized_len, arg_b) { return false; }
                 }
             }
@@ -4811,9 +4847,8 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                         return scanLoopResize(g, m, proj_n.a, resized, resized_len, left) &&
                             scanLoopResize(g, m, n.b, resized, resized_len, left);
                     }
-                    let ptag = m.types.node(m.typeOf(proj_n.a)).tag;
                     if (sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "pop_front" || sp.value == "insert" || sp.value == "remove") &&
-                        (ptag == squid_check_types::Tag.array || ptag == squid_check_types::Tag.packed || ptag == squid_check_types::Tag.seq) {
+                        isCheckMutableContainer(m, m.typeOf(proj_n.a)) {
                         let target_b = localRef(m, proj_n.a);
                         if target_b == 0 { return false; }
                         if !addResizedSet(resized, resized_len, target_b) { return false; }
@@ -4837,8 +4872,7 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
             let ch = m.children(id);
             if (op == squid_backend_collection_ops::Op.get || op == squid_backend_collection_ops::Op.length) && ch.len > 0 {
                 let b = localRef(m, ch[0]);
-                let ctag = m.types.node(m.typeOf(ch[0])).tag;
-                if b != 0 && (ctag == squid_check_types::Tag.array || ctag == squid_check_types::Tag.seq) {
+                if b != 0 && isCheckReadContainer(m, m.typeOf(ch[0])) {
                     var seen = false;
                     for i in 0..out_len { if out[i] == b { seen = true; break; } }
                     if !seen && out_len < 4 { out[out_len] = b; out_len += 1; }
@@ -4853,8 +4887,7 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
                 (op_k == squid_check_storage_ops::Op.read || op_k == squid_check_storage_ops::Op.length || op_k == squid_check_storage_ops::Op.view) &&
                 ch.len > 0 {
                 let b = localRef(m, ch[0]);
-                let ctag = m.types.node(m.typeOf(ch[0])).tag;
-                if b != 0 && (ctag == squid_check_types::Tag.array || ctag == squid_check_types::Tag.seq) {
+                if b != 0 && isCheckReadContainer(m, m.typeOf(ch[0])) {
                     var seen = false;
                     for i in 0..out_len { if out[i] == b { seen = true; break; } }
                     if !seen && out_len < 4 { out[out_len] = b; out_len += 1; }
@@ -5225,9 +5258,8 @@ recursive fn exprPreservesHandle(
             if m.node(n.a).tag == squid_check_core::Tag.project {
                 let proj_n = m.node(n.a);
                 let sp = m.fieldSpelling(m.projection(proj_n.b).field);
-                let ptag = m.types.node(m.typeOf(proj_n.a)).tag;
                 if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "insert") &&
-                    (ptag == squid_check_types::Tag.array || ptag == squid_check_types::Tag.packed || ptag == squid_check_types::Tag.seq) {
+                    isCheckMutableContainer(m, m.typeOf(proj_n.a)) {
                     return exprPreservesHandle(g, m, proj_n.a, same, same_len, depth + 1, allow_calls, call_depth);
                 }
             }

@@ -13,6 +13,29 @@ let PACKED_FLAT: u32 = 0;
 let PACKED_SOA: u32 = 1;
 let PACKED_SPLIT_SUM: u32 = 2;
 
+// PACKED_SOA header layout (16-byte aligned):
+//   +0:            cached `elem_cap: u32` guaranteed across all S columns
+//   +16:           S * 8 bytes of `(sub_slot, sub_gen)` handles
+//   +16 + S * 8:   S * 4 bytes of cached `col_base[s]: u32` direct data pointers
+let PACKED_SOA_HDR_CAP: u32 = 0;
+let PACKED_SOA_HDR_SUBS: u32 = 16;
+
+fn packedSubOff(plan: const PackedPlan&, s: i64) -> u32 {
+    if plan.mode == PACKED_SOA { return PACKED_SOA_HDR_SUBS + (s as u32) * 8; }
+    return (s as u32) * 8;
+}
+
+fn packedSoaColBaseOff(plan: const PackedPlan&, s: i64) -> u32 {
+    return PACKED_SOA_HDR_SUBS + (plan.stream_count as u32) * 8 + (s as u32) * 4;
+}
+
+fn packedHeaderBytes(plan: const PackedPlan&) -> u32 {
+    if plan.mode == PACKED_SOA {
+        return (PACKED_SOA_HDR_SUBS + (plan.stream_count as u32) * 12 + 15) & 0xfffffff0;
+    }
+    return (plan.stream_count as u32) * 8;
+}
+
 struct PackedPlan {
     mode: u32 = 0,
     elem_ty: Ty = 0,
@@ -150,20 +173,18 @@ fn computePackedPlan(g: Generator&, f: const Fn&, elem_ty: Ty, id: u32) -> Packe
 }
 
 // Checks header handle is live and not a deeply-immutable static const pool.
-// Returns (h_entry, h_base, h_len).
+// Returns (h_entry, h_base, h_len). Hoists `rt.check` via `ensureCheckedGrow`.
 fn emitCheckPackedHeaderMutable(g: Generator&, f: Fn&, container: Val) -> u32, u32, u32 {
-    let rt = g.runtime_();
-    let h_entry = local32(g, f);
+    let h_entry = ensureCheckedGrow(g, f, container);
+    if !knownMutable(g, f, container) {
+        lget(g, h_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+        i32Const(g, squid_direct_runtime::static_pool_flag);
+        op(g, OP_i32_and);
+        trap(g, f);
+    }
     let h_base = local32(g, f);
     let h_len = local32(g, f);
-    lget(g, w(g, container, 0));
-    lget(g, w(g, container, 1));
-    callf(g, rt.check);
-    ltee(g, h_entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
-    i32Const(g, squid_direct_runtime::static_pool_flag);
-    op(g, OP_i32_and);
-    trap(g, f);
     lget(g, h_entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, h_base);
@@ -173,9 +194,121 @@ fn emitCheckPackedHeaderMutable(g: Generator&, f: Fn&, container: Val) -> u32, u
     return h_entry, h_base, h_len;
 }
 
-// Loads `(sub_slot, sub_gen)` of stream `s` from header buffer `h_base`.
-fn emitLoadPackedSubHandle(g: Generator&, f: const Fn&, h_base: u32, s: i64) -> u32, u32 {
+// Direct 2-level owner-table entry lookup for a private live sub-stream slot (zero calls).
+fn emitPackedSubEntryAddr(g: Generator&, f: const Fn&, sub_slot: u32) -> u32 {
+    let sub_entry = local32(g, f);
+    lget(g, sub_slot);
+    i32Const(g, 8);
+    op(g, OP_i32_shr_u);
+    i32Const(g, 2);
+    op(g, OP_i32_shl);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, g.runtime_().layout.owner_table);
+    lget(g, sub_slot);
+    i32Const(g, 255);
+    op(g, OP_i32_and);
+    i32Const(g, 4);
+    op(g, OP_i32_shl);
+    op(g, OP_i32_add);
+    lset(g, sub_entry);
+    return sub_entry;
+}
+
+// Inline fast-path push onto private sub-stream `s` of a live mutable packed header.
+// Avoids `rt.check` + `rt.push` call overhead whenever capacity suffices (`!rt.has_fork`).
+fn emitPackedSubPushFast(g: Generator&, f: Fn&, h_base: u32, s: i64, step: u32) -> u32, u32 {
+    let rt = g.runtime_();
     let off = (s as u32) * 8;
+    let sub_slot = local32(g, f);
+    let addr = local32(g, f);
+    lget(g, h_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+    lset(g, sub_slot);
+    if !rt.has_fork && step > 0 && step <= 65536 {
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        let slen = local32(g, f);
+        let next_len = local32(g, f);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        ltee(g, slen);
+        i32Const(g, 1);
+        op(g, OP_i32_add);
+        lset(g, next_len);
+        let need = emitScaledBytes(g, f, next_len, step);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+        i32Const(g, squid_direct_runtime::capacity_mask);
+        op(g, OP_i32_and);
+        lget(g, need);
+        op(g, OP_i32_ge_u);
+        let fast = open(g, f, OP_if_);
+        lget(g, sub_entry);
+        lget(g, next_len);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        let sbase = local32(g, f);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        lset(g, sbase);
+        let fast_addr = emitOffsetAddress(g, f, sbase, slen, step);
+        lget(g, fast_addr);
+        lset(g, addr);
+        popCheckedArraysAt(f, fast);
+        op(g, OP_else_);
+        lget(g, sub_slot);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off + 4);
+        i32Const(g, step);
+        callf(g, rt.push);
+        lset(g, addr);
+        close(g, f);
+    } else {
+        lget(g, sub_slot);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off + 4);
+        i32Const(g, step);
+        callf(g, rt.push);
+        lset(g, addr);
+    }
+    return sub_slot, addr;
+}
+
+// Syncs `sub_entry.entry_length = h_len` for all PACKED_SOA sub-slots before slow-path
+// `rt.reserve`, `rt.copy`, or `rt.persist` (fast-path push updates only header `entry_length`).
+fn emitPackedSoaSyncSubLens(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, h_len: u32) {
+    for s in 0..plan.stream_count {
+        let off = packedSubOff(plan, s);
+        let sub_slot = local32(g, f);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+        lset(g, sub_slot);
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        lget(g, sub_entry);
+        lget(g, h_len);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    }
+}
+
+// Refreshes PACKED_SOA header `elem_cap` and cached `col_base[0..S-1]` direct pointers.
+fn emitPackedSoaRefreshCache(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, cap_local: u32) {
+    lget(g, h_base);
+    lget(g, cap_local);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, PACKED_SOA_HDR_CAP);
+    for s in 0..plan.stream_count {
+        let off = packedSubOff(plan, s);
+        let sub_slot = local32(g, f);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+        lset(g, sub_slot);
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        lget(g, h_base);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
+    }
+}
+
+// Loads `(sub_slot, sub_gen)` of stream `s` from header buffer `h_base`.
+fn emitLoadPackedSubHandle(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, s: i64) -> u32, u32 {
+    let off = packedSubOff(plan, s);
     let sub_slot = local32(g, f);
     let sub_gen = local32(g, f);
     lget(g, h_base);
@@ -187,12 +320,21 @@ fn emitLoadPackedSubHandle(g: Generator&, f: const Fn&, h_base: u32, s: i64) -> 
     return sub_slot, sub_gen;
 }
 
-fn emitLoadPackedSubBase(g: Generator&, f: Fn&, h_base: u32, s: i64) -> u32 {
-    let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, h_base, s);
+fn emitLoadPackedSubBase(g: Generator&, f: Fn&, plan: const PackedPlan&, h_base: u32, s: i64) -> u32 {
     let sub_base = local32(g, f);
-    lget(g, sub_slot);
-    lget(g, sub_gen);
-    callf(g, g.runtime_().check);
+    if plan.mode == PACKED_SOA && !g.runtime_().has_fork {
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
+        lset(g, sub_base);
+        return sub_base;
+    }
+    let off = packedSubOff(plan, s);
+    let sub_slot = local32(g, f);
+    lget(g, h_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+    lset(g, sub_slot);
+    let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+    lget(g, sub_entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, sub_base);
     return sub_base;
@@ -282,7 +424,7 @@ fn emitPackedWithCapacity(g: Generator&, f: Fn&, ty: Ty, cap_local: u32, has_cap
         recordMutable(g, f, handle);
         return handle, squid_direct_types::Error.none;
     }
-    let header_bytes = (plan.stream_count as u32) * 8;
+    let header_bytes = packedHeaderBytes(plan);
     let h_base = local32(g, f);
     i32Const(g, header_bytes);
     callf(g, rt.stack);
@@ -290,13 +432,17 @@ fn emitPackedWithCapacity(g: Generator&, f: Fn&, ty: Ty, cap_local: u32, has_cap
     for s in 0..plan.stream_count {
         let use_cap = has_cap && (plan.mode == PACKED_SOA || s == 0);
         let sub_slot, sub_gen = emitPackedCreateSub(g, f, cap_local, use_cap, plan.stream_stride[s]);
-        let off = (s as u32) * 8;
+        let off = packedSubOff(plan, s);
         lget(g, h_base);
         lget(g, sub_slot);
         op(g, OP_i32_store); uleb(g, 2); uleb(g, off);
         lget(g, h_base);
         lget(g, sub_gen);
         op(g, OP_i32_store); uleb(g, 2); uleb(g, off + 4);
+    }
+    if plan.mode == PACKED_SOA {
+        let init_cap = if has_cap { cap_local } else { constLocal(g, f, 0) };
+        emitPackedSoaRefreshCache(g, f, plan, h_base, init_cap);
     }
     lget(g, h_base);
     i32Const(g, 0);
@@ -361,11 +507,64 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
         let step, serr = stride(g, f, elem_ty, id);
         if serr != squid_direct_types::Error.none { return neverVal(), serr; }
         let address = local32(g, f);
-        lget(g, w(g, container, 0));
-        lget(g, w(g, container, 1));
-        i32Const(g, step);
-        callf(g, rt.push);
-        lset(g, address);
+        if !rt.has_fork && step > 0 && step <= 65536 {
+            let entry = ensureCheckedGrow(g, f, container);
+            let len = local32(g, f);
+            let next_len = local32(g, f);
+            lget(g, entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+            ltee(g, len);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lset(g, next_len);
+            let need = emitScaledBytes(g, f, next_len, step);
+            let cap = local32(g, f);
+            lget(g, entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+            if knownMutable(g, f, container) {
+                i32Const(g, squid_direct_runtime::capacity_mask);
+                op(g, OP_i32_and);
+                lget(g, need);
+                op(g, OP_i32_ge_u);
+            } else {
+                ltee(g, cap);
+                i32Const(g, squid_direct_runtime::flag_mask ^ squid_direct_runtime::heap_flag);
+                op(g, OP_i32_and);
+                i32Const(g, squid_direct_runtime::live_flag);
+                op(g, OP_i32_eq);
+                lget(g, need);
+                lget(g, cap);
+                i32Const(g, squid_direct_runtime::capacity_mask);
+                op(g, OP_i32_and);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+            }
+            let fast = open(g, f, OP_if_);
+            lget(g, entry);
+            lget(g, next_len);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+            let elem_base = local32(g, f);
+            lget(g, entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+            lset(g, elem_base);
+            let fast_addr = emitOffsetAddress(g, f, elem_base, len, step);
+            lget(g, fast_addr);
+            lset(g, address);
+            popCheckedArraysAt(f, fast);
+            op(g, OP_else_);
+            lget(g, w(g, container, 0));
+            lget(g, w(g, container, 1));
+            i32Const(g, step);
+            callf(g, rt.push);
+            lset(g, address);
+            close(g, f);
+        } else {
+            lget(g, w(g, container, 0));
+            lget(g, w(g, container, 1));
+            i32Const(g, step);
+            callf(g, rt.push);
+            lset(g, address);
+        }
         let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
         if noted != squid_direct_types::Error.none { return neverVal(), noted; }
         if rt.has_fork { recordBeforeWrite(g, f, w(g, container, 0), address, 0, step); }
@@ -382,6 +581,83 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
             if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
             inner_val = uw;
         }
+        if !rt.has_fork {
+            let next_len = local32(g, f);
+            let cur_cap = local32(g, f);
+            lget(g, h_len);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            ltee(g, next_len);
+            lget(g, h_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, PACKED_SOA_HDR_CAP);
+            ltee(g, cur_cap);
+            op(g, OP_i32_gt_u);
+            let need_grow = open(g, f, OP_if_);
+            // Rare slow path: sync all column lengths, grow all S columns together, refresh cached bases.
+            emitPackedSoaSyncSubLens(g, f, plan, h_base, h_len);
+            let new_cap = local32(g, f);
+            lget(g, cur_cap);
+            i32Const(g, 1);
+            op(g, OP_i32_shl);
+            i32Const(g, 16);
+            lget(g, cur_cap);
+            i32Const(g, 8);
+            op(g, OP_i32_ge_u);
+            op(g, OP_select);
+            ltee(g, new_cap);
+            lget(g, next_len);
+            op(g, OP_i32_lt_u);
+            let fix_cap = open(g, f, OP_if_);
+            lget(g, next_len);
+            lset(g, new_cap);
+            close(g, f);
+            for s in 0..plan.stream_count {
+                let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
+                lget(g, sub_slot);
+                lget(g, sub_gen);
+                lget(g, new_cap);
+                i32Const(g, plan.stream_stride[s]);
+                callf(g, rt.reserve);
+            }
+            emitPackedSoaRefreshCache(g, f, plan, h_base, new_cap);
+            popCheckedArraysAt(f, need_grow);
+            close(g, f);
+            // Single-check fast path: write each field straight to cached `col_base[s] + h_len * step`!
+            for fi in 0..plan.soa_field_count {
+                let s = plan.soa_field_stream[fi];
+                if s < 0 { continue; }
+                let fval = if plan.soa_is_record {
+                    let fv, ferr = recordField(g, f, inner_val, fi, id);
+                    if ferr != squid_direct_types::Error.none { return neverVal(), ferr; }
+                    fv
+                } else {
+                    let iv, ierr = tupleItem(g, f, inner_val, fi, id);
+                    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+                    iv
+                };
+                let step = plan.stream_stride[s];
+                let col_base = local32(g, f);
+                lget(g, h_base);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
+                lset(g, col_base);
+                let addr = emitOffsetAddress(g, f, col_base, h_len, step);
+                if holdsContainer(g, fval.ty, 0) {
+                    let sub_slot = local32(g, f);
+                    lget(g, h_base);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSubOff(plan, s));
+                    lset(g, sub_slot);
+                    let noted = noteStoreToSlot(g, f, sub_slot, fval);
+                    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+                }
+                let werr = writeElement(g, f, addr, 0, fval, id);
+                if werr != squid_direct_types::Error.none { return neverVal(), werr; }
+            }
+            lget(g, h_entry);
+            lget(g, next_len);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+            if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
+            return container, squid_direct_types::Error.none;
+        }
         for fi in 0..plan.soa_field_count {
             let s = plan.soa_field_stream[fi];
             if s < 0 { continue; }
@@ -394,8 +670,8 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
                 if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
                 iv
             };
-            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, h_base, s);
             let step = plan.stream_stride[s];
+            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
             let addr = local32(g, f);
             lget(g, sub_slot);
             lget(g, sub_gen);
@@ -404,13 +680,11 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
             lset(g, addr);
             let noted = noteStoreToSlot(g, f, sub_slot, fval);
             if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-            if rt.has_fork { recordBeforeWrite(g, f, sub_slot, addr, 0, step); }
+            recordBeforeWrite(g, f, sub_slot, addr, 0, step);
             let werr = writeElement(g, f, addr, 0, fval, id);
             if werr != squid_direct_types::Error.none { return neverVal(), werr; }
         }
-        if rt.has_fork {
-            recordBeforeWrite(g, f, w(g, container, 0), h_entry, squid_direct_runtime::entry_length, 4);
-        }
+        recordBeforeWrite(g, f, w(g, container, 0), h_entry, squid_direct_runtime::entry_length, 4);
         lget(g, h_entry);
         lget(g, h_len);
         i32Const(g, 1);
@@ -426,13 +700,7 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
     let terr = emitValueTag(g, f, value, id);
     if terr != squid_direct_types::Error.none { return neverVal(), terr; }
     lset(g, tag_loc);
-    let t_slot, t_gen = emitLoadPackedSubHandle(g, f, h_base, 0);
-    let t_addr = local32(g, f);
-    lget(g, t_slot);
-    lget(g, t_gen);
-    i32Const(g, 1);
-    callf(g, rt.push);
-    lset(g, t_addr);
+    let t_slot, t_addr = emitPackedSubPushFast(g, f, h_base, 0, 1);
     if rt.has_fork { recordBeforeWrite(g, f, t_slot, t_addr, 0, 1); }
     let done = open(g, f, OP_block);
     for ci in 0..plan.variant_count {
@@ -449,14 +717,8 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
         if s >= 0 {
             let payload, uerr = unwrapVariant(g, f, value, vtag, id);
             if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
-            let p_slot, p_gen = emitLoadPackedSubHandle(g, f, h_base, s);
             let step = plan.stream_stride[s];
-            let p_addr = local32(g, f);
-            lget(g, p_slot);
-            lget(g, p_gen);
-            i32Const(g, step);
-            callf(g, rt.push);
-            lset(g, p_addr);
+            let p_slot, p_addr = emitPackedSubPushFast(g, f, h_base, s, step);
             let noted = noteStoreToSlot(g, f, p_slot, payload);
             if noted != squid_direct_types::Error.none { return neverVal(), noted; }
             if rt.has_fork { recordBeforeWrite(g, f, p_slot, p_addr, 0, step); }
@@ -547,6 +809,11 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
     op(g, OP_i32_eqz);
     trap(g, f);
     if plan.mode == PACKED_SOA {
+        let new_len = local32(g, f);
+        lget(g, h_len);
+        i32Const(g, 1);
+        op(g, OP_i32_sub);
+        lset(g, new_len);
         let field_vals = g.reserveVals(plan.soa_field_count);
         for fi in 0..plan.soa_field_count {
             let s = plan.soa_field_stream[fi];
@@ -555,14 +822,24 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
                 g.s.vals[field_vals.start + fi] = Val { fty, 0, 0 };
                 continue;
             }
-            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, h_base, s);
             let step = plan.stream_stride[s];
             let addr = local32(g, f);
-            lget(g, sub_slot);
-            lget(g, sub_gen);
-            i32Const(g, step);
-            callf(g, rt.pop);
-            lset(g, addr);
+            if !rt.has_fork {
+                let col_base = local32(g, f);
+                lget(g, h_base);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
+                lset(g, col_base);
+                let a = emitOffsetAddress(g, f, col_base, new_len, step);
+                lget(g, a);
+                lset(g, addr);
+            } else {
+                let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
+                lget(g, sub_slot);
+                lget(g, sub_gen);
+                i32Const(g, step);
+                callf(g, rt.pop);
+                lset(g, addr);
+            }
             let fval, lerr = loadElement(g, f, addr, 0, fty, id);
             if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
             g.s.vals[field_vals.start + fi] = fval;
@@ -571,9 +848,7 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
             recordBeforeWrite(g, f, w(g, container, 0), h_entry, squid_direct_runtime::entry_length, 4);
         }
         lget(g, h_entry);
-        lget(g, h_len);
-        i32Const(g, 1);
-        op(g, OP_i32_sub);
+        lget(g, new_len);
         op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
         if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
         return assembleSoaVal(g, f, plan, field_vals, id);
@@ -581,7 +856,7 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
     // PACKED_SPLIT_SUM
     let cases, cerr = g.types.variants(elem_ty);
     if cerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
-    let t_slot, t_gen = emitLoadPackedSubHandle(g, f, h_base, 0);
+    let t_slot, t_gen = emitLoadPackedSubHandle(g, f, plan, h_base, 0);
     let t_addr = local32(g, f);
     let ci_loc = local32(g, f);
     lget(g, t_slot);
@@ -613,7 +888,7 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
         let s = plan.variant_stream[ci];
         var payload = Val { pty, 0, 0 };
         if s >= 0 {
-            let p_slot, p_gen = emitLoadPackedSubHandle(g, f, h_base, s);
+            let p_slot, p_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
             let step = plan.stream_stride[s];
             let p_addr = local32(g, f);
             lget(g, p_slot);
@@ -674,14 +949,33 @@ fn emitPackedReserve(g: Generator&, f: Fn&, container: Val, additional: u32, id:
     lget(g, h_len);
     op(g, OP_i32_lt_u);
     trap(g, f);
-    let limit = if plan.mode == PACKED_SOA { plan.stream_count } else { 1 };
-    for s in 0..limit {
-        let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, h_base, s);
-        lget(g, sub_slot);
-        lget(g, sub_gen);
+    if plan.mode == PACKED_SOA && !rt.has_fork {
         lget(g, need);
-        i32Const(g, plan.stream_stride[s]);
-        callf(g, rt.reserve);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, PACKED_SOA_HDR_CAP);
+        op(g, OP_i32_gt_u);
+        let need_r = open(g, f, OP_if_);
+        emitPackedSoaSyncSubLens(g, f, plan, h_base, h_len);
+        for s in 0..plan.stream_count {
+            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
+            lget(g, sub_slot);
+            lget(g, sub_gen);
+            lget(g, need);
+            i32Const(g, plan.stream_stride[s]);
+            callf(g, rt.reserve);
+        }
+        emitPackedSoaRefreshCache(g, f, plan, h_base, need);
+        close(g, f);
+    } else {
+        let limit = if plan.mode == PACKED_SOA { plan.stream_count } else { 1 };
+        for s in 0..limit {
+            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
+            lget(g, sub_slot);
+            lget(g, sub_gen);
+            lget(g, need);
+            i32Const(g, plan.stream_stride[s]);
+            callf(g, rt.reserve);
+        }
     }
     if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
     return container, squid_direct_types::Error.none;
@@ -843,10 +1137,14 @@ fn emitPackedExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId,
         lget(g, src_h_len);
         op(g, OP_i32_eqz);
         opIndex(g, OP_br_if, 0);
+        if plan.mode == PACKED_SOA && !rt.has_fork {
+            emitPackedSoaSyncSubLens(g, f, plan, dst_h_base, dst_h_len);
+            emitPackedSoaSyncSubLens(g, f, plan, src_h_base, src_h_len);
+        }
         for s in 0..plan.stream_count {
             let step = plan.stream_stride[s];
-            let ds_slot, ds_gen = emitLoadPackedSubHandle(g, f, dst_h_base, s);
-            let ss_slot, ss_gen = emitLoadPackedSubHandle(g, f, src_h_base, s);
+            let ds_slot, ds_gen = emitLoadPackedSubHandle(g, f, plan, dst_h_base, s);
+            let ss_slot, ss_gen = emitLoadPackedSubHandle(g, f, plan, src_h_base, s);
             let ds_entry = local32(g, f);
             let ss_entry = local32(g, f);
             let ds_len = local32(g, f);
@@ -881,6 +1179,20 @@ fn emitPackedExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId,
             op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
             close(g, f);
         }
+        if plan.mode == PACKED_SOA && !rt.has_fork {
+            let cur_cap = local32(g, f);
+            let final_cap = local32(g, f);
+            lget(g, dst_h_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, PACKED_SOA_HDR_CAP);
+            ltee(g, cur_cap);
+            lget(g, next_h_len);
+            lget(g, cur_cap);
+            lget(g, next_h_len);
+            op(g, OP_i32_ge_u);
+            op(g, OP_select);
+            lset(g, final_cap);
+            emitPackedSoaRefreshCache(g, f, plan, dst_h_base, final_cap);
+        }
         if rt.has_fork {
             recordBeforeWrite(g, f, w(g, dst, 0), dst_h_entry, squid_direct_runtime::entry_length, 4);
         }
@@ -914,10 +1226,10 @@ fn emitPackedExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId,
         var cur_ptrs: u32[16] = [0; 16];
         var tags_base: u32 = 0;
         if plan.mode == PACKED_SPLIT_SUM {
-            tags_base = emitLoadPackedSubBase(g, f, src_h_base, 0);
-            for s in 1..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, src_h_base, s); }
+            tags_base = emitLoadPackedSubBase(g, f, plan, src_h_base, 0);
+            for s in 1..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, src_h_base, s); }
         } else {
-            for s in 0..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, src_h_base, s); }
+            for s in 0..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, src_h_base, s); }
         }
         let idx = constLocal(g, f, 0);
         let exit = open(g, f, OP_block);
@@ -1030,13 +1342,16 @@ recursive fn emitPackedDeepCopy(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u
 
     let src_h_base, length = ensureCheckedArray(g, f, value);
     if !holds {
-        let header_bytes = (plan.stream_count as u32) * 8;
+        if plan.mode == PACKED_SOA && !rt.has_fork {
+            emitPackedSoaSyncSubLens(g, f, plan, src_h_base, length);
+        }
+        let header_bytes = packedHeaderBytes(plan);
         let new_h_base = local32(g, f);
         i32Const(g, header_bytes);
         callf(g, rt.stack);
         lset(g, new_h_base);
         for s in 0..plan.stream_count {
-            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, src_h_base, s);
+            let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, src_h_base, s);
             let ns = local32(g, f);
             let ng = local32(g, f);
             lget(g, sub_slot);
@@ -1046,9 +1361,12 @@ recursive fn emitPackedDeepCopy(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u
             callf(g, rt.copy);
             lset(g, ng);
             lset(g, ns);
-            let off = (s as u32) * 8;
+            let off = packedSubOff(plan, s);
             lget(g, new_h_base); lget(g, ns); op(g, OP_i32_store); uleb(g, 2); uleb(g, off);
             lget(g, new_h_base); lget(g, ng); op(g, OP_i32_store); uleb(g, 2); uleb(g, off + 4);
+        }
+        if plan.mode == PACKED_SOA {
+            emitPackedSoaRefreshCache(g, f, plan, new_h_base, length);
         }
         lget(g, new_h_base);
         lget(g, length);
@@ -1065,10 +1383,10 @@ recursive fn emitPackedDeepCopy(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u
     var cur_ptrs: u32[16] = [0; 16];
     var tags_base: u32 = 0;
     if plan.mode == PACKED_SPLIT_SUM {
-        tags_base = emitLoadPackedSubBase(g, f, src_h_base, 0);
-        for s in 1..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, src_h_base, s); }
+        tags_base = emitLoadPackedSubBase(g, f, plan, src_h_base, 0);
+        for s in 1..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, src_h_base, s); }
     } else {
-        for s in 0..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, src_h_base, s); }
+        for s in 0..plan.stream_count { cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, src_h_base, s); }
     }
     let idx = constLocal(g, f, 0);
     let exit = open(g, f, OP_block);
@@ -1121,13 +1439,16 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, h_base);
     lget(g, h_entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, h_len);
-    let header_bytes = (plan.stream_count as u32) * 8;
+    if plan.mode == PACKED_SOA && !rt.has_fork {
+        emitPackedSoaSyncSubLens(g, f, plan, h_base, h_len);
+    }
+    let header_bytes = packedHeaderBytes(plan);
     let p_h_base = local32(g, f);
     i32Const(g, header_bytes);
     callf(g, rt.alloc_persistent);
     lset(g, p_h_base);
     for s in 0..plan.stream_count {
-        let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, h_base, s);
+        let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
         let ps = local32(g, f);
         let pg = local32(g, f);
         lget(g, sub_slot);
@@ -1137,7 +1458,7 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
         callf(g, rt.persist);
         lset(g, pg);
         lset(g, ps);
-        let off = (s as u32) * 8;
+        let off = packedSubOff(plan, s);
         lget(g, p_h_base); lget(g, ps); op(g, OP_i32_store); uleb(g, 2); uleb(g, off);
         lget(g, p_h_base); lget(g, pg); op(g, OP_i32_store); uleb(g, 2); uleb(g, off + 4);
         let sholds, sherr = g.contentsHoldMemory(plan.stream_ty[s]);
@@ -1146,6 +1467,10 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
             let aerr = persistArrayElements(g, f, ps, pg, plan.stream_ty[s], plan.stream_stride[s], id, depth + 1);
             if aerr != squid_direct_types::Error.none { return 0, 0, aerr; }
         }
+    }
+    if plan.mode == PACKED_SOA {
+        let zero_cap = constLocal(g, f, 0);
+        emitPackedSoaRefreshCache(g, f, plan, p_h_base, zero_cap);
     }
     let p_slot = local32(g, f);
     let p_gen = local32(g, f);
@@ -1823,17 +2148,17 @@ recursive fn emitPackedLoopCore(
             for fi in 0..plan.soa_field_count {
                 let s = plan.soa_field_stream[fi];
                 if s >= 0 && ((soa_used_fields >> (fi as u32)) & 1) != 0 {
-                    cur_ptrs[s] = emitLoadPackedSubBase(g, f, base, s);
+                    cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, base, s);
                 }
             }
         } else {
             for s in 0..plan.stream_count {
-                cur_ptrs[s] = emitLoadPackedSubBase(g, f, base, s);
+                cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, base, s);
             }
         }
     } else {
         // PACKED_SPLIT_SUM
-        tags_base = emitLoadPackedSubBase(g, f, base, 0);
+        tags_base = emitLoadPackedSubBase(g, f, plan, base, 0);
         if info.pattern != 0 && m.pattern(info.pattern).tag == squid_check_core::PatternTag.bind && split_sum_depth < 4 && plan.variant_count <= 64 {
             let ev_b = m.pattern(info.pattern).a;
             let match_root = unwrapSingleMatchNode(m, info.body);
@@ -1854,12 +2179,12 @@ recursive fn emitPackedLoopCore(
             for ci in 0..plan.variant_count {
                 let s = plan.variant_stream[ci];
                 if s >= 0 && ((split_needed_mask >> (ci as u64)) & 1) != 0 {
-                    cur_ptrs[s] = emitLoadPackedSubBase(g, f, base, s);
+                    cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, base, s);
                 }
             }
         } else {
             for s in 1..plan.stream_count {
-                cur_ptrs[s] = emitLoadPackedSubBase(g, f, base, s);
+                cur_ptrs[s] = emitLoadPackedSubBase(g, f, plan, base, s);
             }
         }
     }

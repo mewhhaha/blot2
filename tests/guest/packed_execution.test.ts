@@ -850,3 +850,142 @@ io main (): U32 =>
     "mutating module const %[U32]",
   );
 });
+
+Deno.test("Packed %[]: SoA header-cached growth, pop/refill, reserve, extend, copy, nested containers, and fork rollback", async () => {
+  await compileAndRun(
+    `
+type WideRec = {
+  id: U32,
+  hp: U32,
+  x: F64,
+  y: F64,
+  z: F64,
+  flags: U32,
+}
+
+type BagRec = {
+  id: U32,
+  items: #[U32],
+}
+
+const CONST_WIDE: %[WideRec] = %[
+  { id: 1, hp: 10, x: 1.0f64, y: 2.0f64, z: 3.0f64, flags: 7 },
+  { id: 2, hp: 20, x: 4.0f64, y: 5.0f64, z: 6.0f64, flags: 9 },
+]
+
+io test_soa_cached_lifecycle (): #[U32] =>
+  // Start completely empty (%[]), grow across multiple doublings (0 -> 4 -> 8 -> ... -> 512)
+  let xs: %[WideRec] = %[]
+  for i in 0..300:
+    xs := xs.push { id: i, hp: i * 3 + 1, x: i.to_f64, y: 2.0f64, z: 3.0f64, flags: i % 5 }
+
+  // Pop 50 elements, push 20 back, reserve +200, push 30 more (total = 300)
+  let pop_sum: U32 = 0
+  for _ in 0..50:
+    let (next_xs, v) = xs.pop
+    xs := next_xs
+    pop_sum := self + v.id
+  for i in 0..20:
+    xs := xs.push { id: 1000 + i, hp: 5, x: 0.0f64, y: 0.0f64, z: 0.0f64, flags: 1 }
+  xs := xs.reserve 200
+  for i in 0..30:
+    xs := xs.push { id: 2000 + i, hp: 7, x: 0.0f64, y: 0.0f64, z: 0.0f64, flags: 2 }
+
+  // Copy isolation + extend + pop on copy must not disturb original
+  let cp = xs.copy
+  cp := cp.extend CONST_WIDE
+  let (cp2, last_v) = cp.pop
+  let xs_sum: U32 = 0
+  for { id, hp, flags } in xs:
+    xs_sum := self + id + hp + flags
+  let cp2_sum: U32 = 0
+  for { id, hp } in cp2:
+    cp2_sum := self + id + hp
+
+  // Fork rollback across BOTH growth and pop on SoA
+  let pre_len = xs.length
+  let fork_len = fork xs:
+    for i in 0..400:
+      xs := xs.push { id: 9000 + i, hp: 1, x: 0.0f64, y: 0.0f64, z: 0.0f64, flags: 0 }
+    let (xs_p, _) = xs.pop
+    xs := xs_p
+    return xs.length
+  let post_sum: U32 = 0
+  for { id, hp, flags } in xs:
+    post_sum := self + id + hp + flags
+
+  // Nested container field inside SoA record (tests holdsContainer noteStore + deep copy!)
+  let bags: %[BagRec] = %[]
+  for i in 0..40:
+    bags := bags.push { id: i, items: #[i, i + 1] }
+  let bags_cp = bags.copy
+  let bags_sum: U32 = 0
+  for b in bags_cp:
+    let sub: U32 = 0
+    for v in b.items:
+      sub := self + v
+    bags_sum := self + b.id + sub
+
+  return #[
+    pre_len,
+    fork_len,
+    xs.length,
+    pop_sum,
+    last_v.id,
+    last_v.hp,
+    xs_sum,
+    post_sum,
+    cp2.length,
+    cp2_sum,
+    bags_sum,
+  ]
+`,
+    (guest) => {
+      // Popped ids: 250..299 => sum = 50*(250+299)/2 = 13725
+      let popSum = 0;
+      for (let i = 250; i < 300; i++) popSum += i;
+      // xs contains: 0..249 (id=i, hp=3i+1, flags=i%5), 1000..1019 (hp=5, flags=1), 2000..2029 (hp=7, flags=2)
+      let xsSum = 0;
+      let xsIdHp = 0;
+      for (let i = 0; i < 250; i++) {
+        xsSum += i + (i * 3 + 1) + (i % 5);
+        xsIdHp += i + (i * 3 + 1);
+      }
+      for (let i = 0; i < 20; i++) {
+        xsSum += (1000 + i) + 5 + 1;
+        xsIdHp += (1000 + i) + 5;
+      }
+      for (let i = 0; i < 30; i++) {
+        xsSum += (2000 + i) + 7 + 2;
+        xsIdHp += (2000 + i) + 7;
+      }
+      // cp2 = xs + CONST_WIDE[0] (id=1, hp=10)
+      const cp2Sum = xsIdHp + 1 + 10;
+      // bags: i + i + (i + 1) = 3i + 1 for i=0..39 => 3*(39*40/2) + 40 = 2380
+      let bagsSum = 0;
+      for (let i = 0; i < 40; i++) bagsSum += i + i + (i + 1);
+      const expected = [
+        300, // pre_len
+        699, // fork_len (300 + 400 - 1)
+        300, // xs.length rolled back
+        popSum,
+        2, // last_v.id (CONST_WIDE[1])
+        20, // last_v.hp
+        xsSum,
+        xsSum, // post_sum unchanged after fork rollback
+        301, // cp2.length
+        cp2Sum,
+        bagsSum,
+      ];
+      assert.deepEqual(
+        Array.from(guest.call("test_soa_cached_lifecycle", null) as Uint32Array),
+        expected,
+      );
+      // Run twice to ensure CONST_WIDE persists across invocations
+      assert.deepEqual(
+        Array.from(guest.call("test_soa_cached_lifecycle", null) as Uint32Array),
+        expected,
+      );
+    },
+  );
+});

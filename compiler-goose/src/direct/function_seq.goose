@@ -40,6 +40,8 @@ let SEQ_HDR_REV: u32 = 12;
 let SEQ_HDR_FOCUS: u32 = 16;
 let SEQ_HDR_FSTART: u32 = 20;
 let SEQ_HDR_FOLDLEN: u32 = 24;
+let SEQ_HDR_FAST_APPEND_EP: u32 = 28;
+let SEQ_HDR_FAST_PREPEND_EP: u32 = 32;
 
 // NODE_INTERNAL (144 bytes, 16-byte aligned)
 let SEQ_NODE_BYTES: u32 = 144;
@@ -114,17 +116,17 @@ fn computeSeqPlan(g: Generator&, f: const Fn&, elem_ty: Ty, id: u32) -> SeqPlan,
         sp.sum_sub_caps_off = sp.sum_sub_lens_off + k;
         sp.sum_leaf_bytes = align16(sp.sum_sub_caps_off + k);
     } else if packed.mode == PACKED_SOA {
-        sp.leaf_cap = 32;
+        sp.leaf_cap = if eb <= 128 { 128 } else { 32 };
         sp.leaf_kind = SEQ_KIND_PACKED_SOA;
         var off: u32 = 16;
         for s in 0..packed.stream_count {
             off = align4(off);
             sp.soa_col_off[s] = off;
-            off += 32 * packed.stream_stride[s];
+            off += sp.leaf_cap * packed.stream_stride[s];
         }
         sp.soa_leaf_bytes = align16(off);
     } else {
-        sp.leaf_cap = if eb <= 4 { 64 } else if eb <= 16 { 32 } else { 16 };
+        sp.leaf_cap = if eb <= 4 { 256 } else if eb <= 16 { 64 } else { 32 };
         sp.leaf_kind = SEQ_KIND_FLAT;
     }
     sp.flat_leaf_bytes = align16(16 + sp.leaf_cap * eb);
@@ -343,6 +345,44 @@ fn ensureSeqRuntime(g: Generator&) -> Error {
     return squid_direct_types::Error.none;
 }
 
+fn emitSeqSimdFindInline(g: Generator&, nf: const Fn&, node_ptr: u32, p: u32, vp: u32, mask: u32) {
+    lget(g, p);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_splat);
+    lset(g, vp);
+    // lanes 0..3
+    lget(g, node_ptr);
+    op(g, OP_prefix_fd); uleb(g, SIMD_v128_load); uleb(g, 4); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, vp);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_gt_u);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_bitmask);
+    lset(g, mask);
+    // lanes 4..7
+    lget(g, node_ptr);
+    op(g, OP_prefix_fd); uleb(g, SIMD_v128_load); uleb(g, 4); uleb(g, SEQ_NODE_PREFIXES + 16);
+    lget(g, vp);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_gt_u);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_bitmask);
+    i32Const(g, 4); op(g, OP_i32_shl);
+    lget(g, mask); op(g, OP_i32_or); lset(g, mask);
+    // lanes 8..11
+    lget(g, node_ptr);
+    op(g, OP_prefix_fd); uleb(g, SIMD_v128_load); uleb(g, 4); uleb(g, SEQ_NODE_PREFIXES + 32);
+    lget(g, vp);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_gt_u);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_bitmask);
+    i32Const(g, 8); op(g, OP_i32_shl);
+    lget(g, mask); op(g, OP_i32_or); lset(g, mask);
+    // lanes 12..15
+    lget(g, node_ptr);
+    op(g, OP_prefix_fd); uleb(g, SIMD_v128_load); uleb(g, 4); uleb(g, SEQ_NODE_PREFIXES + 48);
+    lget(g, vp);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_gt_u);
+    op(g, OP_prefix_fd); uleb(g, SIMD_i32x4_bitmask);
+    i32Const(g, 12); op(g, OP_i32_shl);
+    lget(g, mask); op(g, OP_i32_or);
+    op(g, OP_i32_ctz);
+}
+
 fn emitSeqForkBump(g: Generator&) -> Error {
     if !g.types.has_seq_type { return squid_direct_types::Error.none; }
     let err = ensureSeqRuntime(g);
@@ -405,16 +445,22 @@ fn ensureSeqRebuildPrefixes(g: Generator&) -> u32, Error {
     var nf = newFn(g, 1, 0);
     let node = local(g, nf, VT_i32);
     nf.parameter_words = 1;
+    let meta = local32(g, nf);
     let count = local32(g, nf);
     let acc = local32(g, nf);
     let i = local32(g, nf);
-    let ch = local32(g, nf);
-    lget(g, node); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    let clen = local32(g, nf);
+    let c0_len = local32(g, nf);
+    let uniform = local32(g, nf);
+    let sh = local32(g, nf);
+    lget(g, node); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
     i32Const(g, 8); op(g, OP_i32_shr_u);
     i32Const(g, 255); op(g, OP_i32_and);
     lset(g, count);
     i32Const(g, 0); lset(g, acc);
     i32Const(g, 0); lset(g, i);
+    i32Const(g, 0); lset(g, c0_len);
+    lget(g, count); i32Const(g, 2); op(g, OP_i32_ge_u); lset(g, uniform);
     let b1 = open(g, nf, OP_block);
     let l1 = open(g, nf, OP_loop);
     lget(g, i); lget(g, count); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b1);
@@ -422,14 +468,40 @@ fn ensureSeqRebuildPrefixes(g: Generator&) -> u32, Error {
     op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
     i32Const(g, 0xfffffffe); op(g, OP_i32_and);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    ltee(g, clen);
     lget(g, acc); op(g, OP_i32_add); lset(g, acc);
     lget(g, node); lget(g, i); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
     lget(g, acc);
     op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, i); op(g, OP_i32_eqz);
+    let is_first = open(g, nf, OP_if_);
+    lget(g, clen); lset(g, c0_len);
+    lget(g, uniform);
+    lget(g, clen); i32Const(g, 2); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, clen); lget(g, clen); i32Const(g, 1); op(g, OP_i32_sub); op(g, OP_i32_and); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lset(g, uniform);
+    op(g, OP_else_);
+    lget(g, i); i32Const(g, 1); op(g, OP_i32_add); lget(g, count); op(g, OP_i32_lt_u);
+    let not_last = open(g, nf, OP_if_);
+    lget(g, uniform); lget(g, clen); lget(g, c0_len); op(g, OP_i32_eq); op(g, OP_i32_and); lset(g, uniform);
+    op(g, OP_else_);
+    lget(g, uniform); lget(g, clen); lget(g, c0_len); op(g, OP_i32_le_u); op(g, OP_i32_and); lset(g, uniform);
+    close(g, nf);
+    close(g, nf);
     lget(g, i); i32Const(g, 1); op(g, OP_i32_add); lset(g, i);
     br(g, nf, OP_br, l1);
     close(g, nf); close(g, nf);
     lget(g, node); lget(g, acc); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    // Pack dense radix shift (1..30) into bits 24..30 of SEQ_NODE_META when uniform power-of-2 children!
+    lget(g, c0_len); op(g, OP_i32_ctz);
+    i32Const(g, 0);
+    lget(g, uniform);
+    op(g, OP_select);
+    lset(g, sh);
+    lget(g, node);
+    lget(g, meta); i32Const(g, 0x00ffffff); op(g, OP_i32_and);
+    lget(g, sh); i32Const(g, 24); op(g, OP_i32_shl); op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
     // Fill inactive lanes count..15 with 0xffffffff
     let b2 = open(g, nf, OP_block);
     let l2 = open(g, nf, OP_loop);
@@ -690,8 +762,10 @@ fn ensureSeqHdrCloneShared(g: Generator&) -> u32, Error {
     lget(g, slot); lget(g, gen); callf(g, rt.check);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, src_hdr);
-    // Mark source shared (unlogged write to owner_epoch = 0 -> safe even across fork!).
+    // Mark source shared (unlogged write to owner_epoch/fast_epochs = 0 -> safe even across fork!).
     lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     i32Const(g, SEQ_HDR_BYTES); callf(g, g.s.seq_alloc_fn); ltee(g, dst_hdr);
     lget(g, src_hdr); i32Const(g, SEQ_HDR_BYTES); memoryCopyOp(g);
     lget(g, dst_hdr); callf(g, ep_fn); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
@@ -795,6 +869,8 @@ fn ensureSeqIterNextLeaf(g: Generator&) -> u32, Error {
     lget(g, edge); i32Const(g, 1); op(g, OP_i32_and); lset(g, rev);
     lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
     i32Const(g, 15); op(g, OP_i32_and);
+    lget(g, meta); i32Const(g, 16); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); i32Const(g, 1); op(g, OP_i32_eq);
+    op(g, OP_i32_or);
     let is_leaf = open(g, nf, OP_if_);
     lget(g, sp); i32Const(g, 1); op(g, OP_i32_sub);
     lget(g, edge);
@@ -1304,8 +1380,6 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     }
     lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, nlen);
     lget(g, leaf); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
-    lget(g, leaf); i32Const(g, sp.leaf_kind); lget(g, nlen); i32Const(g, 8); op(g, OP_i32_shl); op(g, OP_i32_or);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
     squid_direct_relocations::rewind(sites_mark);
@@ -1586,8 +1660,6 @@ fn ensureSeqLeafMerge(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, bb); memoryCopyOp(g);
         lget(g, la); lget(g, lb); op(g, OP_i32_add); lset(g, tot);
         lget(g, out); lget(g, tot); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
-        lget(g, out); i32Const(g, SEQ_KIND_FLAT); lget(g, tot); i32Const(g, 8); op(g, OP_i32_shl); op(g, OP_i32_or);
-        op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
         lget(g, out); op(g, OP_return_);
         close(g, nf);
     }
@@ -1742,14 +1814,10 @@ fn ensureSeqLeafSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add);
         lget(g, bl); memoryCopyOp(g);
         lget(g, lout); lget(g, k); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
-        lget(g, lout); i32Const(g, SEQ_KIND_FLAT); lget(g, k); i32Const(g, 8); op(g, OP_i32_shl); op(g, OP_i32_or);
-        op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
         lget(g, rout); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add);
         lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lget(g, bl); op(g, OP_i32_add);
         lget(g, br_b); memoryCopyOp(g);
         lget(g, rout); lget(g, rcnt); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
-        lget(g, rout); i32Const(g, SEQ_KIND_FLAT); lget(g, rcnt); i32Const(g, 8); op(g, OP_i32_shl); op(g, OP_i32_or);
-        op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
         lget(g, lout); lget(g, rout); op(g, OP_return_);
     } else {
         i32Const(g, 0); lset(g, i);
@@ -1837,24 +1905,43 @@ fn ensureSeqTreeGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let idx = local(g, nf, VT_i32);
     nf.parameter_words = 2;
     let ptr = local32(g, nf);
+    let meta = local32(g, nf);
+    let sh = local32(g, nf);
     let len = local32(g, nf);
     let p = local32(g, nf);
     let j = local32(g, nf);
     let prev = local32(g, nf);
     let lp = open(g, nf, OP_loop);
     lget(g, edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); ltee(g, ptr);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
     i32Const(g, 15); op(g, OP_i32_and);
     let is_leaf = open(g, nf, OP_if_);
     lget(g, edge); lget(g, idx); callf(g, leaf_get_fn); op(g, OP_return_);
     close(g, nf);
-    // Internal node: mirror once if rev == 1, branchless SIMD search, enter child[j] with its own rev bit!
+    // Dense radix-16 fast path when unreversed & radix_shift != 0 (zero prefix load, zero SIMD!)
+    lget(g, meta); i32Const(g, 24); op(g, OP_i32_shr_u); ltee(g, sh);
+    lget(g, edge); i32Const(g, 1); op(g, OP_i32_and); op(g, OP_i32_eqz);
+    op(g, OP_i32_and);
+    let fast_radix = open(g, nf, OP_if_);
+    lget(g, idx); lget(g, sh); op(g, OP_i32_shr_u); lset(g, j);
+    lget(g, idx); lget(g, j); lget(g, sh); op(g, OP_i32_shl); op(g, OP_i32_sub); lset(g, idx);
+    lget(g, ptr); lget(g, j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lset(g, edge);
+    br(g, nf, OP_br, lp);
+    close(g, nf);
+    // Reversed or relaxed internal node
     lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN); lset(g, len);
     lget(g, len); i32Const(g, 1); op(g, OP_i32_sub); lget(g, idx); op(g, OP_i32_sub);
     lget(g, idx);
     lget(g, edge); i32Const(g, 1); op(g, OP_i32_and);
     op(g, OP_select);
     lset(g, p);
+    lget(g, sh);
+    let rev_radix = open(g, nf, OP_if_);
+    lget(g, p); lget(g, sh); op(g, OP_i32_shr_u); lset(g, j);
+    lget(g, p); lget(g, j); lget(g, sh); op(g, OP_i32_shl); op(g, OP_i32_sub); lset(g, idx);
+    op(g, OP_else_);
     lget(g, ptr); lget(g, p); callf(g, g.s.seq_simd_find_fn); ltee(g, j);
     let has_prev = open(g, nf, OP_if_);
     lget(g, ptr); lget(g, j); i32Const(g, 1); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
@@ -1864,6 +1951,7 @@ fn ensureSeqTreeGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     i32Const(g, 0); lset(g, prev);
     close(g, nf);
     lget(g, p); lget(g, prev); op(g, OP_i32_sub); lset(g, idx);
+    close(g, nf);
     lget(g, ptr); lget(g, j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
     lset(g, edge);
@@ -2276,16 +2364,19 @@ fn ensureSeqTreeSetFast(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     nf.parameter_words = (3 + lay.len) as u32;
     let ptr = local32(g, nf);
     let rev = local32(g, nf);
+    let meta = local32(g, nf);
     let kind = local32(g, nf);
-    let len = local32(g, nf);
+    let sh = local32(g, nf);
     let p = local32(g, nf);
     let j = local32(g, nf);
     let prev = local32(g, nf);
+    let sub_i = local32(g, nf);
     let old_ch = local32(g, nf);
     let new_ch = local32(g, nf);
     lget(g, edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, ptr);
     lget(g, edge); i32Const(g, 1); op(g, OP_i32_and); lset(g, rev);
-    lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); i32Const(g, 15); op(g, OP_i32_and); ltee(g, kind);
+    lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
+    i32Const(g, 15); op(g, OP_i32_and); ltee(g, kind);
     let is_leaf = open(g, nf, OP_if_);
     lget(g, kind); i32Const(g, sp.leaf_kind); op(g, OP_i32_eq);
     let is_canon = open(g, nf, OP_if_);
@@ -2294,10 +2385,19 @@ fn ensureSeqTreeSetFast(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     close(g, nf);
     i32Const(g, 0); op(g, OP_return_);
     close(g, nf);
-    // Internal node
-    lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN); lset(g, len);
-    lget(g, len); i32Const(g, 1); op(g, OP_i32_sub); lget(g, idx); op(g, OP_i32_sub);
-    lget(g, idx); lget(g, rev); op(g, OP_select); lset(g, p);
+    // Internal node: mirror if rev, then use dense radix shift when available!
+    lget(g, rev);
+    let is_rev = open(g, nf, OP_if_);
+    lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    i32Const(g, 1); op(g, OP_i32_sub); lget(g, idx); op(g, OP_i32_sub); lset(g, p);
+    op(g, OP_else_);
+    lget(g, idx); lset(g, p);
+    close(g, nf);
+    lget(g, meta); i32Const(g, 24); op(g, OP_i32_shr_u); ltee(g, sh);
+    let has_sh = open(g, nf, OP_if_);
+    lget(g, p); lget(g, sh); op(g, OP_i32_shr_u); lset(g, j);
+    lget(g, p); lget(g, j); lget(g, sh); op(g, OP_i32_shl); op(g, OP_i32_sub); lset(g, sub_i);
+    op(g, OP_else_);
     lget(g, ptr); lget(g, p); callf(g, g.s.seq_simd_find_fn); ltee(g, j);
     let hp = open(g, nf, OP_if_);
     lget(g, ptr); lget(g, j); i32Const(g, 1); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
@@ -2305,9 +2405,11 @@ fn ensureSeqTreeSetFast(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_else_);
     i32Const(g, 0); lset(g, prev);
     close(g, nf);
+    lget(g, p); lget(g, prev); op(g, OP_i32_sub); lset(g, sub_i);
+    close(g, nf);
     lget(g, ptr); lget(g, j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN); lset(g, old_ch);
-    lget(g, old_ch); lget(g, p); lget(g, prev); op(g, OP_i32_sub); seqPushVal(g, val); lget(g, epoch);
+    lget(g, old_ch); lget(g, sub_i); seqPushVal(g, val); lget(g, epoch);
     callf(g, fn_id);
     ltee(g, new_ch);
     op(g, OP_i32_eqz);
@@ -2438,8 +2540,6 @@ fn emitSeqFocusMoveGap(g: Generator&, f: Fn&, sp: const SeqPlan&, focus: u32, ta
 fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
     if crerr != squid_direct_types::Error.none { return 0, crerr; }
-    let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != squid_direct_types::Error.none { return 0, aerr; }
     let key = squid_direct_emit::key64(sp.elem_ty, 14);
     let existing, found = g.s.seq_helpers.get(key);
     if found { return existing, squid_direct_types::Error.none; }
@@ -2487,38 +2587,180 @@ fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             close(g, nf);
         }
         lget(g, out); lget(g, live); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
-        lget(g, out); i32Const(g, SEQ_KIND_FLAT); lget(g, live); i32Const(g, 8); op(g, OP_i32_shl); op(g, OP_i32_or);
-        op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
-    } else {
-        // Pack focus elements [0..gs) and [ge..cap) into LEAF_PACKED_SUM or LEAF_PACKED_SOA!
+    } else if sp.leaf_kind == SEQ_KIND_PACKED_SOA {
+        // Inline SoA transpose directly into column pointers (zero per-element calls!).
+        var col_ptrs: u32[16] = [0; 16];
+        for st in 0..sp.packed.stream_count {
+            col_ptrs[st] = local32(g, nf);
+            lget(g, out); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, col_ptrs[st]);
+        }
+        let gap_len = local32(g, nf);
+        let phys = local32(g, nf);
+        lget(g, ge); lget(g, gs); op(g, OP_i32_sub); lset(g, gap_len);
         i32Const(g, 0); lset(g, i);
         let b1 = open(g, nf, OP_block); let l1 = open(g, nf, OP_loop);
-        lget(g, i); lget(g, gs); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b1);
-        let a1 = emitOffsetAddress(g, nf, dbase, i, sp.elem_bytes);
-        let v1, err1 = loadElement(g, nf, a1, 0, sp.elem_ty, 0);
+        lget(g, i); lget(g, live); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b1);
+        lget(g, i);
+        lget(g, i); lget(g, gap_len); op(g, OP_i32_add);
+        lget(g, i); lget(g, gs); op(g, OP_i32_lt_u);
+        op(g, OP_select); lset(g, phys);
+        let a1 = emitOffsetAddress(g, nf, dbase, phys, sp.elem_bytes);
+        let v1, err1 = readFlat(g, nf, a1, 0, sp.elem_ty, 0);
         if err1 != squid_direct_types::Error.none {
             squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err1;
         }
-        lget(g, out); seqPushVal(g, v1); callf(g, app_fn);
+        var inner_val = v1;
+        if sp.packed.soa_is_nominal {
+            let uw, uerr = unwrapVariant(g, nf, v1, sp.packed.soa_nominal_tag, 0);
+            if uerr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return 0, uerr;
+            }
+            inner_val = uw;
+        }
+        for fi in 0..sp.packed.soa_field_count {
+            let st = sp.packed.soa_field_stream[fi];
+            if st < 0 { continue; }
+            var fv = neverVal();
+            if sp.packed.soa_is_record {
+                let got, gerr = recordField(g, nf, inner_val, fi, 0);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
+                    s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                    return 0, gerr;
+                }
+                fv = got;
+            } else {
+                let got, gerr = tupleItem(g, nf, inner_val, fi, 0);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
+                    s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                    return 0, gerr;
+                }
+                fv = got;
+            }
+            let werr = writeElement(g, nf, col_ptrs[st], 0, fv, 0);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return 0, werr;
+            }
+            lget(g, col_ptrs[st]); i32Const(g, sp.packed.stream_stride[st]); op(g, OP_i32_add); lset(g, col_ptrs[st]);
+        }
         lget(g, i); i32Const(g, 1); op(g, OP_i32_add); lset(g, i);
         br(g, nf, OP_br, l1);
         close(g, nf); close(g, nf);
-        lget(g, ge); lset(g, i);
-        let b2 = open(g, nf, OP_block); let l2 = open(g, nf, OP_loop);
-        lget(g, i); lget(g, cap); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b2);
-        let a2 = emitOffsetAddress(g, nf, dbase, i, sp.elem_bytes);
-        let v2, err2 = loadElement(g, nf, a2, 0, sp.elem_ty, 0);
-        if err2 != squid_direct_types::Error.none {
+        lget(g, out); lget(g, live); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
+    } else {
+        // Inline SEQ_KIND_PACKED_SUM packing with in-register sub-stream pointers/lens/caps (zero app_fn calls!).
+        let cases, cerr = g.types.variants(sp.elem_ty);
+        if cerr != squid_direct_types::Error.none {
             squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-            return 0, err2;
+            return 0, cerr;
         }
-        lget(g, out); seqPushVal(g, v2); callf(g, app_fn);
+        var sub_ptrs: u32[16] = [0; 16];
+        var sub_lens: u32[16] = [0; 16];
+        var sub_caps: u32[16] = [0; 16];
+        for st in 1..sp.packed.stream_count {
+            let si = st - 1;
+            sub_ptrs[si] = constLocal(g, nf, 0);
+            sub_lens[si] = constLocal(g, nf, 0);
+            sub_caps[si] = constLocal(g, nf, 0);
+        }
+        let gap_len = local32(g, nf);
+        let phys = local32(g, nf);
+        let vtag_loc = local32(g, nf);
+        let tags_dst = local32(g, nf);
+        lget(g, ge); lget(g, gs); op(g, OP_i32_sub); lset(g, gap_len);
+        lget(g, out); i32Const(g, SEQ_SUM_TAGS); op(g, OP_i32_add); lset(g, tags_dst);
+        i32Const(g, 0); lset(g, i);
+        let b1 = open(g, nf, OP_block); let l1 = open(g, nf, OP_loop);
+        lget(g, i); lget(g, live); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b1);
+        lget(g, i);
+        lget(g, i); lget(g, gap_len); op(g, OP_i32_add);
+        lget(g, i); lget(g, gs); op(g, OP_i32_lt_u);
+        op(g, OP_select); lset(g, phys);
+        let a1 = emitOffsetAddress(g, nf, dbase, phys, sp.elem_bytes);
+        let v1, err1 = readFlat(g, nf, a1, 0, sp.elem_ty, 0);
+        if err1 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, err1;
+        }
+        let terr = emitValueTag(g, nf, v1, 0);
+        if terr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, terr;
+        }
+        lset(g, vtag_loc);
+        let done_v = open(g, nf, OP_block);
+        for ci in 0..(cases.len as i64) {
+            let vtag = g.types.variant_tags[cases.tags + ci];
+            let st = sp.packed.variant_stream[ci];
+            lget(g, vtag_loc); i32Const(g, vtag); op(g, OP_i32_eq);
+            let arm = open(g, nf, OP_if_);
+            lget(g, tags_dst); lget(g, i); op(g, OP_i32_add);
+            i32Const(g, ci as u32);
+            op(g, OP_i32_store8); uleb(g, 0); uleb(g, 0);
+            if st >= 1 {
+                let si = st - 1;
+                let step = sp.packed.stream_stride[st];
+                lget(g, sub_lens[si]); lget(g, sub_caps[si]); op(g, OP_i32_ge_u);
+                let grow = open(g, nf, OP_if_);
+                let ncap = local32(g, nf);
+                let nptr = local32(g, nf);
+                lget(g, sub_caps[si]); i32Const(g, 1); op(g, OP_i32_shl);
+                i32Const(g, 2);
+                lget(g, sub_caps[si]);
+                op(g, OP_select);
+                ltee(g, ncap);
+                i32Const(g, 32); op(g, OP_i32_gt_u);
+                let c32 = open(g, nf, OP_if_); i32Const(g, 32); lset(g, ncap); close(g, nf);
+                let ab = emitScaledBytes(g, nf, ncap, step);
+                lget(g, ab); callf(g, g.s.seq_alloc_fn); lset(g, nptr);
+                lget(g, sub_lens[si]);
+                let ho = open(g, nf, OP_if_);
+                let cb = emitScaledBytes(g, nf, sub_lens[si], step);
+                lget(g, nptr); lget(g, sub_ptrs[si]); lget(g, cb); memoryCopyOp(g);
+                close(g, nf);
+                lget(g, nptr); lset(g, sub_ptrs[si]);
+                lget(g, ncap); lset(g, sub_caps[si]);
+                close(g, nf);
+                let paddr = emitOffsetAddress(g, nf, sub_ptrs[si], sub_lens[si], step);
+                let uw, uerr = unwrapVariant(g, nf, v1, vtag, 0);
+                if uerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
+                    s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                    return 0, uerr;
+                }
+                let werr = writeElement(g, nf, paddr, 0, uw, 0);
+                if werr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
+                    s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                    return 0, werr;
+                }
+                lget(g, sub_lens[si]); i32Const(g, 1); op(g, OP_i32_add); lset(g, sub_lens[si]);
+            }
+            br(g, nf, OP_br, done_v);
+            close(g, nf);
+        }
+        close(g, nf);
         lget(g, i); i32Const(g, 1); op(g, OP_i32_add); lset(g, i);
-        br(g, nf, OP_br, l2);
+        br(g, nf, OP_br, l1);
         close(g, nf); close(g, nf);
+        for st in 1..sp.packed.stream_count {
+            let si = st - 1;
+            let siu = si as u32;
+            lget(g, out); lget(g, sub_ptrs[si]); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_SUM_SUB_PTRS + siu * 4);
+            lget(g, out); lget(g, sub_lens[si]); op(g, OP_i32_store8); uleb(g, 0); uleb(g, sp.sum_sub_lens_off + siu);
+            lget(g, out); lget(g, sub_caps[si]); op(g, OP_i32_store8); uleb(g, 0); uleb(g, sp.sum_sub_caps_off + siu);
+        }
+        lget(g, out); lget(g, live); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
     }
     lget(g, out);
     op(g, OP_end);
@@ -2596,6 +2838,248 @@ fn ensureSeqNormalizedRoot(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     return fn_id, squid_direct_types::Error.none;
 }
 
+// Type-independent O(1)-amortized in-place right-spine leaf append:
+// seq_tree_push_leaf(root, fleaf, epoch) -> root (or 0 to fall back to concat_fn).
+// Handles 15/16 of sequential append flushes with zero allocations, zero stack traffic,
+// zero memory.copy, and exact radix_shift preservation!
+fn ensureSeqTreePushLeaf(g: Generator&) -> u32, Error {
+    let new2_fn, n2err = ensureSeqNodeNew2(g);
+    if n2err != squid_direct_types::Error.none { return 0, n2err; }
+    let key = squid_direct_emit::key64(0xffffffff, 110);
+    let existing, found = g.s.seq_helpers.get(key);
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
+    let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32]));
+    g.s.seq_helpers.put(key, fn_id);
+    let s .= g.s;
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
+    let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
+    var nf = newFn(g, 1, 0);
+    let root = local(g, nf, VT_i32);
+    let fleaf = local(g, nf, VT_i32);
+    let epoch = local(g, nf, VT_i32);
+    nf.parameter_words = 3;
+    let flen = local32(g, nf);
+    let cur = local32(g, nf);
+    let meta = local32(g, nf);
+    let cnt = local32(g, nf);
+    let h = local32(g, nf);
+    let old_len = local32(g, nf);
+    let new_len = local32(g, nf);
+    let sh = local32(g, nf);
+    let c0 = local32(g, nf);
+    let prev_last = local32(g, nf);
+    let unit = local32(g, nf);
+    let carry = local32(g, nf);
+    let nn = local32(g, nf);
+    let lvl = local32(g, nf);
+    let a_cur = local32(g, nf);
+    let bump_n = local32(g, nf);
+    let anc0 = constLocal(g, nf, 0);
+    let anc1 = constLocal(g, nf, 0);
+    let anc2 = constLocal(g, nf, 0);
+    let anc3 = constLocal(g, nf, 0);
+    let depth = constLocal(g, nf, 0);
+    lget(g, fleaf); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN); lset(g, flen);
+    lget(g, root); lset(g, cur);
+    let do_bump = open(g, nf, OP_block);
+    let lp = open(g, nf, OP_loop);
+    // Reject reversed node, leaf root, or shared epoch
+    lget(g, cur); i32Const(g, 1); op(g, OP_i32_and);
+    let is_rev = open(g, nf, OP_if_); i32Const(g, 0); op(g, OP_return_); close(g, nf);
+    lget(g, cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
+    i32Const(g, 15); op(g, OP_i32_and);
+    let is_leaf = open(g, nf, OP_if_); i32Const(g, 0); op(g, OP_return_); close(g, nf);
+    lget(g, cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_EPOCH); lget(g, epoch); op(g, OP_i32_ne);
+    let is_shared = open(g, nf, OP_if_); i32Const(g, 0); op(g, OP_return_); close(g, nf);
+    lget(g, meta); i32Const(g, 8); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); lset(g, cnt);
+    lget(g, meta); i32Const(g, 16); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); lset(g, h);
+    lget(g, h); i32Const(g, 1); op(g, OP_i32_eq);
+    let is_h1 = open(g, nf, OP_if_);
+    lget(g, cnt); i32Const(g, 16); op(g, OP_i32_lt_u);
+    let has_room = open(g, nf, OP_if_);
+    // Fast path (15/16 of flushes): append fleaf directly into cur.children[cnt]!
+    lget(g, cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    lget(g, fleaf); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN); ltee(g, old_len);
+    lget(g, flen); op(g, OP_i32_add); lset(g, new_len);
+    lget(g, cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, cur); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    lget(g, meta); i32Const(g, 24); op(g, OP_i32_shr_u); lset(g, sh);
+    lget(g, cnt); i32Const(g, 1); op(g, OP_i32_eq);
+    let was_one = open(g, nf, OP_if_);
+    lget(g, cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES); lset(g, c0);
+    lget(g, c0); op(g, OP_i32_ctz);
+    i32Const(g, 0);
+    lget(g, c0); i32Const(g, 2); op(g, OP_i32_ge_u);
+    lget(g, c0); lget(g, c0); i32Const(g, 1); op(g, OP_i32_sub); op(g, OP_i32_and); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, flen); lget(g, c0); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    op(g, OP_select); lset(g, sh);
+    op(g, OP_else_);
+    lget(g, sh);
+    let had_sh = open(g, nf, OP_if_);
+    lget(g, old_len);
+    lget(g, cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    op(g, OP_i32_sub); lset(g, prev_last);
+    i32Const(g, 1); lget(g, sh); op(g, OP_i32_shl); lset(g, unit);
+    lget(g, prev_last); lget(g, unit); op(g, OP_i32_ne);
+    lget(g, flen); lget(g, unit); op(g, OP_i32_gt_u); op(g, OP_i32_or);
+    let clr_sh = open(g, nf, OP_if_); i32Const(g, 0); lset(g, sh); close(g, nf);
+    close(g, nf);
+    close(g, nf);
+    lget(g, cur);
+    lget(g, cnt); i32Const(g, 1); op(g, OP_i32_add); i32Const(g, 8); op(g, OP_i32_shl);
+    i32Const(g, 1 << 16); op(g, OP_i32_or);
+    lget(g, sh); i32Const(g, 24); op(g, OP_i32_shl); op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    lget(g, depth); lset(g, bump_n);
+    br(g, nf, OP_br, do_bump);
+    close(g, nf);
+    // Dense 16+1 carry propagation (1/16 of flushes): keeps EVERY internal node full 16-way
+    // and preserves exact power-of-2 radix_shift at EVERY tree level!
+    i32Const(g, SEQ_NODE_BYTES); callf(g, g.s.seq_alloc_fn); lset(g, carry);
+    lget(g, carry); i32Const(g, (1 << 8) | (1 << 16)); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    lget(g, carry); lget(g, epoch); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_EPOCH);
+    lget(g, carry); lget(g, flen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    lget(g, carry); lget(g, fleaf); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, carry); lget(g, flen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, carry); i32Const(g, SEQ_NODE_PREFIXES + 4); op(g, OP_i32_add);
+    i32Const(g, 0xff); i32Const(g, 60); memoryFillOp(g);
+    lget(g, depth); lset(g, lvl);
+    let prop_done = open(g, nf, OP_block);
+    let prop_lp = open(g, nf, OP_loop);
+    lget(g, lvl); op(g, OP_i32_eqz); br(g, nf, OP_br_if, prop_done);
+    lget(g, lvl); i32Const(g, 1); op(g, OP_i32_sub); lset(g, lvl);
+    lget(g, anc0); lset(g, a_cur);
+    lget(g, lvl); i32Const(g, 1); op(g, OP_i32_eq); let l1 = open(g, nf, OP_if_); lget(g, anc1); lset(g, a_cur); close(g, nf);
+    lget(g, lvl); i32Const(g, 2); op(g, OP_i32_eq); let l2 = open(g, nf, OP_if_); lget(g, anc2); lset(g, a_cur); close(g, nf);
+    lget(g, lvl); i32Const(g, 3); op(g, OP_i32_eq); let l3 = open(g, nf, OP_if_); lget(g, anc3); lset(g, a_cur); close(g, nf);
+    lget(g, a_cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
+    i32Const(g, 8); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); lset(g, cnt);
+    lget(g, meta); i32Const(g, 16); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); lset(g, h);
+    lget(g, cnt); i32Const(g, 16); op(g, OP_i32_lt_u);
+    let a_room = open(g, nf, OP_if_);
+    lget(g, a_cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    lget(g, carry); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, a_cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN); ltee(g, old_len);
+    lget(g, flen); op(g, OP_i32_add); lset(g, new_len);
+    lget(g, a_cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, a_cur); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    lget(g, meta); i32Const(g, 24); op(g, OP_i32_shr_u); lset(g, sh);
+    lget(g, cnt); i32Const(g, 1); op(g, OP_i32_eq);
+    let a_was_one = open(g, nf, OP_if_);
+    lget(g, a_cur); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES); lset(g, c0);
+    lget(g, c0); op(g, OP_i32_ctz);
+    i32Const(g, 0);
+    lget(g, c0); i32Const(g, 2); op(g, OP_i32_ge_u);
+    lget(g, c0); lget(g, c0); i32Const(g, 1); op(g, OP_i32_sub); op(g, OP_i32_and); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, flen); lget(g, c0); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    op(g, OP_select); lset(g, sh);
+    op(g, OP_else_);
+    lget(g, sh);
+    let a_had_sh = open(g, nf, OP_if_);
+    lget(g, old_len);
+    lget(g, a_cur); lget(g, cnt); i32Const(g, 2); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    op(g, OP_i32_sub); lset(g, prev_last);
+    i32Const(g, 1); lget(g, sh); op(g, OP_i32_shl); lset(g, unit);
+    lget(g, prev_last); lget(g, unit); op(g, OP_i32_ne);
+    lget(g, flen); lget(g, unit); op(g, OP_i32_gt_u); op(g, OP_i32_or);
+    let a_clr = open(g, nf, OP_if_); i32Const(g, 0); lset(g, sh); close(g, nf);
+    close(g, nf);
+    close(g, nf);
+    lget(g, a_cur);
+    lget(g, cnt); i32Const(g, 1); op(g, OP_i32_add); i32Const(g, 8); op(g, OP_i32_shl);
+    lget(g, h); i32Const(g, 16); op(g, OP_i32_shl); op(g, OP_i32_or);
+    lget(g, sh); i32Const(g, 24); op(g, OP_i32_shl); op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    lget(g, lvl); lset(g, bump_n);
+    br(g, nf, OP_br, do_bump);
+    close(g, nf);
+    // Ancestor also full: wrap carry in 1-child node of height `h` and continue up!
+    i32Const(g, SEQ_NODE_BYTES); callf(g, g.s.seq_alloc_fn); lset(g, nn);
+    lget(g, nn); i32Const(g, 1 << 8); lget(g, h); i32Const(g, 16); op(g, OP_i32_shl); op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    lget(g, nn); lget(g, epoch); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_EPOCH);
+    lget(g, nn); lget(g, flen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    lget(g, nn); lget(g, carry); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, nn); lget(g, flen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lget(g, nn); i32Const(g, SEQ_NODE_PREFIXES + 4); op(g, OP_i32_add);
+    i32Const(g, 0xff); i32Const(g, 60); memoryFillOp(g);
+    lget(g, nn); lset(g, carry);
+    br(g, nf, OP_br, prop_lp);
+    close(g, nf); close(g, nf);
+    // Root itself was full: grow tree height by 1 with [root, carry]!
+    lget(g, root); lget(g, carry);
+    lget(g, root); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META);
+    i32Const(g, 16); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and);
+    i32Const(g, 1); op(g, OP_i32_add);
+    lget(g, epoch); callf(g, new2_fn);
+    op(g, OP_return_);
+    close(g, nf);
+    // Record ancestor and descend rightmost child
+    lget(g, depth); i32Const(g, 4); op(g, OP_i32_ge_u);
+    let too_deep = open(g, nf, OP_if_); i32Const(g, 0); op(g, OP_return_); close(g, nf);
+    lget(g, depth); i32Const(g, 0); op(g, OP_i32_eq); let d0 = open(g, nf, OP_if_); lget(g, cur); lset(g, anc0); close(g, nf);
+    lget(g, depth); i32Const(g, 1); op(g, OP_i32_eq); let d1 = open(g, nf, OP_if_); lget(g, cur); lset(g, anc1); close(g, nf);
+    lget(g, depth); i32Const(g, 2); op(g, OP_i32_eq); let d2 = open(g, nf, OP_if_); lget(g, cur); lset(g, anc2); close(g, nf);
+    lget(g, depth); i32Const(g, 3); op(g, OP_i32_eq); let d3 = open(g, nf, OP_if_); lget(g, cur); lset(g, anc3); close(g, nf);
+    lget(g, depth); i32Const(g, 1); op(g, OP_i32_add); lset(g, depth);
+    lget(g, cur); lget(g, cnt); i32Const(g, 1); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN); lset(g, cur);
+    br(g, nf, OP_br, lp);
+    close(g, nf);
+    i32Const(g, 0); op(g, OP_return_);
+    close(g, nf);
+    // Bump len & last prefix (and verify radix_shift) on ancestors 0..bump_n-1!
+    let ancs: u32[4] = [anc0, anc1, anc2, anc3];
+    for ai in 0..4 {
+        let a_loc = ancs[ai];
+        lget(g, bump_n); i32Const(g, (ai + 1) as u32); op(g, OP_i32_ge_u);
+        let has_a = open(g, nf, OP_if_);
+        let ameta = local32(g, nf);
+        let alast = local32(g, nf);
+        let alen = local32(g, nf);
+        let ash = local32(g, nf);
+        let aprev = local32(g, nf);
+        lget(g, a_loc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, ameta);
+        i32Const(g, 8); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and);
+        i32Const(g, 1); op(g, OP_i32_sub); lset(g, alast);
+        lget(g, a_loc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+        lget(g, flen); op(g, OP_i32_add); lset(g, alen);
+        lget(g, a_loc); lget(g, alen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+        lget(g, a_loc); lget(g, alast); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+        lget(g, alen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+        lget(g, ameta); i32Const(g, 24); op(g, OP_i32_shr_u); ltee(g, ash);
+        let has_ash = open(g, nf, OP_if_);
+        lget(g, alast);
+        let has_ap = open(g, nf, OP_if_);
+        lget(g, a_loc); lget(g, alast); i32Const(g, 1); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES); lset(g, aprev);
+        op(g, OP_else_);
+        i32Const(g, 0); lset(g, aprev);
+        close(g, nf);
+        lget(g, alen); lget(g, aprev); op(g, OP_i32_sub);
+        i32Const(g, 1); lget(g, ash); op(g, OP_i32_shl);
+        op(g, OP_i32_gt_u);
+        let clr_a = open(g, nf, OP_if_);
+        lget(g, a_loc); lget(g, ameta); i32Const(g, 0x00ffffff); op(g, OP_i32_and);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_NODE_META);
+        close(g, nf);
+        close(g, nf);
+        close(g, nf);
+    }
+    lget(g, root);
+    op(g, OP_end);
+    finishWith(g, fn_id, nf, false, 0, 0, 0);
+    squid_direct_relocations::rewind(sites_mark);
+    s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+    return fn_id, squid_direct_types::Error.none;
+}
+
 // Kind 16: seq_flush_focus(hdr_ptr, epoch) -> void (mutates hdr in base frame, keeping hdr.root_rev!)
 fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let f2l_fn, ferr = ensureSeqFocusToLeaf(g, sp);
@@ -2604,6 +3088,8 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     if serr != squid_direct_types::Error.none { return 0, serr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
     if cerr != squid_direct_types::Error.none { return 0, cerr; }
+    let push_leaf_fn, plerr = ensureSeqTreePushLeaf(g);
+    if plerr != squid_direct_types::Error.none { return 0, plerr; }
     let key = squid_direct_emit::key64(sp.elem_ty, 16);
     let existing, found = g.s.seq_helpers.get(key);
     if found { return existing, squid_direct_types::Error.none; }
@@ -2626,6 +3112,9 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let rest = local32(g, nf);
     let right = local32(g, nf);
     let merged = local32(g, nf);
+    let fast_r = local32(g, nf);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS); ltee(g, foc);
     op(g, OP_i32_eqz);
     let zif = open(g, nf, OP_if_); op(g, OP_return_); close(g, nf);
@@ -2633,6 +3122,24 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FSTART); lset(g, fstart);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN); lset(g, fold);
     lget(g, foc); lget(g, epoch); callf(g, f2l_fn); lset(g, fleaf);
+    // Fast right-end append path (skips split_fn and 15/16 of concat_fn calls!)
+    lget(g, root); op(g, OP_i32_eqz);
+    let empty_root = open(g, nf, OP_if_);
+    lget(g, fleaf); lset(g, merged);
+    op(g, OP_else_);
+    lget(g, fold); op(g, OP_i32_eqz);
+    lget(g, fleaf); i32Const(g, 0); op(g, OP_i32_ne); op(g, OP_i32_and);
+    lget(g, fstart);
+    lget(g, root); i32Const(g, 0xfffffffe); op(g, OP_i32_and); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN);
+    op(g, OP_i32_eq); op(g, OP_i32_and);
+    let right_end = open(g, nf, OP_if_);
+    lget(g, root); lget(g, fleaf); lget(g, epoch); callf(g, push_leaf_fn); ltee(g, fast_r);
+    let did_fast = open(g, nf, OP_if_);
+    lget(g, fast_r); lset(g, merged);
+    op(g, OP_else_);
+    lget(g, root); lget(g, fleaf); lget(g, epoch); callf(g, concat_fn); lset(g, merged);
+    close(g, nf);
+    op(g, OP_else_);
     lget(g, root); lget(g, fstart); lget(g, epoch); callf(g, split_fn);
     lset(g, rest); lset(g, left);
     lget(g, fold);
@@ -2645,6 +3152,8 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, left); lget(g, fleaf); lget(g, epoch); callf(g, concat_fn);
     lget(g, right); lget(g, epoch); callf(g, concat_fn);
     lset(g, merged);
+    close(g, nf);
+    close(g, nf);
     lget(g, hdr); lget(g, merged); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_ROOT);
     lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS);
     lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FSTART);
@@ -2658,28 +3167,27 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
 
 // ---- Header-level entry helpers: get, set, insert (push/push_front/insert), remove (pop/pop_front/remove) ----
 
-// Kind 17: seq_hdr_get(slot, gen, idx) -> val...
+// Kind 17: seq_hdr_get(hdr, idx) -> val...
+// Flattened single-call lookup: caller hoists `rt.check` via `ensureCheckedArray`,
+// and tree descent + v128 SIMD routing + FLAT/SPAN/RAMP leaf reads run inline with zero inner calls!
 fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
-    let tree_get_fn, tgerr = ensureSeqTreeGet(g, sp);
-    if tgerr != squid_direct_types::Error.none { return 0, tgerr; }
+    let leaf_get_fn, lgerr = ensureSeqLeafGet(g, sp);
+    if lgerr != squid_direct_types::Error.none { return 0, lgerr; }
     let key = squid_direct_emit::key64(sp.elem_ty, 17);
     let existing, found = g.s.seq_helpers.get(key);
     if found { return existing, squid_direct_types::Error.none; }
     if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
     if lerr != squid_direct_types::Error.none { return 0, lerr; }
-    let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], lay));
+    let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], lay));
     g.s.seq_helpers.put(key, fn_id);
-    let rt = g.runtime_();
     let s .= g.s;
     let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
-    let slot = local(g, nf, VT_i32);
-    let gen = local(g, nf, VT_i32);
+    let hdr = local(g, nf, VT_i32);
     let idx = local(g, nf, VT_i32);
-    nf.parameter_words = 3;
-    let hdr = local32(g, nf);
+    nf.parameter_words = 2;
     let total = local32(g, nf);
     let rev = local32(g, nf);
     let p = local32(g, nf);
@@ -2691,8 +3199,17 @@ fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let ge = local32(g, nf);
     let k = local32(g, nf);
     let phys = local32(g, nf);
-    lget(g, slot); lget(g, gen); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
+    let edge = local32(g, nf);
+    let ptr = local32(g, nf);
+    let meta = local32(g, nf);
+    let kind = local32(g, nf);
+    let sh = local32(g, nf);
+    let nlen = local32(g, nf);
+    let np = local32(g, nf);
+    let j = local32(g, nf);
+    let prev = local32(g, nf);
+    let vp = local(g, nf, VT_v128);
+    let mask = local32(g, nf);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, idx); lget(g, total); op(g, OP_i32_ge_u); trap(g, nf);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV); lset(g, rev);
@@ -2736,8 +3253,115 @@ fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, p); lget(g, flive); op(g, OP_i32_sub); lget(g, fold); op(g, OP_i32_add); lset(g, p);
     close(g, nf);
     close(g, nf);
-    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT);
-    lget(g, p); callf(g, tree_get_fn);
+    // Inline tree descent + dense radix-16 fast path + v128 SIMD fallback + FLAT/SPAN/RAMP leaf reads!
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); lset(g, edge);
+    let lp = open(g, nf, OP_loop);
+    lget(g, edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); ltee(g, ptr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, meta);
+    i32Const(g, 15); op(g, OP_i32_and); ltee(g, kind);
+    let is_leaf = open(g, nf, OP_if_);
+    if sp.elem_bytes == 0 {
+        op(g, OP_return_);
+    } else {
+        lget(g, kind); i32Const(g, SEQ_KIND_FLAT); op(g, OP_i32_eq);
+        let is_flat = open(g, nf, OP_if_);
+        let lpos = local32(g, nf);
+        lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
+        i32Const(g, 1); op(g, OP_i32_sub); lget(g, p); op(g, OP_i32_sub);
+        lget(g, p);
+        lget(g, edge); i32Const(g, 1); op(g, OP_i32_and);
+        op(g, OP_select); lset(g, lpos);
+        let lbase = local32(g, nf);
+        lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, lbase);
+        let laddr = emitOffsetAddress(g, nf, lbase, lpos, sp.elem_bytes);
+        let loaded_f, ferr2 = loadElement(g, nf, laddr, 0, sp.elem_ty, 0);
+        if ferr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, ferr2;
+        }
+        seqPushVal(g, loaded_f);
+        op(g, OP_return_);
+        close(g, nf);
+        lget(g, kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
+        let is_span = open(g, nf, OP_if_);
+        let spos = local32(g, nf);
+        lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
+        i32Const(g, 1); op(g, OP_i32_sub); lget(g, p); op(g, OP_i32_sub);
+        lget(g, p);
+        lget(g, edge); i32Const(g, 1); op(g, OP_i32_and);
+        op(g, OP_select); lset(g, spos);
+        let sbase = local32(g, nf);
+        lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SPAN_PTR); lset(g, sbase);
+        let saddr = emitOffsetAddress(g, nf, sbase, spos, sp.elem_bytes);
+        let loaded_s, serr2 = loadElement(g, nf, saddr, 0, sp.elem_ty, 0);
+        if serr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, serr2;
+        }
+        seqPushVal(g, loaded_s);
+        op(g, OP_return_);
+        close(g, nf);
+        if sp.elem_ty == squid_direct_types::u32_ {
+            lget(g, kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
+            let is_ramp = open(g, nf, OP_if_);
+            let rpos = local32(g, nf);
+            lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
+            i32Const(g, 1); op(g, OP_i32_sub); lget(g, p); op(g, OP_i32_sub);
+            lget(g, p);
+            lget(g, edge); i32Const(g, 1); op(g, OP_i32_and);
+            op(g, OP_select); lset(g, rpos);
+            lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_START);
+            lget(g, rpos);
+            lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_STEP);
+            op(g, OP_i32_mul); op(g, OP_i32_add);
+            op(g, OP_return_);
+            close(g, nf);
+        }
+        lget(g, edge); lget(g, p); callf(g, leaf_get_fn); op(g, OP_return_);
+    }
+    close(g, nf);
+    // Dense radix-16 fast path: zero node.len load, zero prefixes cache line, zero SIMD!
+    lget(g, meta); i32Const(g, 24); op(g, OP_i32_shr_u); ltee(g, sh);
+    lget(g, edge); i32Const(g, 1); op(g, OP_i32_and); op(g, OP_i32_eqz);
+    op(g, OP_i32_and);
+    let fast_radix = open(g, nf, OP_if_);
+    lget(g, p); lget(g, sh); op(g, OP_i32_shr_u); lset(g, j);
+    lget(g, p); lget(g, j); lget(g, sh); op(g, OP_i32_shl); op(g, OP_i32_sub); lset(g, p);
+    lget(g, ptr); lget(g, j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lset(g, edge);
+    br(g, nf, OP_br, lp);
+    close(g, nf);
+    // Reversed or relaxed internal node
+    lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_LEN); lset(g, nlen);
+    lget(g, nlen); i32Const(g, 1); op(g, OP_i32_sub); lget(g, p); op(g, OP_i32_sub);
+    lget(g, p);
+    lget(g, edge); i32Const(g, 1); op(g, OP_i32_and);
+    op(g, OP_select);
+    lset(g, np);
+    lget(g, sh);
+    let rev_radix = open(g, nf, OP_if_);
+    lget(g, np); lget(g, sh); op(g, OP_i32_shr_u); lset(g, j);
+    lget(g, np); lget(g, j); lget(g, sh); op(g, OP_i32_shl); op(g, OP_i32_sub); lset(g, p);
+    op(g, OP_else_);
+    emitSeqSimdFindInline(g, nf, ptr, np, vp, mask); ltee(g, j);
+    let has_prev = open(g, nf, OP_if_);
+    lget(g, ptr); lget(g, j); i32Const(g, 1); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_PREFIXES);
+    lset(g, prev);
+    op(g, OP_else_);
+    i32Const(g, 0); lset(g, prev);
+    close(g, nf);
+    lget(g, np); lget(g, prev); op(g, OP_i32_sub); lset(g, p);
+    close(g, nf);
+    lget(g, ptr); lget(g, j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lset(g, edge);
+    br(g, nf, OP_br, lp);
+    close(g, nf);
+    op(g, OP_unreachable_);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
     squid_direct_relocations::rewind(sites_mark);
@@ -2791,6 +3415,8 @@ fn ensureSeqHdrSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let phys = local32(g, nf);
     lget(g, slot); lget(g, gen); callf(g, wr_fn);
     lset(g, epoch); lset(g, hdr); lset(g, entry);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, idx); lget(g, total); op(g, OP_i32_ge_u); trap(g, nf);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV); lset(g, rev);
@@ -2962,8 +3588,29 @@ fn ensureSeqHdrInsert(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
     close(g, nf);
 
-    // Write val at gap_start and advance gap_start += 1
+    // Head-prepend fast layout: when inserting at cut == 0 of a non-empty seq with gap at 0,
+    // write into `ge - 1` and decrement `ge` so subsequent `push_front`s stay shift-free at gs == 0!
     lget(g, foc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_GSTART); lset(g, gs);
+    lget(g, foc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_GEND); lset(g, ge);
+    lget(g, cut); op(g, OP_i32_eqz);
+    lget(g, total); i32Const(g, 0); op(g, OP_i32_gt_u); op(g, OP_i32_and);
+    lget(g, gs); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, ge); i32Const(g, 0); op(g, OP_i32_gt_u); op(g, OP_i32_and);
+    let prepend_end = open(g, nf, OP_if_);
+    lget(g, ge); i32Const(g, 1); op(g, OP_i32_sub); lset(g, ge);
+    if sp.elem_bytes != 0 {
+        let dbase = local32(g, nf);
+        lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
+        let addr = emitOffsetAddress(g, nf, dbase, ge, sp.elem_bytes);
+        let werr2 = writeElement(g, nf, addr, 0, val, 0);
+        if werr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, werr2;
+        }
+    }
+    lget(g, foc); lget(g, ge); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GEND);
+    op(g, OP_else_);
     if sp.elem_bytes != 0 {
         let dbase = local32(g, nf);
         lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
@@ -2975,11 +3622,33 @@ fn ensureSeqHdrInsert(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             return 0, werr2;
         }
     }
-    lget(g, foc); lget(g, gs); i32Const(g, 1); op(g, OP_i32_add);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GSTART);
+    lget(g, gs); i32Const(g, 1); op(g, OP_i32_add); lset(g, gs);
+    lget(g, foc); lget(g, gs); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GSTART);
+    close(g, nf);
     lget(g, total); i32Const(g, 1); op(g, OP_i32_add); lset(g, ntotal);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
     lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    // Arm fast-append / fast-prepend cached epochs in SeqHeader for O(1) inline push/push_front/pop_front!
+    let cur_fstart = local32(g, nf);
+    let cur_fold = local32(g, nf);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FSTART); lset(g, cur_fstart);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN); lset(g, cur_fold);
+    lget(g, hdr);
+    lget(g, epoch); i32Const(g, 0);
+    lget(g, rev); op(g, OP_i32_eqz);
+    lget(g, cur_fold); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, ge); i32Const(g, sp.leaf_cap); op(g, OP_i32_eq); op(g, OP_i32_and);
+    lget(g, cur_fstart); lget(g, gs); op(g, OP_i32_add); lget(g, ntotal); op(g, OP_i32_eq); op(g, OP_i32_and);
+    op(g, OP_select);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hdr);
+    lget(g, epoch); i32Const(g, 0);
+    lget(g, rev); op(g, OP_i32_eqz);
+    lget(g, cur_fold); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, cur_fstart); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, gs); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    op(g, OP_select);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
     squid_direct_relocations::rewind(sites_mark);
@@ -3035,6 +3704,8 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     }
     lget(g, slot); lget(g, gen); callf(g, wr_fn);
     lset(g, epoch); lset(g, hdr); lset(g, entry);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, idx); lget(g, total); op(g, OP_i32_ge_u); trap(g, nf);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV); lset(g, rev);
@@ -3179,7 +3850,10 @@ fn emitSeqEmpty(g: Generator&, f: Fn&, ty: Ty, id: u32) -> Val, Error {
     i32Const(g, 0);
     callf(g, ep_fn);
     callf(g, open_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 fn emitSeqFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Val, Error {
@@ -3213,8 +3887,8 @@ fn emitSeqReadVal(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) ->
     if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let get_fn, gerr = ensureSeqHdrGet(g, sp);
     if gerr != squid_direct_types::Error.none { return neverVal(), gerr; }
-    lget(g, w(g, container, 0));
-    lget(g, w(g, container, 1));
+    let hdr_base, _ = ensureCheckedArray(g, f, container);
+    lget(g, hdr_base);
     lget(g, index);
     callf(g, get_fn);
     return pop(g, f, elem_ty, id);
@@ -3277,14 +3951,107 @@ recursive fn emitSeqIndexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val
 }
 
 fn emitSeqPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, selective: bool = false) -> Val, Error {
-    let len, lerr = lengthOf(g, f, container, id);
-    if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
-    return emitSeqInsertVal(g, f, container, len, value, id, selective);
+    let elem_ty, eerr = elementOf(g, f, container.ty, id);
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
+    let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
+    let ins_fn, ierr = ensureSeqHdrInsert(g, sp);
+    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+    let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+    noteAllocation(f);
+    let entry = ensureCheckedGrow(g, f, container);
+    let hdr = local32(g, f);
+    let total = local32(g, f);
+    let foc = local32(g, f);
+    let gs = local32(g, f);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
+    let push_done = open(g, f, OP_block);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    gget(g, g.s.seq_min_mutable_epoch); op(g, OP_i32_ge_u);
+    let ep_ok = open(g, f, OP_if_);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS); ltee(g, foc);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_GSTART); ltee(g, gs);
+    i32Const(g, sp.leaf_cap); op(g, OP_i32_lt_u);
+    let do_fast = open(g, f, OP_if_);
+    if sp.elem_bytes != 0 {
+        let dbase = local32(g, f);
+        lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
+        let addr = emitOffsetAddress(g, f, dbase, gs, sp.elem_bytes);
+        let werr = writeElement(g, f, addr, 0, value, id);
+        if werr != squid_direct_types::Error.none { return neverVal(), werr; }
+    }
+    lget(g, foc); lget(g, gs); i32Const(g, 1); op(g, OP_i32_add);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GSTART);
+    let ntotal = local32(g, f);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    i32Const(g, 1); op(g, OP_i32_add); lset(g, ntotal);
+    lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    br(g, f, OP_br, push_done);
+    close(g, f);
+    close(g, f);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
+    lget(g, w(g, container, 0));
+    lget(g, w(g, container, 1));
+    lget(g, total);
+    seqPushVal(g, value);
+    callf(g, ins_fn);
+    close(g, f);
+    if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
+    return container, squid_direct_types::Error.none;
 }
 
 fn emitSeqPushFrontVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, selective: bool = false) -> Val, Error {
-    let zero = constLocal(g, f, 0);
-    return emitSeqInsertVal(g, f, container, zero, value, id, selective);
+    let elem_ty, eerr = elementOf(g, f, container.ty, id);
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
+    let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
+    let ins_fn, ierr = ensureSeqHdrInsert(g, sp);
+    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+    let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+    noteAllocation(f);
+    let entry = ensureCheckedGrow(g, f, container);
+    let hdr = local32(g, f);
+    let foc = local32(g, f);
+    let ge = local32(g, f);
+    let fast_done = constLocal(g, f, 0);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
+    gget(g, g.s.seq_min_mutable_epoch); op(g, OP_i32_ge_u);
+    let ep_ok = open(g, f, OP_if_);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS); ltee(g, foc);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_GEND); ltee(g, ge);
+    i32Const(g, 0); op(g, OP_i32_gt_u);
+    let do_fast = open(g, f, OP_if_);
+    lget(g, ge); i32Const(g, 1); op(g, OP_i32_sub); lset(g, ge);
+    if sp.elem_bytes != 0 {
+        let dbase = local32(g, f);
+        lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
+        let addr = emitOffsetAddress(g, f, dbase, ge, sp.elem_bytes);
+        let werr = writeElement(g, f, addr, 0, value, id);
+        if werr != squid_direct_types::Error.none { return neverVal(), werr; }
+    }
+    lget(g, foc); lget(g, ge); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GEND);
+    let ntotal = local32(g, f);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    i32Const(g, 1); op(g, OP_i32_add); lset(g, ntotal);
+    lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    i32Const(g, 1); lset(g, fast_done);
+    close(g, f);
+    close(g, f);
+    lget(g, fast_done); op(g, OP_i32_eqz);
+    let slow = open(g, f, OP_if_);
+    lget(g, w(g, container, 0));
+    lget(g, w(g, container, 1));
+    i32Const(g, 0);
+    seqPushVal(g, value);
+    callf(g, ins_fn);
+    close(g, f);
+    if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
+    return container, squid_direct_types::Error.none;
 }
 
 fn emitSeqInsertVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Val, id: u32, selective: bool = false) -> Val, Error {
@@ -3316,8 +4083,58 @@ fn emitSeqPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, selecti
 }
 
 fn emitSeqPopFrontVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, selective: bool = false) -> Val, Error {
-    let zero = constLocal(g, f, 0);
-    return emitSeqRemoveVal(g, f, container, zero, ty, id, selective);
+    let elem_ty, eerr = elementOf(g, f, container.ty, id);
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
+    let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
+    let rem_fn, rerr = ensureSeqHdrRemove(g, sp);
+    if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
+    noteAllocation(f);
+    let out, oerr = fresh(g, f, ty, id);
+    if oerr != squid_direct_types::Error.none { return out, oerr; }
+    let entry = ensureCheckedGrow(g, f, container);
+    let hdr = local32(g, f);
+    let foc = local32(g, f);
+    let ge = local32(g, f);
+    let fast_done = constLocal(g, f, 0);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
+    gget(g, g.s.seq_min_mutable_epoch); op(g, OP_i32_ge_u);
+    let ep_ok = open(g, f, OP_if_);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS); ltee(g, foc);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_GEND); ltee(g, ge);
+    i32Const(g, sp.leaf_cap); op(g, OP_i32_lt_u);
+    let do_fast = open(g, f, OP_if_);
+    if sp.elem_bytes != 0 {
+        let dbase = local32(g, f);
+        lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
+        let addr = emitOffsetAddress(g, f, dbase, ge, sp.elem_bytes);
+        let loaded, lerr = loadElement(g, f, addr, 0, ty, id);
+        if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
+        let _ = copy(g, f, loaded, out, id);
+    }
+    lget(g, foc); lget(g, ge); i32Const(g, 1); op(g, OP_i32_add);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GEND);
+    let ntotal = local32(g, f);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    i32Const(g, 1); op(g, OP_i32_sub); lset(g, ntotal);
+    lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    i32Const(g, 1); lset(g, fast_done);
+    close(g, f);
+    close(g, f);
+    lget(g, fast_done); op(g, OP_i32_eqz);
+    let slow = open(g, f, OP_if_);
+    lget(g, w(g, container, 0));
+    lget(g, w(g, container, 1));
+    i32Const(g, 0);
+    callf(g, rem_fn);
+    let val, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return val, perr; }
+    let _ = copy(g, f, val, out, id);
+    close(g, f);
+    if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
+    return out, squid_direct_types::Error.none;
 }
 
 fn emitSeqRemoveVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id: u32, selective: bool = false) -> Val, Error {
@@ -3347,7 +4164,10 @@ fn emitSeqCopyVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> Val
     lget(g, w(g, container, 1));
     i32Const(g, 0);
     callf(g, clone_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(1) persistent reverse (48 bytes, zero focus flush, flips root_rev ^= 1!)
@@ -3359,7 +4179,10 @@ fn emitSeqReverseVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> 
     lget(g, w(g, container, 1));
     i32Const(g, 1);
     callf(g, clone_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(log_16 m) split (O(1) on LEAF_SPAN / LEAF_REPEAT / LEAF_RAMP!) -> (~[T], ~[T])
@@ -3392,6 +4215,8 @@ fn emitSeqSplitVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id
     lget(g, index); lget(g, total); op(g, OP_i32_gt_u); trap(g, f);
     // Mark source shared (unlogged)
     lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     callf(g, ep_fn); lset(g, ep);
     lget(g, src_hdr); lget(g, ep); callf(g, norm_fn); lset(g, root);
     lget(g, root); lget(g, index); lget(g, ep); callf(g, split_fn);
@@ -3445,13 +4270,20 @@ fn emitSeqConcatVal(g: Generator&, f: Fn&, left: Val, right: Val, ty: Ty, id: u3
     lget(g, la); lget(g, lb); op(g, OP_i32_add); ltee(g, tot);
     lget(g, la); op(g, OP_i32_lt_u); trap(g, f);
     lget(g, ha); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+    lget(g, ha); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, ha); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     lget(g, hb); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+    lget(g, hb); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hb); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     callf(g, ep_fn); lset(g, ep);
     lget(g, ha); lget(g, ep); callf(g, norm_fn); lset(g, ra);
     lget(g, hb); lget(g, ep); callf(g, norm_fn); lset(g, rb);
     lget(g, ra); lget(g, rb); lget(g, ep); callf(g, concat_fn); lset(g, merged);
     lget(g, merged); lget(g, tot); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(log_16 m) non-destructive persistent slice (O(1) on SPAN / REPEAT / RAMP!)
@@ -3486,6 +4318,8 @@ fn emitSeqSliceVal(g: Generator&, f: Fn&, container: Val, start_idx: u32, end_id
     trap(g, f);
     lget(g, end_idx); lget(g, start_idx); op(g, OP_i32_sub); lset(g, slen);
     lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
     callf(g, ep_fn); lset(g, ep);
     lget(g, src_hdr); lget(g, ep); callf(g, norm_fn); lset(g, root);
     lget(g, root); lget(g, start_idx); lget(g, ep); callf(g, split_fn);
@@ -3493,7 +4327,10 @@ fn emitSeqSliceVal(g: Generator&, f: Fn&, container: Val, start_idx: u32, end_id
     lget(g, right); lget(g, slen); lget(g, ep); callf(g, split_fn);
     op(g, OP_drop); lset(g, mid);
     lget(g, mid); lget(g, slen); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(1) generative repeat: 16 + elem_bytes for ANY count!
@@ -3524,6 +4361,7 @@ fn emitSeqRepeatVal(g: Generator&, f: Fn&, count: u32, val: Val, ty: Ty, id: u32
     lget(g, leaf); lget(g, count); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let handle, perr = pop(g, f, ty, id);
     if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
     let noted = noteStoreToSlot(g, f, w(g, handle, 0), val);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
     return handle, squid_direct_types::Error.none;
@@ -3548,7 +4386,10 @@ fn emitSeqRampVal(g: Generator&, f: Fn&, start_v: u32, step_v: u32, count: u32, 
     lget(g, leaf); lget(g, step_v); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_RAMP_STEP);
     close(g, f);
     lget(g, leaf); lget(g, count); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
-    return pop(g, f, ty, id);
+    let handle, perr = pop(g, f, ty, id);
+    if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(1) zero-copy span wrapping an immutable frozen `*#[T]` backing array!
@@ -3574,6 +4415,7 @@ fn emitSeqFromFrozenVal(g: Generator&, f: Fn&, arr: Val, ty: Ty, id: u32) -> Val
     lget(g, leaf); lget(g, len); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let handle, perr = pop(g, f, ty, id);
     if perr != squid_direct_types::Error.none { return handle, perr; }
+    recordMutable(g, f, handle);
     let noted = noteStoreToSlot(g, f, w(g, handle, 0), arr);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
     return handle, squid_direct_types::Error.none;
@@ -3618,6 +4460,8 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         lget(g, dlen); lget(g, slen); op(g, OP_i32_add); ltee(g, nlen);
         lget(g, dlen); op(g, OP_i32_lt_u); trap(g, f);
         lget(g, shdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
+        lget(g, shdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+        lget(g, shdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
         lget(g, dhdr); lget(g, epoch); callf(g, norm_fn); lset(g, droot);
         lget(g, shdr); lget(g, epoch); callf(g, norm_fn); lset(g, sroot);
         lget(g, dhdr); lget(g, droot); lget(g, sroot); lget(g, epoch); callf(g, concat_fn);
@@ -3626,6 +4470,8 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS);
         lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FSTART);
         lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
+        lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+        lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
         lget(g, dhdr); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
         lget(g, entry); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
         close(g, f);
@@ -3683,10 +4529,10 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         var cur_ptrs: u32[16] = [0; 16];
         var tags_base: u32 = 0;
         if plan.mode == PACKED_SPLIT_SUM {
-            tags_base = emitLoadPackedSubBase(g, f, sbase, 0);
-            for st in 1..plan.stream_count { cur_ptrs[st] = emitLoadPackedSubBase(g, f, sbase, st); }
+            tags_base = emitLoadPackedSubBase(g, f, plan, sbase, 0);
+            for st in 1..plan.stream_count { cur_ptrs[st] = emitLoadPackedSubBase(g, f, plan, sbase, st); }
         } else {
-            for st in 0..plan.stream_count { cur_ptrs[st] = emitLoadPackedSubBase(g, f, sbase, st); }
+            for st in 0..plan.stream_count { cur_ptrs[st] = emitLoadPackedSubBase(g, f, plan, sbase, st); }
         }
         let idx = constLocal(g, f, 0);
         let exit = open(g, f, OP_block); let top = open(g, f, OP_loop);
@@ -3764,7 +4610,7 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     let idx = constLocal(g, f, 0);
     let exit = open(g, f, OP_block); let top = open(g, f, OP_loop);
     lget(g, idx); lget(g, len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
-    lget(g, src_slot); lget(g, src_gen); lget(g, idx); callf(g, get_fn);
+    lget(g, src_hdr); lget(g, idx); callf(g, get_fn);
     let ev, perr = pop(g, f, elem_ty, id);
     if perr != squid_direct_types::Error.none { return 0, 0, perr; }
     let dst_addr = emitOffsetAddress(g, f, p_data, idx, elem_step);
@@ -3802,7 +4648,91 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     return p_slot, p_gen, squid_direct_types::Error.none;
 }
 
-// ---- Fast Leaf-Streaming `for x in seq:` emitter (Flat / Span / Repeat / Ramp / SoA / Fused Split-Sum!) ----
+// ---- Fast 2-Level Leaf-Streaming `for x in seq:` emitter (Flat / Span / Repeat / Ramp / SoA / Fused Split-Sum!) ----
+// Outer loop steps across leaves (via height-1 sibling cache or traversal stack);
+// inner loop streams elements within a leaf with ZERO next_leaf_fn calls, ZERO leaf_kind branches on canonical leaves,
+// and constant-stride pointer loops that match `#[T]` / `%[T]` and auto-vectorize under `wtime-aot`.
+
+recursive fn emitSeqLoopBodyTail(
+    g: Generator&,
+    f: Fn&,
+    id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    outgoing: Vals,
+    slots: Words,
+    exit: u32,
+    elem_top: u32,
+    release: bool,
+    release_owner: u32,
+    release_stack: u32,
+    saved_escape: u32,
+    unchanged: u32,
+    guards: Words,
+    pushed_soa_frame: bool,
+    pushed_split_frame: bool,
+) -> Error {
+    let m .= g.units[f.unit - 1];
+    let carries = m.loopCarries(id);
+    let rt = g.runtime_();
+    let allocations = f.allocations;
+    let stores = f.memory_stores;
+    let unused = g.newSlot();
+    let s_lbl .= g.s;
+    let labels_mark = s_lbl.labels.len;
+    s_lbl.labels.push(squid_direct_emit::Label {
+        target: id,
+        depth: exit,
+        result: unused,
+        kind: squid_direct_emit::LabelKind.loop_,
+        top: elem_top,
+        iteration: iteration,
+        outgoing: outgoing,
+        unchanged: unchanged,
+        has_release: release,
+        release_owner: release_owner,
+        release_stack: release_stack,
+        allocations: allocations,
+        slots: slots,
+        saved_esc: saved_escape,
+        guards: guards,
+    });
+    f.loop_depth += 1;
+    let body, error = stmt(g, f, info.body);
+    if pushed_soa_frame { soa_loop_depth -= 1; }
+    if pushed_split_frame { split_sum_depth -= 1; }
+    if error != squid_direct_types::Error.none {
+        f.loop_depth -= 1;
+        s_lbl.labels.resize(labels_mark);
+        return error;
+    }
+
+    if body.ty != squid_direct_types::never {
+        let backedge = g.reserveVals(carries.len);
+        for carry, at in carries {
+            let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
+            if rerr != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return rerr; }
+            if !present { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return g.fail(m, id, "loop carry without a backedge value"); }
+            g.s.vals[backedge.start + at] = value;
+        }
+        let assigned_c = assignCarries(g, f, backedge, iteration, slots, unchanged, release_owner, release_stack, id);
+        if assigned_c != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return assigned_c; }
+        let label = s_lbl.labels[labels_mark];
+        if label.has_release {
+            let iter_esc = local32(g, f);
+            gget(g, rt.escape_min_slot);
+            lset(g, iter_esc);
+            if f.allocations != allocations && f.memory_stores == stores {
+                releaseIteration(g, f, label, iter_esc);
+            }
+            emitMergeEscapeMin(g, f, iter_esc, label.saved_esc);
+        }
+        br(g, f, OP_br, elem_top);
+    }
+    f.loop_depth -= 1;
+    s_lbl.labels.resize(labels_mark);
+    return squid_direct_types::Error.none;
+}
 
 recursive fn emitSeqLoopCore(
     g: Generator&,
@@ -3824,6 +4754,8 @@ recursive fn emitSeqLoopCore(
     if sperr != squid_direct_types::Error.none { return sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
     if eperr != squid_direct_types::Error.none { return eperr; }
+    let flush_fn, flerr = ensureSeqFlushFocus(g, sp);
+    if flerr != squid_direct_types::Error.none { return flerr; }
     let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
     if nerr != squid_direct_types::Error.none { return nerr; }
     let next_leaf_fn, nlerr = ensureSeqIterNextLeaf(g);
@@ -3877,10 +4809,11 @@ recursive fn emitSeqLoopCore(
         unrev_sum_fn = uf;
     }
 
-    // Per-iteration scratch release eligibility
+    // Per-iteration scratch release eligibility + compact no-alloc specialization check
     var release = true;
     var boxed_carries = false;
     var guards = Words { 0, 0 };
+    var body_no_alloc = false;
     {
         let s_state .= g.s;
         let scratch_mark = s_state.scratch.len;
@@ -3891,20 +4824,57 @@ recursive fn emitSeqLoopCore(
             if oerr != squid_direct_types::Error.none { s_state.scratch.resize(scratch_mark); return oerr; }
             if !safe { release = false; }
         }
-        if release {
-            var no_alloc_budget: i64 = 512;
-            if bodyNoAlloc(g, f, m, info.body, no_alloc_budget) { release = false; }
+        var no_alloc_budget: i64 = 512;
+        if bodyNoAlloc(g, f, m, info.body, no_alloc_budget) {
+            body_no_alloc = true;
+            release = false;
         }
         guards = Words { g.s.words.len as u32, (s_state.scratch.len - scratch_mark) as u32 };
         for at in scratch_mark..s_state.scratch.len { let sl = s_state.scratch[at]; g.s.words.push(sl); }
         s_state.scratch.resize(scratch_mark);
     }
+    var spec_budget: i64 = 96;
+    let can_spec = !release && body_no_alloc && bodyNoAlloc(g, f, m, info.body, spec_budget);
 
-    // Initialize 64-byte traversal stack & normalized root ONCE before OP_loop!
+    // Initialize 64-byte traversal stack & normalized root ONCE before outer leaf loop!
+    // If hdr.focus != 0 and hdr is exclusively mutable in the current epoch, flush once in place
+    // so repeated outer scan passes (e.g. `for _ in 0..80:`) never re-normalize!
     let rt = g.runtime_();
     let hdr_base, _ = ensureCheckedArray(g, f, source);
     let norm_root = local32(g, f);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS);
+    let has_foc_norm = open(g, f, OP_if_);
+    let hdr_ep = local32(g, f);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH); ltee(g, hdr_ep);
+    gget(g, g.s.seq_min_mutable_epoch); op(g, OP_i32_ge_u);
+    let mut_flush = open(g, f, OP_if_);
+    lget(g, hdr_base); lget(g, hdr_ep); callf(g, flush_fn);
+    let fl_root = local32(g, f);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); ltee(g, fl_root);
+    let nz_fl = open(g, f, OP_if_);
+    lget(g, fl_root);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV);
+    op(g, OP_i32_xor);
+    lset(g, norm_root);
+    op(g, OP_else_);
+    i32Const(g, 0); lset(g, norm_root);
+    close(g, f);
+    op(g, OP_else_);
     lget(g, hdr_base); callf(g, ep_fn); callf(g, norm_fn); lset(g, norm_root);
+    close(g, f);
+    op(g, OP_else_);
+    let raw_root = local32(g, f);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); ltee(g, raw_root);
+    let nz_root = open(g, f, OP_if_);
+    lget(g, raw_root);
+    lget(g, hdr_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV);
+    op(g, OP_i32_xor);
+    lset(g, norm_root);
+    op(g, OP_else_);
+    i32Const(g, 0); lset(g, norm_root);
+    close(g, f);
+    close(g, f);
+
     let stack_mem = local32(g, f);
     i32Const(g, 64); callf(g, rt.stack); lset(g, stack_mem);
     let stack_sp = constLocal(g, f, 0);
@@ -3915,140 +4885,230 @@ recursive fn emitSeqLoopCore(
     i32Const(g, 1); lset(g, stack_sp);
     close(g, f);
 
-    // Active leaf state locals
-    let leaf_edge = constLocal(g, f, 0);
-    let leaf_ptr = constLocal(g, f, 0);
-    let leaf_kind = constLocal(g, f, 0);
-    let leaf_rev = constLocal(g, f, 0);
-    let leaf_i = constLocal(g, f, 0);
-    let leaf_len = constLocal(g, f, 0);
-    let cur_ptr = constLocal(g, f, 0);
-    let cur_delta = constLocal(g, f, 0);
-    var ramp_val: u32 = 0;
-    var ramp_delta: u32 = 0;
-    if elem_ty == squid_direct_types::u32_ {
-        ramp_val = constLocal(g, f, 0);
-        ramp_delta = constLocal(g, f, 0);
-    }
-    var rep_val = neverVal();
-    if sp.elem_bytes != 0 {
-        let rv, rverr = fresh(g, f, elem_ty, id);
-        if rverr != squid_direct_types::Error.none { return rverr; }
-        rep_val = rv;
-    }
+    // Height-1 sibling-array leaf cache (eliminates 15/16 = 93.75% of next_leaf_fn calls!)
+    let sib_ptr = constLocal(g, f, 0);
+    let sib_i = constLocal(g, f, 0);
+    let sib_count = constLocal(g, f, 0);
+    let sib_rev = constLocal(g, f, 0);
+
+    // Active leaf locals
+    let leaf_edge = local32(g, f);
+    let leaf_ptr = local32(g, f);
+    let leaf_kind = local32(g, f);
+    let leaf_rev = local32(g, f);
+    let leaf_len = local32(g, f);
+    let leaf_i = local32(g, f);
+
+    // Mode-specific locals (keep register pressure minimal!)
     var cur_ptrs: u32[16] = [0; 16];
     var cur_deltas: u32[16] = [0; 16];
     var sum_tags_ptr: u32 = 0;
-    if sp.leaf_kind == SEQ_KIND_PACKED_SOA {
+    let is_soa_mode = sp.leaf_kind == SEQ_KIND_PACKED_SOA && (soa_virtual || soa_destruct);
+    let is_split_mode = !is_soa_mode && sp.leaf_kind == SEQ_KIND_PACKED_SUM && split_fused;
+    var soa_first_st: i64 = -1;
+    if is_soa_mode {
         for st in 0..sp.packed.stream_count {
-            cur_ptrs[st] = constLocal(g, f, 0);
-            cur_deltas[st] = constLocal(g, f, 0);
+            var needed = false;
+            for fi in 0..sp.packed.soa_field_count {
+                if sp.packed.soa_field_stream[fi] == st && ((soa_used_fields >> (fi as u32)) & 1) != 0 {
+                    needed = true; break;
+                }
+            }
+            if needed {
+                cur_ptrs[st] = local32(g, f);
+                cur_deltas[st] = local32(g, f);
+                if soa_first_st < 0 { soa_first_st = st; }
+            }
         }
     } else if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
-        sum_tags_ptr = constLocal(g, f, 0);
+        sum_tags_ptr = local32(g, f);
         for st in 1..sp.packed.stream_count {
-            cur_ptrs[st] = constLocal(g, f, 0);
+            var st_needed = true;
+            if is_split_mode {
+                st_needed = false;
+                for ci in 0..sp.packed.variant_count {
+                    if sp.packed.variant_stream[ci] == st && ((split_needed_mask >> (ci as u64)) & 1) != 0 {
+                        st_needed = true; break;
+                    }
+                }
+            }
+            if st_needed { cur_ptrs[st] = local32(g, f); }
         }
     }
 
     let exit = open(g, f, OP_block);
-    let top = open(g, f, OP_loop);
+    let leaf_top = open(g, f, OP_loop);
     f.checked_elems_len = 0;
 
-    // Refill leaf ONLY when leaf_i >= leaf_len (once per 32 elements, or once total for Span/Repeat/Ramp!)
-    lget(g, leaf_i); lget(g, leaf_len); op(g, OP_i32_ge_u);
-    let need_leaf = open(g, f, OP_if_);
+    // Fetch next leaf_edge via sibling cache or traversal stack
+    lget(g, sib_i); lget(g, sib_count); op(g, OP_i32_lt_u);
+    let has_sib = open(g, f, OP_if_);
+    let phys_j = local32(g, f);
+    lget(g, sib_count); i32Const(g, 1); op(g, OP_i32_sub); lget(g, sib_i); op(g, OP_i32_sub);
+    lget(g, sib_i);
+    lget(g, sib_rev);
+    op(g, OP_select);
+    lset(g, phys_j);
+    lget(g, sib_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, sib_i);
+    lget(g, sib_ptr); lget(g, phys_j); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, sib_rev); op(g, OP_i32_xor); lset(g, leaf_edge);
+    op(g, OP_else_);
+    let next_edge = local32(g, f);
     lget(g, stack_mem); lget(g, stack_sp); callf(g, next_leaf_fn);
-    lset(g, leaf_edge); lset(g, stack_sp);
-    lget(g, leaf_edge); op(g, OP_i32_eqz);
+    lset(g, next_edge); lset(g, stack_sp);
+    lget(g, next_edge); op(g, OP_i32_eqz);
     let done_if = open(g, f, OP_if_);
     let assigned = assign(g, f, iteration, outgoing, id);
     if assigned != squid_direct_types::Error.none { return assigned; }
     br(g, f, OP_br, exit);
     close(g, f);
+    let n_ptr = local32(g, f);
+    let n_meta = local32(g, f);
+    lget(g, next_edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); ltee(g, n_ptr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_META); ltee(g, n_meta);
+    i32Const(g, 15); op(g, OP_i32_and); op(g, OP_i32_eqz);
+    let is_h1 = open(g, f, OP_if_);
+    lget(g, n_ptr); lset(g, sib_ptr);
+    lget(g, next_edge); i32Const(g, 1); op(g, OP_i32_and); lset(g, sib_rev);
+    lget(g, n_meta); i32Const(g, 8); op(g, OP_i32_shr_u); i32Const(g, 255); op(g, OP_i32_and); lset(g, sib_count);
+    i32Const(g, 1); lset(g, sib_i);
+    let p0 = local32(g, f);
+    lget(g, sib_count); i32Const(g, 1); op(g, OP_i32_sub);
+    i32Const(g, 0);
+    lget(g, sib_rev);
+    op(g, OP_select);
+    lset(g, p0);
+    lget(g, sib_ptr); lget(g, p0); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_NODE_CHILDREN);
+    lget(g, sib_rev); op(g, OP_i32_xor); lset(g, leaf_edge);
+    op(g, OP_else_);
+    lget(g, next_edge); lset(g, leaf_edge);
+    close(g, f);
+    close(g, f);
+
+    // Unpack active leaf header; skip empty leaves
     lget(g, leaf_edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, leaf_ptr);
     lget(g, leaf_edge); i32Const(g, 1); op(g, OP_i32_and); lset(g, leaf_rev);
     lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_META); i32Const(g, 15); op(g, OP_i32_and); lset(g, leaf_kind);
-    lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN); lset(g, leaf_len);
-    i32Const(g, 0); lset(g, leaf_i);
+    lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_LEAF_LEN); ltee(g, leaf_len);
+    op(g, OP_i32_eqz); br(g, f, OP_br_if, leaf_top);
 
-    // Hoist per-leaf direct pointers once per leaf!
-    // 1) LEAF_FLAT or LEAF_SPAN:
-    lget(g, leaf_kind); i32Const(g, SEQ_KIND_FLAT); op(g, OP_i32_eq);
-    lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
-    op(g, OP_i32_or);
-    let init_flat = open(g, f, OP_if_);
-    if sp.elem_bytes != 0 {
-        let base_p = local32(g, f);
-        lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
-        let is_sp = open(g, f, OP_if_);
-        lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SPAN_PTR); lset(g, base_p);
-        op(g, OP_else_);
-        lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, base_p);
-        close(g, f);
-        lget(g, leaf_rev);
-        let rev_f = open(g, f, OP_if_);
-        let last_i = local32(g, f);
-        lget(g, leaf_len); i32Const(g, 1); op(g, OP_i32_sub); lset(g, last_i);
-        let end_a = emitOffsetAddress(g, f, base_p, last_i, sp.elem_bytes);
-        lget(g, end_a); lset(g, cur_ptr);
-        i32Const(g, 0 - sp.elem_bytes); lset(g, cur_delta);
-        op(g, OP_else_);
-        lget(g, base_p); lset(g, cur_ptr);
-        i32Const(g, sp.elem_bytes); lset(g, cur_delta);
-        close(g, f);
-    }
-    close(g, f);
+    // Save Fn fact caches when specializing fast vs fallback inner loops
+    let saved_ca = f.checked_arrays;
+    let saved_ca_len = f.checked_arrays_len;
+    let saved_cg = f.checked_grows;
+    let saved_cg_len = f.checked_grows_len;
+    let saved_cv = f.checked_views;
+    let saved_cv_len = f.checked_views_len;
+    let saved_ce = f.checked_elems;
+    let saved_ce_len = f.checked_elems_len;
+    let saved_cb_len = f.checked_bounds_len;
+    let saved_cl_len = f.checked_le_len;
+    let saved_cm_len = f.checked_masks_len;
+    let saved_cadd_len = f.checked_adds_len;
+    let saved_caff_len = f.checked_affines_len;
+    let saved_csub_len = f.checked_sub1_len;
+    let saved_cu32_len = f.const_u32_len;
+    let saved_cu64_len = f.const_u64_len;
+    let saved_ext_len = f.ext_u32_u64_len;
+    let saved_km_len = f.known_mutable_len;
+    let saved_ct_len = f.const_tags_len;
 
-    // 2) LEAF_REPEAT: load element ONCE outside inner loop!
-    lget(g, leaf_kind); i32Const(g, SEQ_KIND_REPEAT); op(g, OP_i32_eq);
-    let init_rep = open(g, f, OP_if_);
-    if sp.elem_bytes != 0 {
-        let rbase = local32(g, f);
-        lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, rbase);
-        let loaded_r, lrerr = loadElement(g, f, rbase, 0, elem_ty, id);
-        if lrerr != squid_direct_types::Error.none { return lrerr; }
-        let _ = copy(g, f, loaded_r, rep_val, id);
-    }
-    close(g, f);
+    if is_soa_mode {
+        // ---- Mode 1: Touched-column SoA (`LEAF_PACKED_SOA`) ----
+        if can_spec {
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
+            lget(g, leaf_rev); op(g, OP_i32_eqz);
+            op(g, OP_i32_and);
+            let fast_soa_if = open(g, f, OP_if_);
+            // Tight forward PACKED_SOA inner loop: ZERO calls, ZERO leaf_kind branches, constant-stride pointers!
+            for st in 0..sp.packed.stream_count {
+                if cur_ptrs[st] == 0 { continue; }
+                lget(g, leaf_ptr); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
+            }
+            var end_ptr: u32 = 0;
+            if soa_first_st >= 0 {
+                end_ptr = emitOffsetAddress(g, f, cur_ptrs[soa_first_st], leaf_len, sp.packed.stream_stride[soa_first_st]);
+            } else {
+                i32Const(g, 0); lset(g, leaf_i);
+            }
+            let elem_exit = open(g, f, OP_block);
+            let elem_top = open(g, f, OP_loop);
+            f.checked_elems_len = 0;
+            if soa_first_st >= 0 {
+                lget(g, cur_ptrs[soa_first_st]); lget(g, end_ptr); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+            } else {
+                lget(g, leaf_i); lget(g, leaf_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+                lget(g, leaf_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, leaf_i);
+            }
+            var pushed_soa_fast = false;
+            if soa_virtual {
+                let d = soa_loop_depth;
+                soa_loop_binding[d] = soa_bind_id;
+                soa_loop_ty[d] = elem_ty;
+                soa_loop_inner_ty[d] = sp.packed.soa_inner_ty;
+                soa_loop_is_record[d] = sp.packed.soa_is_record;
+                for fi in 0..16 { soa_loop_field_loaded[d * 16 + fi] = false; }
+                for fi in 0..sp.packed.soa_field_count {
+                    if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
+                    let st = sp.packed.soa_field_stream[fi];
+                    let fty = sp.packed.soa_field_ty[fi];
+                    var fv = Val { fty, 0, 0 };
+                    if st >= 0 {
+                        let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, fty, id);
+                        if lerr != squid_direct_types::Error.none { return lerr; }
+                        lget(g, cur_ptrs[st]); i32Const(g, sp.packed.stream_stride[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
+                        fv = loaded;
+                    }
+                    let slot_i = d * 16 + fi;
+                    soa_loop_field_loaded[slot_i] = true;
+                    soa_loop_field_start[slot_i] = fv.start;
+                    soa_loop_field_len[slot_i] = fv.len;
+                    soa_loop_field_ty[slot_i] = fv.ty;
+                }
+                soa_loop_depth += 1;
+                pushed_soa_fast = true;
+            } else {
+                for fi in 0..sp.packed.soa_field_count {
+                    if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
+                    let st = sp.packed.soa_field_stream[fi];
+                    let fty = sp.packed.soa_field_ty[fi];
+                    var fv = Val { fty, 0, 0 };
+                    if st >= 0 {
+                        let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, fty, id);
+                        if lerr != squid_direct_types::Error.none { return lerr; }
+                        lget(g, cur_ptrs[st]); i32Const(g, sp.packed.stream_stride[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
+                        fv = loaded;
+                    }
+                    let terr = test_(g, f, soa_field_pats[fi], fv, false, 0, id);
+                    if terr != squid_direct_types::Error.none { return terr; }
+                }
+            }
+            let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, false, 0, 0, 0, 0xffffffff, guards, pushed_soa_fast, false);
+            if berr != squid_direct_types::Error.none { return berr; }
+            close(g, f);
+            close(g, f);
 
-    // 3) LEAF_RAMP (U32 only): hoist start & signed step!
-    if elem_ty == squid_direct_types::u32_ {
-        lget(g, leaf_kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
-        let init_ramp = open(g, f, OP_if_);
-        let rs = local32(g, f);
-        let rstep = local32(g, f);
-        lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_START); lset(g, rs);
-        lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_STEP); lset(g, rstep);
-        lget(g, leaf_rev);
-        let rev_r = open(g, f, OP_if_);
-        lget(g, rs); lget(g, leaf_len); i32Const(g, 1); op(g, OP_i32_sub); lget(g, rstep); op(g, OP_i32_mul); op(g, OP_i32_add);
-        lset(g, ramp_val);
-        i32Const(g, 0); lget(g, rstep); op(g, OP_i32_sub); lset(g, ramp_delta);
-        op(g, OP_else_);
-        lget(g, rs); lset(g, ramp_val);
-        lget(g, rstep); lset(g, ramp_delta);
-        close(g, f);
-        close(g, f);
-    }
+            // Restore Fn caches before fallback branch
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+            op(g, OP_else_);
+        }
 
-    // 4) LEAF_PACKED_SOA: hoist column pointers (ONLY touched columns when soa_virtual/soa_destruct!)
-    if sp.leaf_kind == SEQ_KIND_PACKED_SOA {
+        // General / reversed / SPAN / REPEAT SoA inner loop
         lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
         let init_soa = open(g, f, OP_if_);
         let last_i = local32(g, f);
         lget(g, leaf_len); i32Const(g, 1); op(g, OP_i32_sub); lset(g, last_i);
         for st in 0..sp.packed.stream_count {
-            var needed = true;
-            if soa_virtual || soa_destruct {
-                needed = false;
-                for fi in 0..sp.packed.soa_field_count {
-                    if sp.packed.soa_field_stream[fi] == st && ((soa_used_fields >> (fi as u32)) & 1) != 0 {
-                        needed = true; break;
-                    }
-                }
-            }
-            if !needed { continue; }
+            if cur_ptrs[st] == 0 { continue; }
             let col_b = local32(g, f);
             lget(g, leaf_ptr); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, col_b);
             let step = sp.packed.stream_stride[st];
@@ -4063,53 +5123,72 @@ recursive fn emitSeqLoopCore(
             close(g, f);
         }
         close(g, f);
-    }
-
-    // 5) LEAF_PACKED_SUM: if reversed, un-reverse once into forward leaf (32 elems) so fused + sequential cursors walk forward!
-    if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
-        lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SUM); op(g, OP_i32_eq);
-        let init_sum = open(g, f, OP_if_);
-        lget(g, leaf_rev);
-        let rev_sum = open(g, f, OP_if_);
-        lget(g, leaf_edge); callf(g, ep_fn); callf(g, unrev_sum_fn); lset(g, leaf_ptr);
-        i32Const(g, 0); lset(g, leaf_rev);
-        close(g, f);
-        lget(g, leaf_ptr); i32Const(g, SEQ_SUM_TAGS); op(g, OP_i32_add); lset(g, sum_tags_ptr);
-        for st in 1..sp.packed.stream_count {
-            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SUM_SUB_PTRS + ((st - 1) as u32) * 4);
-            lset(g, cur_ptrs[st]);
+        i32Const(g, 0); lset(g, leaf_i);
+        let elem_exit = open(g, f, OP_block);
+        let elem_top = open(g, f, OP_loop);
+        f.checked_elems_len = 0;
+        lget(g, leaf_i); lget(g, leaf_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+        var release_owner: u32 = 0;
+        var release_stack: u32 = 0;
+        var saved_escape: u32 = 0;
+        var unchanged: u32 = 0xffffffff;
+        if release {
+            release_owner = local32(g, f);
+            release_stack = local32(g, f);
+            saved_escape = local32(g, f);
+            if boxed_carries { unchanged = local32(g, f); }
+            markInto(g, g.s.code, release_owner, release_stack);
+            gget(g, rt.escape_min_slot); lset(g, saved_escape);
+            i32Const(g, 0xffffffff); gset(g, rt.escape_min_slot);
+        }
+        let cur_li = local32(g, f);
+        lget(g, leaf_i); lset(g, cur_li);
+        lget(g, leaf_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, leaf_i);
+        var pushed_soa_fb = false;
+        var field_locs: Val[16] = [Val {}; 16];
+        for fi in 0..sp.packed.soa_field_count {
+            if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
+            let fv, fverr = fresh(g, f, sp.packed.soa_field_ty[fi], id);
+            if fverr != squid_direct_types::Error.none { return fverr; }
+            field_locs[fi] = fv;
+        }
+        lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
+        let soa_fast = open(g, f, OP_if_);
+        for fi in 0..sp.packed.soa_field_count {
+            if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
+            let st = sp.packed.soa_field_stream[fi];
+            if st >= 0 {
+                let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, sp.packed.soa_field_ty[fi], id);
+                if lerr != squid_direct_types::Error.none { return lerr; }
+                let _ = copy(g, f, loaded, field_locs[fi], id);
+                lget(g, cur_ptrs[st]); lget(g, cur_deltas[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
+            }
+        }
+        op(g, OP_else_);
+        lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
+        let full_v, fperr = pop(g, f, elem_ty, id);
+        if fperr != squid_direct_types::Error.none { return fperr; }
+        var inner_v = full_v;
+        if sp.packed.soa_is_nominal {
+            let uw, uerr = unwrapVariant(g, f, full_v, sp.packed.soa_nominal_tag, id);
+            if uerr != squid_direct_types::Error.none { return uerr; }
+            inner_v = uw;
+        }
+        for fi in 0..sp.packed.soa_field_count {
+            if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
+            var fv = neverVal();
+            if sp.packed.soa_is_record {
+                let got, gerr = recordField(g, f, inner_v, fi, id);
+                if gerr != squid_direct_types::Error.none { return gerr; }
+                fv = got;
+            } else {
+                let got, gerr = tupleItem(g, f, inner_v, fi, id);
+                if gerr != squid_direct_types::Error.none { return gerr; }
+                fv = got;
+            }
+            let _ = copy(g, f, fv, field_locs[fi], id);
         }
         close(g, f);
-    }
-    close(g, f);
-
-    // Per-iteration scratch marks
-    var release_owner: u32 = 0;
-    var release_stack: u32 = 0;
-    var saved_escape: u32 = 0;
-    var unchanged: u32 = 0xffffffff;
-    if release {
-        release_owner = local32(g, f);
-        release_stack = local32(g, f);
-        saved_escape = local32(g, f);
-        if boxed_carries { unchanged = local32(g, f); }
-        markInto(g, g.s.code, release_owner, release_stack);
-        gget(g, rt.escape_min_slot);
-        lset(g, saved_escape);
-        i32Const(g, 0xffffffff);
-        gset(g, rt.escape_min_slot);
-    }
-
-    let cur_li = local32(g, f);
-    lget(g, leaf_i); lset(g, cur_li);
-    lget(g, leaf_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, leaf_i);
-
-    // Emit fast element read / virtual SoA / fused split-sum!
-    var pushed_soa_frame = false;
-    var pushed_split_frame = false;
-
-    if sp.leaf_kind == SEQ_KIND_PACKED_SOA && (soa_virtual || soa_destruct) {
-        // Fast path if leaf_kind == SEQ_KIND_PACKED_SOA; fallback for SPAN/REPEAT via leaf_get + field extract!
         if soa_virtual {
             let d = soa_loop_depth;
             soa_loop_binding[d] = soa_bind_id;
@@ -4117,43 +5196,6 @@ recursive fn emitSeqLoopCore(
             soa_loop_inner_ty[d] = sp.packed.soa_inner_ty;
             soa_loop_is_record[d] = sp.packed.soa_is_record;
             for fi in 0..16 { soa_loop_field_loaded[d * 16 + fi] = false; }
-            var field_locs: Val[16] = [Val {}; 16];
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                let fty = sp.packed.soa_field_ty[fi];
-                let fv, fverr = fresh(g, f, fty, id);
-                if fverr != squid_direct_types::Error.none { return fverr; }
-                field_locs[fi] = fv;
-            }
-            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
-            let soa_fast = open(g, f, OP_if_);
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                let st = sp.packed.soa_field_stream[fi];
-                if st >= 0 {
-                    let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, sp.packed.soa_field_ty[fi], id);
-                    if lerr != squid_direct_types::Error.none { return lerr; }
-                    let _ = copy(g, f, loaded, field_locs[fi], id);
-                    lget(g, cur_ptrs[st]); lget(g, cur_deltas[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
-                }
-            }
-            op(g, OP_else_);
-            lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
-            let full_v, fperr = pop(g, f, elem_ty, id);
-            if fperr != squid_direct_types::Error.none { return fperr; }
-            var inner_v = full_v;
-            if sp.packed.soa_is_nominal {
-                let uw, uerr = unwrapVariant(g, f, full_v, sp.packed.soa_nominal_tag, id);
-                if uerr != squid_direct_types::Error.none { return uerr; }
-                inner_v = uw;
-            }
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                let fv, gerr = recordField(g, f, inner_v, fi, id);
-                if gerr != squid_direct_types::Error.none { return gerr; }
-                let _ = copy(g, f, fv, field_locs[fi], id);
-            }
-            close(g, f);
             for fi in 0..sp.packed.soa_field_count {
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let slot_i = d * 16 + fi;
@@ -4163,75 +5205,127 @@ recursive fn emitSeqLoopCore(
                 soa_loop_field_ty[slot_i] = field_locs[fi].ty;
             }
             soa_loop_depth += 1;
-            pushed_soa_frame = true;
+            pushed_soa_fb = true;
         } else {
-            // soa_destruct
-            var field_locs: Val[16] = [Val {}; 16];
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                let fv, fverr = fresh(g, f, sp.packed.soa_field_ty[fi], id);
-                if fverr != squid_direct_types::Error.none { return fverr; }
-                field_locs[fi] = fv;
-            }
-            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
-            let soa_fast = open(g, f, OP_if_);
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                let st = sp.packed.soa_field_stream[fi];
-                if st >= 0 {
-                    let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, sp.packed.soa_field_ty[fi], id);
-                    if lerr != squid_direct_types::Error.none { return lerr; }
-                    let _ = copy(g, f, loaded, field_locs[fi], id);
-                    lget(g, cur_ptrs[st]); lget(g, cur_deltas[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
-                }
-            }
-            op(g, OP_else_);
-            lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
-            let full_v, fperr = pop(g, f, elem_ty, id);
-            if fperr != squid_direct_types::Error.none { return fperr; }
-            var inner_v = full_v;
-            if sp.packed.soa_is_nominal {
-                let uw, uerr = unwrapVariant(g, f, full_v, sp.packed.soa_nominal_tag, id);
-                if uerr != squid_direct_types::Error.none { return uerr; }
-                inner_v = uw;
-            }
-            for fi in 0..sp.packed.soa_field_count {
-                if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
-                var fv = neverVal();
-                if sp.packed.soa_is_record {
-                    let got, gerr = recordField(g, f, inner_v, fi, id);
-                    if gerr != squid_direct_types::Error.none { return gerr; }
-                    fv = got;
-                } else {
-                    let got, gerr = tupleItem(g, f, inner_v, fi, id);
-                    if gerr != squid_direct_types::Error.none { return gerr; }
-                    fv = got;
-                }
-                let _ = copy(g, f, fv, field_locs[fi], id);
-            }
-            close(g, f);
             for fi in 0..sp.packed.soa_field_count {
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let terr = test_(g, f, soa_field_pats[fi], field_locs[fi], false, 0, id);
                 if terr != squid_direct_types::Error.none { return terr; }
             }
         }
-    } else if sp.leaf_kind == SEQ_KIND_PACKED_SUM && split_fused {
-        // Fused `for ev in seq: case ev of ...` (if a non-packed span/repeat leaf is ever encountered,
-        // fallback cleanly — wait: for split_fused, convert any non-packed leaf? Better: check if leaf_kind == PACKED_SUM;
-        // if not, convert leaf_edge once at refill into a forward PACKED_SUM? Wait: SPAN/REPEAT of a sum can be >32 elements!
-        // So if leaf_kind != PACKED_SUM we load tag+payload into a 1-element scratch slot or disable split_fused when mixed —
-        // EVEN BETTER: write a 1-element scratch address into cur_ptrs[s] when leaf_kind != PACKED_SUM!! Let's keep it 100% general!)
-        let ci_loc = local32(g, f);
-        let fallback_scratch = local32(g, f);
-        i32Const(g, 0); lset(g, fallback_scratch);
+        let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, release, release_owner, release_stack, saved_escape, unchanged, guards, pushed_soa_fb, false);
+        if berr != squid_direct_types::Error.none { return berr; }
+        close(g, f);
+        close(g, f);
+
+        if can_spec {
+            close(g, f);
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+        }
+    } else if is_split_mode {
+        // ---- Mode 2: Fused Split-Sum (`LEAF_PACKED_SUM`) ----
+        // Un-reverse reversed PACKED_SUM leaves ONCE in the outer leaf loop so inner loop always streams forward!
         lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SUM); op(g, OP_i32_eq);
-        let fast_sum = open(g, f, OP_if_);
-        lget(g, sum_tags_ptr); lget(g, cur_li); op(g, OP_i32_add);
-        op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, 0);
-        lset(g, ci_loc);
-        op(g, OP_else_);
-        // Non-packed leaf (e.g. LEAF_SPAN or LEAF_REPEAT of a sum type): decode element and point cur_ptrs[s] at 1-elem stack slot!
+        let init_sum = open(g, f, OP_if_);
+        lget(g, leaf_rev);
+        let rev_sum = open(g, f, OP_if_);
+        lget(g, leaf_edge); callf(g, ep_fn); callf(g, unrev_sum_fn); lset(g, leaf_ptr);
+        i32Const(g, 0); lset(g, leaf_rev);
+        close(g, f);
+        lget(g, leaf_ptr); i32Const(g, SEQ_SUM_TAGS); op(g, OP_i32_add); lset(g, sum_tags_ptr);
+        for st in 1..sp.packed.stream_count {
+            if cur_ptrs[st] == 0 { continue; }
+            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SUM_SUB_PTRS + ((st - 1) as u32) * 4);
+            lset(g, cur_ptrs[st]);
+        }
+        close(g, f);
+
+        if can_spec {
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SUM); op(g, OP_i32_eq);
+            let fast_sum_if = open(g, f, OP_if_);
+            // Tight forward PACKED_SUM inner loop: ZERO calls, ZERO leaf_kind branches, pointer-compare tags_ptr < tags_end!
+            let tags_end = local32(g, f);
+            lget(g, sum_tags_ptr); lget(g, leaf_len); op(g, OP_i32_add); lset(g, tags_end);
+            let ci_loc = local32(g, f);
+            let elem_exit = open(g, f, OP_block);
+            let elem_top = open(g, f, OP_loop);
+            f.checked_elems_len = 0;
+            lget(g, sum_tags_ptr); lget(g, tags_end); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+            lget(g, sum_tags_ptr); op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, 0); lset(g, ci_loc);
+            lget(g, sum_tags_ptr); i32Const(g, 1); op(g, OP_i32_add); lset(g, sum_tags_ptr);
+            let d = split_sum_depth;
+            split_sum_binding[d] = split_bind_id;
+            split_sum_ty[d] = elem_ty;
+            split_sum_ci_loc[d] = ci_loc;
+            split_sum_needed_lo[d] = split_needed_mask;
+            for st in 0..16 {
+                split_sum_cur_ptrs[d * 16 + st] = cur_ptrs[st];
+                split_sum_stream_stride[d * 16 + st] = sp.packed.stream_stride[st];
+            }
+            for ci in 0..64 {
+                split_sum_variant_stream[d * 64 + ci] = if ci < sp.packed.variant_count { sp.packed.variant_stream[ci] } else { -1 };
+            }
+            split_sum_depth += 1;
+            let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, false, 0, 0, 0, 0xffffffff, guards, false, true);
+            if berr != squid_direct_types::Error.none { return berr; }
+            close(g, f);
+            close(g, f);
+
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+            op(g, OP_else_);
+        }
+
+        // General / non-packed (SPAN / REPEAT) sum inner loop
+        var fb_slots: u32[16] = [0; 16];
+        for st in 1..sp.packed.stream_count {
+            if cur_ptrs[st] != 0 {
+                fb_slots[st] = allocate(g, f, sp.packed.stream_stride[st]);
+            }
+        }
+        i32Const(g, 0); lset(g, leaf_i);
+        let ci_loc = local32(g, f);
+        let elem_exit = open(g, f, OP_block);
+        let elem_top = open(g, f, OP_loop);
+        f.checked_elems_len = 0;
+        lget(g, leaf_i); lget(g, leaf_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+        var release_owner: u32 = 0;
+        var release_stack: u32 = 0;
+        var saved_escape: u32 = 0;
+        var unchanged: u32 = 0xffffffff;
+        if release {
+            release_owner = local32(g, f);
+            release_stack = local32(g, f);
+            saved_escape = local32(g, f);
+            if boxed_carries { unchanged = local32(g, f); }
+            markInto(g, g.s.code, release_owner, release_stack);
+            gget(g, rt.escape_min_slot); lset(g, saved_escape);
+            i32Const(g, 0xffffffff); gset(g, rt.escape_min_slot);
+        }
+        let cur_li = local32(g, f);
+        lget(g, leaf_i); lset(g, cur_li);
+        lget(g, leaf_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, leaf_i);
+        if !can_spec {
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SUM); op(g, OP_i32_eq);
+            let fast_sum = open(g, f, OP_if_);
+            lget(g, sum_tags_ptr); lget(g, cur_li); op(g, OP_i32_add);
+            op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, 0); lset(g, ci_loc);
+            op(g, OP_else_);
+        }
+        // Non-packed leaf (SPAN / REPEAT): decode into reusable 1-elem stack slot per needed stream
         lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
         let ev_fb, efberr = pop(g, f, elem_ty, id);
         if efberr != squid_direct_types::Error.none { return efberr; }
@@ -4248,17 +5342,15 @@ recursive fn emitSeqLoopCore(
             let arm = open(g, f, OP_if_);
             i32Const(g, ci as u32); lset(g, ci_loc);
             if st >= 1 && ((split_needed_mask >> (ci as u64)) & 1) != 0 {
-                let pbytes = sp.packed.stream_stride[st];
-                let slot_mem = allocate(g, f, pbytes);
                 let uw, uerr = unwrapVariant(g, f, ev_fb, vtag, id);
                 if uerr != squid_direct_types::Error.none { return uerr; }
-                let werr = writeElement(g, f, slot_mem, 0, uw, id);
+                let werr = writeElement(g, f, fb_slots[st], 0, uw, id);
                 if werr != squid_direct_types::Error.none { return werr; }
-                lget(g, slot_mem); lset(g, cur_ptrs[st]);
+                lget(g, fb_slots[st]); lset(g, cur_ptrs[st]);
             }
             close(g, f);
         }
-        close(g, f);
+        if !can_spec { close(g, f); }
         let d = split_sum_depth;
         split_sum_binding[d] = split_bind_id;
         split_sum_ty[d] = elem_ty;
@@ -4272,25 +5364,186 @@ recursive fn emitSeqLoopCore(
             split_sum_variant_stream[d * 64 + ci] = if ci < sp.packed.variant_count { sp.packed.variant_stream[ci] } else { -1 };
         }
         split_sum_depth += 1;
-        pushed_split_frame = true;
+        let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, release, release_owner, release_stack, saved_escape, unchanged, guards, false, true);
+        if berr != squid_direct_types::Error.none { return berr; }
+        close(g, f);
+        close(g, f);
+
+        if can_spec {
+            close(g, f);
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+        }
     } else {
-        // Materialize `item` via fast hoisted leaf cursor (FLAT/SPAN/RAMP/REPEAT/PACKED_SOA/PACKED_SUM)!
-        let item, iferr = fresh(g, f, elem_ty, id);
-        if iferr != squid_direct_types::Error.none { return iferr; }
-        if sp.elem_bytes != 0 {
-            let item_done = open(g, f, OP_block);
-            // Fast path 1: LEAF_FLAT or LEAF_SPAN
+        // ---- Mode 3: General (`FLAT` / `SPAN` / `RAMP` / `REPEAT` / non-fused `PACKED_SUM` / non-virtual `PACKED_SOA`) ----
+        let do_flat_spec = can_spec && sp.elem_bytes != 0;
+        if do_flat_spec {
             lget(g, leaf_kind); i32Const(g, SEQ_KIND_FLAT); op(g, OP_i32_eq);
             lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
             op(g, OP_i32_or);
+            lget(g, leaf_rev); op(g, OP_i32_eqz);
+            op(g, OP_i32_and);
+            let fast_flat_if = open(g, f, OP_if_);
+            // Tight forward FLAT/SPAN inner loop: ZERO calls, ZERO leaf_kind checks, auto-vectorizable!
+            let f_cur = local32(g, f);
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
+            let is_sp = open(g, f, OP_if_);
+            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SPAN_PTR); lset(g, f_cur);
+            op(g, OP_else_);
+            lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, f_cur);
+            close(g, f);
+            let f_end = emitOffsetAddress(g, f, f_cur, leaf_len, sp.elem_bytes);
+            let elem_exit = open(g, f, OP_block);
+            let elem_top = open(g, f, OP_loop);
+            f.checked_elems_len = 0;
+            lget(g, f_cur); lget(g, f_end); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+            let loaded, lerr = loadElement(g, f, f_cur, 0, elem_ty, id);
+            if lerr != squid_direct_types::Error.none { return lerr; }
+            lget(g, f_cur); i32Const(g, sp.elem_bytes); op(g, OP_i32_add); lset(g, f_cur);
+            if info.pattern != 0 {
+                let terr = test_(g, f, info.pattern, loaded, false, 0, id);
+                if terr != squid_direct_types::Error.none { return terr; }
+            }
+            let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, false, 0, 0, 0, 0xffffffff, guards, false, false);
+            if berr != squid_direct_types::Error.none { return berr; }
+            close(g, f);
+            close(g, f);
+
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+            op(g, OP_else_);
+        }
+
+        // General / reversed / RAMP / REPEAT / non-fused SUM / non-virtual SOA inner loop
+        let is_fast_flat = local32(g, f);
+        let cur_ptr = local32(g, f);
+        let cur_delta = local32(g, f);
+        var ramp_val: u32 = 0;
+        var ramp_delta: u32 = 0;
+        if elem_ty == squid_direct_types::u32_ {
+            ramp_val = local32(g, f);
+            ramp_delta = local32(g, f);
+        }
+        var rep_val = neverVal();
+        if sp.elem_bytes != 0 {
+            let rv, rverr = fresh(g, f, elem_ty, id);
+            if rverr != squid_direct_types::Error.none { return rverr; }
+            rep_val = rv;
+        }
+        // Hoist per-leaf state ONCE before inner loop
+        lget(g, leaf_kind); i32Const(g, SEQ_KIND_FLAT); op(g, OP_i32_eq);
+        lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
+        op(g, OP_i32_or); ltee(g, is_fast_flat);
+        let init_flat = open(g, f, OP_if_);
+        if sp.elem_bytes != 0 {
+            let base_p = local32(g, f);
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_SPAN); op(g, OP_i32_eq);
+            let is_sp = open(g, f, OP_if_);
+            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SPAN_PTR); lset(g, base_p);
+            op(g, OP_else_);
+            lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, base_p);
+            close(g, f);
+            lget(g, leaf_rev);
+            let rev_f = open(g, f, OP_if_);
+            let last_i = local32(g, f);
+            lget(g, leaf_len); i32Const(g, 1); op(g, OP_i32_sub); lset(g, last_i);
+            let end_a = emitOffsetAddress(g, f, base_p, last_i, sp.elem_bytes);
+            lget(g, end_a); lset(g, cur_ptr);
+            i32Const(g, 0 - sp.elem_bytes); lset(g, cur_delta);
+            op(g, OP_else_);
+            lget(g, base_p); lset(g, cur_ptr);
+            i32Const(g, sp.elem_bytes); lset(g, cur_delta);
+            close(g, f);
+        }
+        close(g, f);
+        lget(g, leaf_kind); i32Const(g, SEQ_KIND_REPEAT); op(g, OP_i32_eq);
+        let init_rep = open(g, f, OP_if_);
+        if sp.elem_bytes != 0 {
+            let rbase = local32(g, f);
+            lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, rbase);
+            let loaded_r, lrerr = loadElement(g, f, rbase, 0, elem_ty, id);
+            if lrerr != squid_direct_types::Error.none { return lrerr; }
+            let _ = copy(g, f, loaded_r, rep_val, id);
+        }
+        close(g, f);
+        if elem_ty == squid_direct_types::u32_ {
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
+            let init_ramp = open(g, f, OP_if_);
+            let rs = local32(g, f);
+            let rstep = local32(g, f);
+            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_START); lset(g, rs);
+            lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_STEP); lset(g, rstep);
+            lget(g, leaf_rev);
+            let rev_r = open(g, f, OP_if_);
+            lget(g, rs); lget(g, leaf_len); i32Const(g, 1); op(g, OP_i32_sub); lget(g, rstep); op(g, OP_i32_mul); op(g, OP_i32_add);
+            lset(g, ramp_val);
+            i32Const(g, 0); lget(g, rstep); op(g, OP_i32_sub); lset(g, ramp_delta);
+            op(g, OP_else_);
+            lget(g, rs); lset(g, ramp_val);
+            lget(g, rstep); lset(g, ramp_delta);
+            close(g, f);
+            close(g, f);
+        }
+        if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
+            lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SUM); op(g, OP_i32_eq);
+            let init_sum = open(g, f, OP_if_);
+            lget(g, leaf_rev);
+            let rev_sum = open(g, f, OP_if_);
+            lget(g, leaf_edge); callf(g, ep_fn); callf(g, unrev_sum_fn); lset(g, leaf_ptr);
+            i32Const(g, 0); lset(g, leaf_rev);
+            close(g, f);
+            lget(g, leaf_ptr); i32Const(g, SEQ_SUM_TAGS); op(g, OP_i32_add); lset(g, sum_tags_ptr);
+            for st in 1..sp.packed.stream_count {
+                lget(g, leaf_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SUM_SUB_PTRS + ((st - 1) as u32) * 4);
+                lset(g, cur_ptrs[st]);
+            }
+            close(g, f);
+        }
+
+        i32Const(g, 0); lset(g, leaf_i);
+        let elem_exit = open(g, f, OP_block);
+        let elem_top = open(g, f, OP_loop);
+        f.checked_elems_len = 0;
+        lget(g, leaf_i); lget(g, leaf_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, elem_exit);
+        var release_owner: u32 = 0;
+        var release_stack: u32 = 0;
+        var saved_escape: u32 = 0;
+        var unchanged: u32 = 0xffffffff;
+        if release {
+            release_owner = local32(g, f);
+            release_stack = local32(g, f);
+            saved_escape = local32(g, f);
+            if boxed_carries { unchanged = local32(g, f); }
+            markInto(g, g.s.code, release_owner, release_stack);
+            gget(g, rt.escape_min_slot); lset(g, saved_escape);
+            i32Const(g, 0xffffffff); gset(g, rt.escape_min_slot);
+        }
+        let cur_li = local32(g, f);
+        lget(g, leaf_i); lset(g, cur_li);
+        lget(g, leaf_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, leaf_i);
+        let item, iferr = fresh(g, f, elem_ty, id);
+        if iferr != squid_direct_types::Error.none { return iferr; }
+        if sp.elem_bytes != 0 {
+            lget(g, is_fast_flat);
             let f_if = open(g, f, OP_if_);
             let loaded, lerr = loadElement(g, f, cur_ptr, 0, elem_ty, id);
             if lerr != squid_direct_types::Error.none { return lerr; }
             let _ = copy(g, f, loaded, item, id);
             lget(g, cur_ptr); lget(g, cur_delta); op(g, OP_i32_add); lset(g, cur_ptr);
-            br(g, f, OP_br, item_done);
-            close(g, f);
-            // Fast path 2: LEAF_RAMP (U32 register counter — ZERO memory loads!)
+            op(g, OP_else_);
+            let item_done = open(g, f, OP_block);
             if elem_ty == squid_direct_types::u32_ {
                 lget(g, leaf_kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
                 let r_if = open(g, f, OP_if_);
@@ -4299,89 +5552,48 @@ recursive fn emitSeqLoopCore(
                 br(g, f, OP_br, item_done);
                 close(g, f);
             }
-            // Fast path 3: LEAF_REPEAT (already in registers — ZERO memory loads!)
             lget(g, leaf_kind); i32Const(g, SEQ_KIND_REPEAT); op(g, OP_i32_eq);
             let rep_if = open(g, f, OP_if_);
             let _ = copy(g, f, rep_val, item, id);
             br(g, f, OP_br, item_done);
             close(g, f);
-            // Fast path 4: LEAF_PACKED_SUM (sequential cursor walk without SIMD rank!)
             if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
                 let decoded, derr = emitPackedDecodeStep(g, f, sp.packed, cur_ptrs[..], sum_tags_ptr, cur_li, id);
                 if derr != squid_direct_types::Error.none { return derr; }
                 let _ = copy(g, f, decoded, item, id);
                 br(g, f, OP_br, item_done);
             } else {
-                // LEAF_PACKED_SOA fallback when whole record is bound
                 lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
                 let got, gerr = pop(g, f, elem_ty, id);
                 if gerr != squid_direct_types::Error.none { return gerr; }
                 let _ = copy(g, f, got, item, id);
             }
             close(g, f);
+            close(g, f);
         }
         if info.pattern != 0 {
             let terr = test_(g, f, info.pattern, item, false, 0, id);
             if terr != squid_direct_types::Error.none { return terr; }
         }
+        let berr = emitSeqLoopBodyTail(g, f, id, info, iteration, outgoing, slots, exit, elem_top, release, release_owner, release_stack, saved_escape, unchanged, guards, false, false);
+        if berr != squid_direct_types::Error.none { return berr; }
+        close(g, f);
+        close(g, f);
+
+        if do_flat_spec {
+            close(g, f);
+            f.checked_arrays = saved_ca; f.checked_arrays_len = saved_ca_len;
+            f.checked_grows = saved_cg; f.checked_grows_len = saved_cg_len;
+            f.checked_views = saved_cv; f.checked_views_len = saved_cv_len;
+            f.checked_elems = saved_ce; f.checked_elems_len = saved_ce_len;
+            f.checked_bounds_len = saved_cb_len; f.checked_le_len = saved_cl_len; f.checked_masks_len = saved_cm_len;
+            f.checked_adds_len = saved_cadd_len; f.checked_affines_len = saved_caff_len; f.checked_sub1_len = saved_csub_len;
+            f.const_u32_len = saved_cu32_len; f.const_u64_len = saved_cu64_len; f.ext_u32_u64_len = saved_ext_len;
+            f.known_mutable_len = saved_km_len; f.const_tags_len = saved_ct_len;
+        }
     }
 
-    let allocations = f.allocations;
-    let stores = f.memory_stores;
-    let unused = g.newSlot();
-    let s_lbl .= g.s;
-    let labels_mark = s_lbl.labels.len;
-    s_lbl.labels.push(squid_direct_emit::Label {
-        target: id,
-        depth: exit,
-        result: unused,
-        kind: squid_direct_emit::LabelKind.loop_,
-        top: top,
-        iteration: iteration,
-        outgoing: outgoing,
-        unchanged: unchanged,
-        has_release: release,
-        release_owner: release_owner,
-        release_stack: release_stack,
-        allocations: allocations,
-        slots: slots,
-        saved_esc: saved_escape,
-        guards: guards,
-    });
-    f.loop_depth += 1;
-    let body, error = stmt(g, f, info.body);
-    if pushed_soa_frame { soa_loop_depth -= 1; }
-    if pushed_split_frame { split_sum_depth -= 1; }
-    if error != squid_direct_types::Error.none {
-        f.loop_depth -= 1;
-        s_lbl.labels.resize(labels_mark);
-        return error;
-    }
-
-    if body.ty != squid_direct_types::never {
-        let backedge = g.reserveVals(carries.len);
-        for carry, at in carries {
-            let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-            if rerr != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return rerr; }
-            if !present { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return g.fail(m, id, "loop carry without a backedge value"); }
-            g.s.vals[backedge.start + at] = value;
-        }
-        let assigned_c = assignCarries(g, f, backedge, iteration, slots, unchanged, release_owner, release_stack, id);
-        if assigned_c != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return assigned_c; }
-        let label = s_lbl.labels[labels_mark];
-        if label.has_release {
-            let iter_esc = local32(g, f);
-            gget(g, rt.escape_min_slot);
-            lset(g, iter_esc);
-            if f.allocations != allocations && f.memory_stores == stores {
-                releaseIteration(g, f, label, iter_esc);
-            }
-            emitMergeEscapeMin(g, f, iter_esc, label.saved_esc);
-        }
-        br(g, f, OP_br, top);
-    }
-    f.loop_depth -= 1;
-    s_lbl.labels.resize(labels_mark);
+    br(g, f, OP_br, leaf_top);
     close(g, f);
     close(g, f);
     return squid_direct_types::Error.none;
