@@ -506,6 +506,25 @@ fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Sta
         shift_left => { bits = a << shift; },
         shift_right => { bits = if signed { (x >> shift) as! u64 } else { a >> shift }; },
         from_bits => { return stageWide(a, blot_check_types::f64_type); },
+        mul_wide => {
+            let al = a & 0xffffffff;
+            let ah = a >> 32;
+            let bl = b & 0xffffffff;
+            let bh = b >> 32;
+            let p0 = al * bl;
+            let p1 = al * bh;
+            let p2 = ah * bl;
+            let p3 = ah * bh;
+            let mid = (p0 >> 32) + (p1 & 0xffffffff) + (p2 & 0xffffffff);
+            let hi = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+            let lo = a * b;
+            let start = s.parts.items.len as u32;
+            blot_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(lo, blot_check_types::u64_type) }, part_runs);
+            blot_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(hi, blot_check_types::u64_type) }, part_runs);
+            let idx = s.aggregates.items.len as u32;
+            blot_support_pooled_buffer::push(s.aggregates, StageAggregate { blot_check_core::Tag.product, start, 2, 0, 0, 0 }, aggregate_runs);
+            return StageValue { idx, stage_aggregate, 0 };
+        },
         _ => { return stopStage(s, "#run does not support this integer operation"); },
     }
     return stageWide(bits & mask, ty);

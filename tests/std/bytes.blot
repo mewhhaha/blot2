@@ -1,0 +1,65 @@
+import * as bytes from "std/bytes"
+import * as test from "std/test"
+import * as text from "std/text"
+
+private func bytes_checks (): Unit ! { test.Test } =>
+  // UTF-8 round-trip including ASCII, 2-byte, 3-byte, and 4-byte scalars
+  let sample: Text = "hi é € 🚀"
+  let utf8 = bytes.from_text sample
+  use test.holds "utf8 byte length > scalar length" (utf8.length > sample.length)
+  case bytes.to_text utf8 of
+    $Some decoded =>
+      use test.holds "utf8 round-trip" (text.equal sample decoded)
+    $Nothing =>
+      use test.holds "utf8 decode succeeded" false
+
+  // SIMD index_of_byte across 16-byte boundary and tail
+  let haystack = bytes.from_text "0123456789abcdefXYZ!hello"
+  use test.eq "find X at 16" ($Some 16) (bytes.index_of_byte 88 0 haystack)
+  use test.eq "find ! at 19" ($Some 19) (bytes.index_of_byte 33 0 haystack)
+  use test.eq "find o in tail" ($Some 24) (bytes.index_of_byte 111 0 haystack)
+  use test.eq "missing byte" $Nothing (bytes.index_of_byte 63 0 haystack)
+
+  // Integer and F64 formatting + parsing
+  let b = bytes.builder ()
+  b := bytes.append_i32 (-42) self
+  b := bytes.push 44 self
+  b := bytes.append_u64 18446744073709551615 self
+  b := bytes.push 44 self
+  b := bytes.append_i64 (-9223372036854775808) self
+  b := bytes.push 44 self
+  b := bytes.append_f64_fixed 3 (-3.14159) self
+  let rendered = bytes.finish b
+  let expected = bytes.from_text "-42,18446744073709551615,-9223372036854775808,-3.142"
+  use test.holds "formatted bytes match" (bytes.equal rendered expected)
+
+  let n1 = bytes.from_text "-42"
+  let want_i32: I32 = -42
+  case bytes.parse_i32 n1 0 n1.length of
+    $Some v =>
+      use test.holds "parse_i32" (v == want_i32)
+    $Nothing =>
+      use test.holds "parse_i32" false
+  let n2 = bytes.from_text "18446744073709551615"
+  let want_u64: U64 = 18446744073709551615
+  case bytes.parse_u64 n2 0 n2.length of
+    $Some v =>
+      use test.holds "parse_u64 max" (v == want_u64)
+    $Nothing =>
+      use test.holds "parse_u64 max" false
+  let n3 = bytes.from_text "-9223372036854775808"
+  let want_i64: I64 = -9223372036854775808
+  case bytes.parse_i64 n3 0 n3.length of
+    $Some v =>
+      use test.holds "parse_i64 min" (v == want_i64)
+    $Nothing =>
+      use test.holds "parse_i64 min" false
+  let f1 = bytes.from_text "-12.5e-2"
+  case bytes.parse_f64 f1 0 f1.length of
+    $Some v =>
+      use test.holds "parse_f64" (F64.abs (v - (-0.125)) < 1e-12)
+    $Nothing =>
+      use test.holds "parse_f64" false
+  return ()
+
+io test_bytes (): test.Report => test.run bytes_checks

@@ -4200,7 +4200,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
         },
         array_op => {
             match m.arrayOperation(id) {
-                length, get, simd_load, simd_store => {
+                length, get, simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
                     for child in m.children(id) {
                         if !noStorageResize(g, m, child, left) { return false; }
                     }
@@ -4722,7 +4722,8 @@ recursive fn exprPreservesHandle(
                 exprPreservesHandle(g, m, info.root, same, same_len, depth + 1, allow_calls, call_depth);
         },
         array_op => {
-            if m.arrayOperation(id) != blot_backend_collection_ops::Op.simd_store { return false; }
+            let aop = m.arrayOperation(id);
+            if aop != blot_backend_collection_ops::Op.simd_store && aop != blot_backend_collection_ops::Op.simd_store_u8x16 && aop != blot_backend_collection_ops::Op.simd_store_f64x2 { return false; }
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },

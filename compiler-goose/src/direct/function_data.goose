@@ -853,7 +853,17 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     for index in 0..(payload.len as i64) {
         lget(g, w(g, payload, index));
-        if words[index] == VT_f32 && slots[index + 1] == VT_i32 { op(g, OP_i32_reinterpret_f32); }
+        let src = words[index];
+        let dst = slots[index + 1];
+        if src != dst {
+            if dst == VT_i32 {
+                if src == VT_f32 { op(g, OP_i32_reinterpret_f32); }
+            } else if dst == VT_i64 {
+                if src == VT_f64 { op(g, OP_i64_reinterpret_f64); }
+                else if src == VT_i32 { op(g, OP_i64_extend_i32_u); }
+                else if src == VT_f32 { op(g, OP_i32_reinterpret_f32); op(g, OP_i64_extend_i32_u); }
+            }
+        }
         lset(g, w(g, result, index + 1));
     }
     return result, blot_direct_types::Error.none;
@@ -880,7 +890,8 @@ fn unwrapVariant(g: Generator&, f: const Fn&, value: Val, tag: u32, id: u32) -> 
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     let start = g.s.words.len as u32;
     for kind, index in words {
-        if kind == slots[index + 1] {
+        let slot_kind = slots[index + 1];
+        if kind == slot_kind {
             let shared = w(g, value, index + 1);
             g.s.words.push(shared);
             continue;
@@ -888,7 +899,13 @@ fn unwrapVariant(g: Generator&, f: const Fn&, value: Val, tag: u32, id: u32) -> 
         let made = local(g, f, kind);
         g.s.words.push(made);
         lget(g, w(g, value, index + 1));
-        op(g, OP_f32_reinterpret_i32);
+        if slot_kind == VT_i32 {
+            op(g, OP_f32_reinterpret_i32);
+        } else if slot_kind == VT_i64 {
+            if kind == VT_f64 { op(g, OP_f64_reinterpret_i64); }
+            else if kind == VT_i32 { op(g, OP_i32_wrap_i64); }
+            else if kind == VT_f32 { op(g, OP_i32_wrap_i64); op(g, OP_f32_reinterpret_i32); }
+        }
         lset(g, made);
     }
     return Val { payload_ty, start, words.len as u32 }, blot_direct_types::Error.none;

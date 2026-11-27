@@ -13,6 +13,7 @@ let string_escape: Code=3; let reserved_layout: Code=4; let reserved_selector_ma
 let reserved_import_marker: Code=6; let reserved_clause_marker: Code=7;
 let layout_tab: Code=8; let layout_indent: Code=9; let layout_suite: Code=10; let layout_dedent: Code=11;
 let integer_range: Code=12; let float_range: Code=13; let float_literal: Code=14;
+let char_literal_error: Code=15; let byte_string_escape: Code=16;
 struct Diagnostic { code: Code, start: u32, end: u32 }
 fn message(d: Diagnostic) -> const u8[:] {
  if d.code==invalid_utf8 { return "Source is not valid UTF-8"; }
@@ -29,6 +30,8 @@ fn message(d: Diagnostic) -> const u8[:] {
  if d.code==layout_dedent { return "Dedent must match an enclosing indentation level"; }
  if d.code==integer_range { return "Integer literal exceeds U32 (4294967295)"; }
  if d.code==float_range { return "Floating-point literal exceeds finite F32 range"; }
+ if d.code==char_literal_error { return "Expected a valid single character literal"; }
+ if d.code==byte_string_escape { return "Byte string escapes are limited to quote, backslash, n, r, t, 0 and \\xHH"; }
  return "Invalid F32 literal";
 }
 struct Result { tokens: Token[>..<]&, comments: Token[>..<]&, diagnostics: Diagnostic[>..<]& }
@@ -65,17 +68,68 @@ fn digits(source: const u8[:],start: i64,hexadecimal: bool) -> i64 {
  }
  return at;
 }
+fn suffix_kind(text: const u8[:]) -> u32 {
+ if text=="u8" { return 1; }
+ if text=="u32" { return 2; }
+ if text=="i32" { return 3; }
+ if text=="u64" { return 4; }
+ if text=="i64" { return 5; }
+ if text=="f32" { return 6; }
+ if text=="f64" { return 7; }
+ return 0;
+}
+fn number_suffix(text: const u8[:]) -> const u8[:], u32 {
+ let is_hex = text.len>=2 && text[0]=='0' && (text[1]=='x'||text[1]=='X');
+ if text.len>=3 {
+  let k3=suffix_kind(text[text.len-3..]);
+  if k3!=0 && !(is_hex && k3>=6) {
+   var body_end=text.len-3;
+   if body_end>0 && text[body_end-1]=='_' { body_end--; }
+   if body_end>0 && !(is_hex && body_end<=2) { return text[..body_end], k3; }
+  }
+ }
+ if text.len>=2 {
+  let k2=suffix_kind(text[text.len-2..]);
+  if k2!=0 && !(is_hex && k2>=6) {
+   var body_end=text.len-2;
+   if body_end>0 && text[body_end-1]=='_' { body_end--; }
+   if body_end>0 && !(is_hex && body_end<=2) { return text[..body_end], k2; }
+  }
+ }
+ return text, 0;
+}
+fn scan_number_suffix(source: const u8[:], at: i64, is_hex: bool, tag: Tag) -> Number {
+ var s=at;
+ if s<source.len && source[s]=='_' { s++; }
+ if s>=source.len { return Number {at, tag}; }
+ var end=s;
+ while end<source.len && type_ident(source[end]) { end++; }
+ if end==s { return Number {at, tag}; }
+ let k=suffix_kind(source[s..end]);
+ if k==0 { return Number {at, tag}; }
+ if k>=6 {
+  if is_hex { return Number {at, tag}; }
+  return Number {end, blot_parse_token::float};
+ }
+ if tag==blot_parse_token::float { return Number {at, tag}; }
+ return Number {end, blot_parse_token::integer};
+}
 fn scan_number(source: const u8[:],start: i64) -> Number {
- if source[start]=='0' && start+2<source.len && (source[start+1]=='x'||source[start+1]=='X') && hex(source[start+2]) { return Number {digits(source,start+2,true),blot_parse_token::integer}; }
+ if source[start]=='0' && start+2<source.len && (source[start+1]=='x'||source[start+1]=='X') && hex(source[start+2]) {
+  let at=digits(source,start+2,true);
+  return scan_number_suffix(source,at,true,blot_parse_token::integer);
+ }
  var at=digits(source,start,false); var tag=blot_parse_token::integer;
  if at+1<source.len && source[at]=='.' && digit(source[at+1]) { at=digits(source,at+1,false); tag=blot_parse_token::float; }
  if at<source.len && (source[at]=='e'||source[at]=='E') {
   var exponent=at+1; if exponent<source.len && (source[exponent]=='+'||source[exponent]=='-') { exponent++; }
   if exponent<source.len && digit(source[exponent]) { at=digits(source,exponent,false); tag=blot_parse_token::float; }
  }
- return Number {at,tag};
+ return scan_number_suffix(source,at,false,tag);
 }
-fn integer_value(text: const u8[:]) -> u64,Error {
+fn integer_value(raw_text: const u8[:]) -> u64,Error {
+ let text,suf=number_suffix(raw_text);
+ if suf>=6 { return 0,blot_error::Error.invalid_integer; }
  var radix: u64=10; var at=0;
  if text.len>=2 && text[0]=='0' && (text[1]=='x'||text[1]=='X') { radix=16; at=2; }
  let first=at; if at==text.len { return 0,blot_error::Error.invalid_integer; }
@@ -142,10 +196,11 @@ fn round_decimal(exact: const u8[:], exp10: i64, fraction_width: i64, infinity: 
  if rounded == infinity { return 0,blot_error::Error.float_range; }
  return rounded,blot_error::Error.none;
 }
-fn decimal_bits(text: const u8[:], wide: bool) -> u64,Error {
+fn decimal_bits(raw_text: const u8[:], wide: bool) -> u64,Error {
+ let text,suf=number_suffix(raw_text);
  if text.len==0 || !digit(text[0]) { return 0,blot_error::Error.invalid_float; }
  let scanned=scan_number(text,0);
- if scanned.tag!=blot_parse_token::float || scanned.end!=text.len { return 0,blot_error::Error.invalid_float; }
+ if scanned.end!=text.len || (suf<6 && scanned.tag!=blot_parse_token::float) { return 0,blot_error::Error.invalid_float; }
  var significant: u8[>..]=[]; var exp10: i64=0; var fractional=false; var at=0;
  while at<text.len && text[at]!='e' && text[at]!='E' {
   let c=text[at]; if c=='.' { fractional=true; } else if c!='_' { significant.push(c); if fractional { exp10--; } } at++;
@@ -249,6 +304,50 @@ fn scan(source: const u8[:],result: Result&) {
    continue;
   }
   let start=at;
+  if c=='b' && at+1<slen && source[at+1]=='"' {
+   at+=2; var terminated=false;
+   while at<slen && source[at]!='\r'&&source[at]!='\n' {
+    if source[at]=='"' { at++; terminated=true; break; }
+    if source[at]=='\\' {
+     if at+1==slen||source[at+1]=='\r'||source[at+1]=='\n' { break; }
+     let e=source[at+1];
+     if e=='x' {
+      if at+3<slen && hex(source[at+2]) && hex(source[at+3]) { at+=4; }
+      else { diagnose(result,byte_string_escape,at,if at+2<=slen {at+2} else {slen}); at+=2; }
+     } else {
+      if !contains("\"\\nrt0",e) { diagnose(result,byte_string_escape,at,at+2); }
+      at+=2;
+     }
+    } else { at++; }
+   }
+   if !terminated { diagnose(result,string_literal,start,at); }
+   emit(result.tokens,blot_parse_token::byte_string,start,at); continue;
+  }
+  if c=='\'' {
+   at++;
+   var ok=false;
+   if at<slen && source[at]!='\r' && source[at]!='\n' && source[at]!='\'' {
+    if source[at]=='\\' {
+     if at+1<slen && source[at+1]!='\r' && source[at+1]!='\n' {
+      let e=source[at+1];
+      if e=='x' && at+3<slen && hex(source[at+2]) && hex(source[at+3]) { at+=4; ok=true; }
+      else if contains("'\"\\nrt0",e) { at+=2; ok=true; }
+      else { at+=2; }
+     }
+    } else {
+     let width=utf8_width(source[at]);
+     if width>0 && at+width<=slen { at+=width; ok=true; } else { at++; }
+    }
+   }
+   if ok && at<slen && source[at]=='\'' {
+    at++;
+   } else {
+    while at<slen && source[at]!='\'' && source[at]!='\r' && source[at]!='\n' { at++; }
+    if at<slen && source[at]=='\'' { at++; }
+    diagnose(result,char_literal_error,start,at);
+   }
+   emit(result.tokens,blot_parse_token::char_literal,start,at); continue;
+  }
   if lower(c)||c=='_' {
    if (c=='f' && at+3<slen && source[at+3]=='M' && starts(source,at,"froM")) ||
       (c=='w' && at+4<slen && source[at+4]=='E' && starts(source,at,"wherE")) {

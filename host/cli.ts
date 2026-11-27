@@ -32,6 +32,7 @@ const usage =
                 [--search QUERY] [--compact] [--json] [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source,
+                 --stack-mb 1..1024, --heap-mb 1..1024, --transport-mb 1..1024,
                  --relaxed-simd, --tail-calls, --wasm3, --json`;
 
 async function runTestCli(
@@ -222,6 +223,15 @@ async function runGeneratorProject(
       case "--test":
         config.testMode = true;
         break;
+      case "--stack-mb":
+        config.stackMb = Number(args[++index]);
+        break;
+      case "--heap-mb":
+        config.heapMb = Number(args[++index]);
+        break;
+      case "--transport-mb":
+        config.transportMb = Number(args[++index]);
+        break;
     }
   }
   const assets = await expandGeneratorRules(root, rules, {
@@ -388,8 +398,16 @@ export async function runCli(
         continue;
       }
       if (
-        ["--prelude", "--std-root", "--alias", "--dependencies", "--input-mode"]
-          .includes(value)
+        [
+          "--prelude",
+          "--std-root",
+          "--alias",
+          "--dependencies",
+          "--input-mode",
+          ...(command === "build"
+            ? ["--stack-mb", "--heap-mb", "--transport-mb"]
+            : []),
+        ].includes(value)
       ) {
         if (!rest[i + 1] || rest[i + 1].startsWith("--")) {
           console.error(`Missing value for ${value}`);

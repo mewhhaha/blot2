@@ -149,6 +149,12 @@ export interface ZigProjectCompilerOptions {
   wasm3?: boolean;
   /** Emit first-class `test "..."` declarations and the `blot:tests` custom section. */
   testMode?: boolean;
+  /** Configurable stack budget in MiB (1..1024; default 128). */
+  stackMb?: number;
+  /** Configurable heap budget in MiB (1..1024; default 128). */
+  heapMb?: number;
+  /** Configurable host transport budget in MiB (1..1024; default 2). */
+  transportMb?: number;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -575,6 +581,9 @@ class ProjectProcess implements ZigProjectCompiler {
     tailCalls?: boolean,
     wasm3?: boolean,
     testMode?: boolean,
+    stackMb?: number,
+    heapMb?: number,
+    transportMb?: number,
   ) {
     const args = ["serve-project"];
     if (frontendWorkers !== undefined) {
@@ -593,6 +602,11 @@ class ProjectProcess implements ZigProjectCompiler {
       if (tailCalls) args.push("--tail-calls");
     }
     if (testMode) args.push("--test");
+    if (stackMb !== undefined) args.push("--stack-mb", String(stackMb));
+    if (heapMb !== undefined) args.push("--heap-mb", String(heapMb));
+    if (transportMb !== undefined) {
+      args.push("--transport-mb", String(transportMb));
+    }
     this.#child = new Deno.Command(executable, {
       args,
       clearEnv: true,
@@ -1481,6 +1495,9 @@ export async function createZigProjectCompiler(
     "tailCalls",
     "wasm3",
     "testMode",
+    "stackMb",
+    "heapMb",
+    "transportMb",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -1595,6 +1612,33 @@ export async function createZigProjectCompiler(
   ) {
     throw new RangeError("inferenceBudget must be a positive safe integer");
   }
+  if (
+    options.stackMb !== undefined &&
+    (!Number.isInteger(options.stackMb) || options.stackMb < 1 ||
+      options.stackMb > 1024)
+  ) {
+    throw new RangeError("stackMb must be an integer in 1..1024");
+  }
+  if (
+    options.heapMb !== undefined &&
+    (!Number.isInteger(options.heapMb) || options.heapMb < 1 ||
+      options.heapMb > 1024)
+  ) {
+    throw new RangeError("heapMb must be an integer in 1..1024");
+  }
+  if (
+    options.transportMb !== undefined &&
+    (!Number.isInteger(options.transportMb) || options.transportMb < 1 ||
+      options.transportMb > 1024)
+  ) {
+    throw new RangeError("transportMb must be an integer in 1..1024");
+  }
+  if (
+    (options.stackMb ?? 128) + (options.heapMb ?? 128) +
+        (options.transportMb ?? 2) > 3584
+  ) {
+    throw new RangeError("stackMb + heapMb + transportMb must not exceed 3584");
+  }
   const process = new ProjectProcess(
     executable,
     options.semanticWorkers,
@@ -1604,6 +1648,9 @@ export async function createZigProjectCompiler(
     options.tailCalls,
     options.wasm3,
     options.testMode,
+    options.stackMb,
+    options.heapMb,
+    options.transportMb,
   );
   await process.initialize(open, timeout, identity);
   if (assets !== undefined) {

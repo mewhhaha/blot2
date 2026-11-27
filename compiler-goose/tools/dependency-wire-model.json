@@ -1856,6 +1856,111 @@
           "numeric_convert",
           46,
           "numeric_convert"
+        ],
+        [
+          "mul_wide",
+          47,
+          "mul_wide"
+        ],
+        [
+          "i8x16_splat",
+          48,
+          "i8x16_splat"
+        ],
+        [
+          "i8x16_add",
+          49,
+          "i8x16_add"
+        ],
+        [
+          "i8x16_sub",
+          50,
+          "i8x16_sub"
+        ],
+        [
+          "i8x16_min_u",
+          51,
+          "i8x16_min_u"
+        ],
+        [
+          "i8x16_max_u",
+          52,
+          "i8x16_max_u"
+        ],
+        [
+          "i8x16_eq",
+          53,
+          "i8x16_eq"
+        ],
+        [
+          "i8x16_avgr_u",
+          54,
+          "i8x16_avgr_u"
+        ],
+        [
+          "i8x16_bitmask",
+          55,
+          "i8x16_bitmask"
+        ],
+        [
+          "i8x16_narrow_u",
+          56,
+          "i8x16_narrow_u"
+        ],
+        [
+          "i16x8_splat",
+          57,
+          "i16x8_splat"
+        ],
+        [
+          "i16x8_extend_low_u",
+          58,
+          "i16x8_extend_low_u"
+        ],
+        [
+          "i16x8_extend_high_u",
+          59,
+          "i16x8_extend_high_u"
+        ],
+        [
+          "i16x8_add",
+          60,
+          "i16x8_add"
+        ],
+        [
+          "i16x8_sub",
+          61,
+          "i16x8_sub"
+        ],
+        [
+          "i16x8_mul",
+          62,
+          "i16x8_mul"
+        ],
+        [
+          "i16x8_shl",
+          63,
+          "i16x8_shl"
+        ],
+        [
+          "i16x8_shr_u",
+          64,
+          "i16x8_shr_u"
+        ],
+        [
+          "i16x8_shr_s",
+          65,
+          "i16x8_shr_s"
+        ],
+        [
+          "i16x8_min_u",
+          66,
+          "i16x8_min_u"
+        ],
+        [
+          "i16x8_max_u",
+          67,
+          "i16x8_max_u"
         ]
       ]
     },
@@ -3692,6 +3797,26 @@
           "flatten",
           12,
           "flatten"
+        ],
+        [
+          "simd_load_u8x16",
+          13,
+          "simd_load_u8x16"
+        ],
+        [
+          "simd_store_u8x16",
+          14,
+          "simd_store_u8x16"
+        ],
+        [
+          "simd_load_f64x2",
+          15,
+          "simd_load_f64x2"
+        ],
+        [
+          "simd_store_f64x2",
+          16,
+          "simd_store_f64x2"
         ]
       ]
     },

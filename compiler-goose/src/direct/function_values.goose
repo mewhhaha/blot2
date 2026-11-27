@@ -33,6 +33,11 @@ fn isF32x4CoreExpr(m: const Module&, id: u32) -> bool {
     }
     return true;
 }
+fn isF64x2CoreExpr(m: const Module&, id: u32) -> bool {
+    let ty = m.types.node(m.typeOf(id));
+    if ty.tag != blot_check_types::Tag.product || ty.b != 2 { return false; }
+    return m.types.extra[ty.a] == blot_check_types::f64_type && m.types.extra[ty.a + 1] == blot_check_types::f64_type;
+}
 fn canonicalizeF32Stack(g: Generator&, f: const Fn&) {
     let tmp = local(g, f, VT_f32);
     ltee(g, tmp);
@@ -159,6 +164,28 @@ fn scalarI64(g: Generator&, f: const Fn&, operation: Op, signed: bool, id: u32) 
         },
         abs => {
             if signed { signedAbs(g, f, true); }
+            return blot_direct_types::Error.none;
+        },
+        mul_wide => {
+            let bv = local(g, f, VT_i64);
+            let av = local(g, f, VT_i64);
+            lset(g, bv);
+            lset(g, av);
+            // Push lo first, then hi on top so `pop` unpacks (lo, hi).
+            lget(g, av);
+            lget(g, bv);
+            op(g, OP_i64_mul);
+            let b_lo = local(g, f, VT_i64);
+            let b_hi = local(g, f, VT_i64);
+            lget(g, bv);
+            i64Const(g, 0xffffffff);
+            op(g, OP_i64_and);
+            lset(g, b_lo);
+            lget(g, bv);
+            i64Const(g, 32);
+            op(g, OP_i64_shr_u);
+            lset(g, b_hi);
+            emitMulHi64(g, f, av, b_lo as u64, b_hi as u64, true);
             return blot_direct_types::Error.none;
         },
         _ => { return g.fail(g.units[f.unit - 1], id, "unsupported 64-bit integer operation"); },
@@ -599,7 +626,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     // operation itself canonicalizes or ignores NaN payloads (arithmetic/rounding,
     // float comparisons, F32.to_u32 / F32.to_i32).
     let scalar_children = isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
-    let vector_children = (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)) && isF32x4CoreExpr(m, n.a);
+    let vector_children = (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)) && (isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a));
     let elide_children = scalar_children || vector_children;
     if elide_children { f.elide_f32_nan_node = n.a; }
     let left, error = scalarOperand(g, f, n.a);
@@ -698,6 +725,16 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
         let lowered, error = typeOf(g, f, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         result = lowered;
+    }
+    if n.op == blot_check_core::Op.i8x16_splat {
+        pushScalarOperand(g, f, n.a, left);
+        simdOp(g, SIMD_i8x16_splat);
+        return popV128(g, f, result), blot_direct_types::Error.none;
+    }
+    if n.op == blot_check_core::Op.i16x8_splat {
+        pushScalarOperand(g, f, n.a, left);
+        simdOp(g, SIMD_i16x8_splat);
+        return popV128(g, f, result), blot_direct_types::Error.none;
     }
     if tag == blot_direct_types::Tag.tuple {
         let selectors = laneSelectorOperand(n.op, n.a, n.b);
@@ -872,19 +909,27 @@ fn scalarPayload(g: Generator&, value: Val) -> Val, bool {
 // The shadow's scalar locals are private to this immutable vector result.
 // Branch joins and loop carries still copy through the ordinary tuple layout.
 fn shadowV128(g: Generator&, f: const Fn&, ty: Ty, vloc: u32) -> Val {
-    let is_float = g.types.words[g.types.node(ty).a] == blot_direct_types::f32_;
+    let n = g.types.node(ty);
+    let elem = g.types.words[n.a];
+    let is_wide = n.b == 2;
+    let is_float = elem == blot_direct_types::f32_ || elem == blot_direct_types::f64_;
     var kind = VT_i32;
-    if is_float { kind = VT_f32; }
+    if is_wide {
+        kind = if is_float { VT_f64 } else { VT_i64 };
+    } else if is_float {
+        kind = VT_f32;
+    }
+    let count: u32 = if is_wide { 2 } else { 4 };
     let start = g.s.words.len as u32;
     let w0 = local(g, f, kind);
     let key = shadow_word_bit | ((g.s.v128_shadows.len as u32) << 2);
-    g.s.v128_shadows.push(blot_direct_emit::V128Shadow { w0, vloc, is_float, f.depth, .. });
+    g.s.v128_shadows.push(blot_direct_emit::V128Shadow { w0, vloc, is_float, is_wide, f.depth, .. });
     g.s.words.push(key);
-    for lane in 1..4 {
+    for lane in 1..(count as i64) {
         let _ = local(g, f, kind);
         g.s.words.push(key + (lane as u32));
     }
-    return Val { ty, start, 4 };
+    return Val { ty, start, count };
 }
 fn popV128(g: Generator&, f: const Fn&, ty: Ty) -> Val {
     let vloc = local(g, f, VT_v128);
@@ -892,6 +937,26 @@ fn popV128(g: Generator&, f: const Fn&, ty: Ty) -> Val {
     return shadowV128(g, f, ty, vloc);
 }
 fn ensureV128(g: Generator&, f: const Fn&, value: Val) -> u32 {
+    if value.len == 2 {
+        let first = w(g, value, 0);
+        let second = w(g, value, 1);
+        if isShadowWord(first) && (first & 3) == 0 && second == first + 1 {
+            let at = shadowIndex(first);
+            let shadow = g.s.v128_shadows[at];
+            assert(at >= f.shadows_base && shadow.depth <= f.depth && shadow.is_wide);
+            return shadow.vloc;
+        }
+        let float = localType(g, f, first) == VT_f64;
+        lget(g, first);
+        if float { simdOp(g, SIMD_f64x2_splat); } else { simdOp(g, SIMD_i64x2_splat); }
+        if second != first {
+            lget(g, second);
+            simdLaneOp(g, if float { SIMD_f64x2_replace_lane } else { SIMD_i64x2_replace_lane }, 1);
+        }
+        let vloc = local(g, f, VT_v128);
+        lset(g, vloc);
+        return vloc;
+    }
     let first = w(g, value, 0);
     let second = w(g, value, 1);
     let third = w(g, value, 2);
@@ -919,6 +984,55 @@ fn ensureV128(g: Generator&, f: const Fn&, value: Val) -> u32 {
     let vloc = local(g, f, VT_v128);
     lset(g, vloc);
     return vloc;
+}
+
+fn wideLaneOpcode(op_: Op, float: bool) -> u32 {
+    match op_ {
+        add => { if float { return SIMD_f64x2_add; } return 0; },
+        sub => { if float { return SIMD_f64x2_sub; } return 0; },
+        mul => { if float { return SIMD_f64x2_mul; } return 0; },
+        div => { if float { return SIMD_f64x2_div; } return 0; },
+        abs => { if float { return SIMD_f64x2_abs; } return 0; },
+        neg => { if float { return SIMD_f64x2_neg; } return 0; },
+        ceil => { if float { return SIMD_f64x2_ceil; } return 0; },
+        floor => { if float { return SIMD_f64x2_floor; } return 0; },
+        trunc => { if float { return SIMD_f64x2_trunc; } return 0; },
+        sqrt => { if float { return SIMD_f64x2_sqrt; } return 0; },
+        min => { if float { return SIMD_f64x2_lt; } return 0; },
+        max => { if float { return SIMD_f64x2_gt; } return 0; },
+        equal => { if float { return SIMD_f64x2_eq; } return 0; },
+        not_equal => { if float { return SIMD_f64x2_ne; } return 0; },
+        less => { if float { return SIMD_f64x2_lt; } return 0; },
+        less_equal => { if float { return SIMD_f64x2_le; } return 0; },
+        greater => { if float { return SIMD_f64x2_gt; } return 0; },
+        greater_equal => { if float { return SIMD_f64x2_ge; } return 0; },
+        bit_and => { return SIMD_v128_and; },
+        bit_or => { return SIMD_v128_or; },
+        bit_xor => { return SIMD_v128_xor; },
+        bit_not => { return SIMD_v128_not; },
+        bit_andnot => { return SIMD_v128_andnot; },
+        any_true => { return SIMD_v128_any_true; },
+        all_true => { return SIMD_i64x2_all_true; },
+        i8x16_add => { return SIMD_i8x16_add; },
+        i8x16_sub => { return SIMD_i8x16_sub; },
+        i8x16_min_u => { return SIMD_i8x16_min_u; },
+        i8x16_max_u => { return SIMD_i8x16_max_u; },
+        i8x16_eq => { return SIMD_i8x16_eq; },
+        i8x16_avgr_u => { return SIMD_i8x16_avgr_u; },
+        i8x16_bitmask => { return SIMD_i8x16_bitmask; },
+        i8x16_narrow_u => { return SIMD_i8x16_narrow_i16x8_u; },
+        i16x8_extend_low_u => { return SIMD_i16x8_extend_low_i8x16_u; },
+        i16x8_extend_high_u => { return SIMD_i16x8_extend_high_i8x16_u; },
+        i16x8_add => { return SIMD_i16x8_add; },
+        i16x8_sub => { return SIMD_i16x8_sub; },
+        i16x8_mul => { return SIMD_i16x8_mul; },
+        i16x8_shl => { return SIMD_i16x8_shl; },
+        i16x8_shr_u => { return SIMD_i16x8_shr_u; },
+        i16x8_shr_s => { return SIMD_i16x8_shr_s; },
+        i16x8_min_u => { return SIMD_i16x8_min_u; },
+        i16x8_max_u => { return SIMD_i16x8_max_u; },
+        _ => { return 0; },
+    }
 }
 
 fn laneOpcode(op_: Op, float: bool) -> u32 {
@@ -1031,6 +1145,57 @@ fn lanePermutation(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result
 }
 
 fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, id: u32, elide_nan: bool, selector_node: u32) -> Val, Error {
+    if left.len == 2 {
+        let a = ensureV128(g, f, left);
+        if op_ == blot_check_core::Op.bits || op_ == blot_check_core::Op.from_bits {
+            return shadowV128(g, f, result_ty, a), blot_direct_types::Error.none;
+        }
+        if right.len == 4 {
+            let b = ensureV128(g, f, Val { right.ty, right.start, 2 });
+            let c = ensureV128(g, f, Val { right.ty, right.start + 2, 2 });
+            match op_ {
+                select => {
+                    lget(g, b); lget(g, c); lget(g, a);
+                    simdOp(g, SIMD_v128_bitselect);
+                },
+                relaxed_madd, relaxed_nmadd => {
+                    let neg = op_ == blot_check_core::Op.relaxed_nmadd;
+                    if blot_direct_writer::relaxedSimdEnabled() {
+                        lget(g, a); lget(g, b); lget(g, c);
+                        if neg { simdOp(g, SIMD_f64x2_relaxed_nmadd); } else { simdOp(g, SIMD_f64x2_relaxed_madd); }
+                    } else {
+                        if neg { lget(g, c); }
+                        lget(g, a); lget(g, b);
+                        simdOp(g, SIMD_f64x2_mul);
+                        if neg { simdOp(g, SIMD_f64x2_sub); } else { lget(g, c); simdOp(g, SIMD_f64x2_add); }
+                    }
+                },
+                _ => { return neverVal(), g.fail(g.units[f.unit - 1], id, "unsupported paired wide lane operation"); },
+            }
+        } else {
+            let float = localType(g, f, w(g, left, 0)) == VT_f64;
+            let opcode = wideLaneOpcode(op_, float);
+            if opcode == 0 { return neverVal(), g.fail(g.units[f.unit - 1], id, "unsupported wide lane operation"); }
+            let float_minmax = float && (op_ == blot_check_core::Op.min || op_ == blot_check_core::Op.max);
+            if right.len == 2 {
+                let b = ensureV128(g, f, right);
+                if float_minmax { lget(g, a); lget(g, b); }
+                lget(g, a); lget(g, b);
+            } else {
+                lget(g, a);
+                if right.len == 1 { lget(g, w(g, right, 0)); }
+            }
+            simdOp(g, opcode);
+            if float_minmax { simdOp(g, SIMD_v128_bitselect); }
+        }
+        if op_ == blot_check_core::Op.any_true || op_ == blot_check_core::Op.all_true || op_ == blot_check_core::Op.i8x16_bitmask {
+            return pop(g, f, result_ty, id);
+        }
+        if !elide_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f64 {
+            canonicalizeF64x2(g, f);
+        }
+        return popV128(g, f, result_ty), blot_direct_types::Error.none;
+    }
     if left.len != 4 {
         return neverVal(), g.fail(g.units[f.unit - 1], id, "lane operation requires a four-word tuple");
     }

@@ -98,6 +98,8 @@ fn surface_token_name(tag: blot_parse_token::Tag) -> const u8[:] {
  if tag==blot_parse_token::kw_fork { return "'fork'"; }
  if tag==blot_parse_token::semicolon { return "';'"; }
  if tag==blot_parse_token::kw_spark { return "'spark'"; }
+ if tag==blot_parse_token::char_literal { return "a character literal"; }
+ if tag==blot_parse_token::byte_string { return "a byte string"; }
  return "a token";
 }
 fn format_publication_message(value: Publication,out: u8[>..<]&) -> bool {

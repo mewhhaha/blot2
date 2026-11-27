@@ -1,0 +1,410 @@
+//! Compact UTF-8 / binary byte buffers (`#[U8]`), zero-copy [`Builder`],
+//! SIMD byte search, UTF-8 conversion, and ASCII integer / float codecs.
+
+import * as simd from "./simd"
+
+type Bytes = #[U8]
+type Builder = #[U8]
+
+func builder (): Builder => Array.with_capacity 64
+func with_capacity (capacity: U32): Builder => Array.with_capacity capacity
+func push (byte: U8) -> (out: own Builder): Builder => Array.push out byte
+func reserve (additional: U32) -> (out: own Builder): Builder => Array.reserve out additional
+func extend (more: Bytes) -> (out: own Builder): Builder => Array.extend out more
+func extend_view (more: &[U8]) -> (out: own Builder): Builder => Array.extend_view out more
+func finish (out: own Builder): Bytes => out
+
+func equal (left: Bytes) -> (right: Bytes): Bool =>
+  if left.length != right.length:
+    return false
+  for i in 0..left.length:
+    if left[i] != right[i]:
+      return false
+  return true
+
+func equal_range (buf: Bytes) -> (start: U32) -> (end: U32) -> (other: Bytes): Bool =>
+  if end < start or end > buf.length:
+    return false
+  let n = end - start
+  if n != other.length:
+    return false
+  for i in 0..n:
+    if buf[start + i] != other[i]:
+      return false
+  return true
+
+// SIMD 16-byte scan for `needle` starting at `start`.
+func index_of_byte (needle: U8) -> (start: U32) -> (buf: Bytes): Maybe U32 =>
+  let n = buf.length
+  let i = start
+  let target = simd.u8_splat needle
+  for ever:
+    if i + 16 > n:
+      break
+    let chunk = simd.load_u8x16 i buf
+    let mask = simd.u8_bitmask (simd.u8_eq chunk target)
+    if mask != 0:
+      for lane in 0..16:
+        if ((mask >> lane) & 1) != 0:
+          return $Some (i + lane)
+    i := self + 16
+  for ever:
+    if i >= n:
+      return $Nothing
+    if buf[i] == needle:
+      return $Some i
+    i := self + 1
+
+func append_ascii_text (value: Text) -> (out: own Builder): Builder =>
+  out := Array.reserve self value.length
+  for ch in value:
+    out := Array.push self (U32.to_u8 ch)
+  return out
+
+func from_text (value: Text): Bytes =>
+  let out: Builder = Array.with_capacity value.length
+  for cp in value:
+    if cp < 0x80:
+      out := Array.push self (U32.to_u8 cp)
+    else:
+      if cp < 0x800:
+        out := Array.push self (U32.to_u8 (0xc0 | (cp >> 6)))
+        out := Array.push self (U32.to_u8 (0x80 | (cp & 0x3f)))
+      else:
+        if cp < 0x10000:
+          out := Array.push self (U32.to_u8 (0xe0 | (cp >> 12)))
+          out := Array.push self (U32.to_u8 (0x80 | ((cp >> 6) & 0x3f)))
+          out := Array.push self (U32.to_u8 (0x80 | (cp & 0x3f)))
+        else:
+          out := Array.push self (U32.to_u8 (0xf0 | (cp >> 18)))
+          out := Array.push self (U32.to_u8 (0x80 | ((cp >> 12) & 0x3f)))
+          out := Array.push self (U32.to_u8 (0x80 | ((cp >> 6) & 0x3f)))
+          out := Array.push self (U32.to_u8 (0x80 | (cp & 0x3f)))
+  return out
+
+func to_text (buf: Bytes): Maybe Text =>
+  let n = buf.length
+  let out: #[U32] = Array.with_capacity n
+  let i: U32 = 0
+  for ever:
+    if i >= n:
+      return $Some out
+    let b0 = U8.to_u32 buf[i]
+    if b0 < 0x80:
+      out := Array.push self b0
+      i := self + 1
+    else:
+      if b0 >= 0xc2 and b0 <= 0xdf:
+        if i + 1 >= n:
+          return $Nothing
+        let b1 = U8.to_u32 buf[i + 1]
+        if (b1 & 0xc0) != 0x80:
+          return $Nothing
+        out := Array.push self (((b0 & 0x1f) << 6) | (b1 & 0x3f))
+        i := self + 2
+      else:
+        if b0 >= 0xe0 and b0 <= 0xef:
+          if i + 2 >= n:
+            return $Nothing
+          let b1 = U8.to_u32 buf[i + 1]
+          let b2 = U8.to_u32 buf[i + 2]
+          if (b1 & 0xc0) != 0x80 or (b2 & 0xc0) != 0x80:
+            return $Nothing
+          let cp = ((b0 & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f)
+          if cp < 0x800 or (cp >= 0xd800 and cp <= 0xdfff):
+            return $Nothing
+          out := Array.push self cp
+          i := self + 3
+        else:
+          if b0 >= 0xf0 and b0 <= 0xf4:
+            if i + 3 >= n:
+              return $Nothing
+            let b1 = U8.to_u32 buf[i + 1]
+            let b2 = U8.to_u32 buf[i + 2]
+            let b3 = U8.to_u32 buf[i + 3]
+            if (b1 & 0xc0) != 0x80 or (b2 & 0xc0) != 0x80 or (b3 & 0xc0) != 0x80:
+              return $Nothing
+            let cp = ((b0 & 0x07) << 18) | ((b1 & 0x3f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f)
+            if cp < 0x10000 or cp > 0x10ffff:
+              return $Nothing
+            out := Array.push self cp
+            i := self + 4
+          else:
+            return $Nothing
+
+func append_u32 (value: U32) -> (out: own Builder): Builder =>
+  if value == 0:
+    return Array.push out 48
+  let z8: U8 = 0
+  let buf: #[U8] = @array.fill 10 z8
+  let count: U32 = 0
+  let current = value
+  for ever:
+    if current == 0:
+      break
+    buf[count] := U32.to_u8 (48 + current % 10)
+    count := self + 1
+    current := self / 10
+  out := Array.reserve self count
+  let i = count
+  for ever:
+    if i == 0:
+      return out
+    i := self - 1
+    out := Array.push self buf[i]
+
+func append_i32 (value: I32) -> (out: own Builder): Builder =>
+  if value < 0:
+    out := Array.push self 45
+    let mag: U32 = 0 - I32.to_u32 value
+    return append_u32 mag out
+  return append_u32 (I32.to_u32 value) out
+
+func append_u64 (value: U64) -> (out: own Builder): Builder =>
+  if value == 0:
+    return Array.push out 48
+  let z8: U8 = 0
+  let buf: #[U8] = @array.fill 20 z8
+  let count: U32 = 0
+  let current = value
+  for ever:
+    if current == 0:
+      break
+    buf[count] := U64.to_u8 (48 + current % 10)
+    count := self + 1
+    current := self / 10
+  out := Array.reserve self count
+  let i = count
+  for ever:
+    if i == 0:
+      return out
+    i := self - 1
+    out := Array.push self buf[i]
+
+func append_i64 (value: I64) -> (out: own Builder): Builder =>
+  if value < 0:
+    out := Array.push self 45
+    let zero: U64 = 0
+    let mag: U64 = zero - I64.to_u64 value
+    return append_u64 mag out
+  return append_u64 (I64.to_u64 value) out
+
+// Formats finite `value` with `places` decimal digits (0..12) using round-half-away-from-zero.
+func append_f64_fixed (places: U32) -> (value: F64) -> (out: own Builder): Builder =>
+  if not (F64.eq value value):
+    out := Array.push self 78
+    out := Array.push self 97
+    return Array.push out 78
+  let bits = F64.to_bits value
+  let negative = (bits >> 63) != 0
+  if negative:
+    out := Array.push self 45
+  if not (F64.is_finite value):
+    out := Array.push self 105
+    out := Array.push self 110
+    return Array.push out 102
+  let mag = F64.abs value
+  let p = if places > 12 then 12 else places
+  let scale: U64 = 1
+  for _ in 0..p:
+    scale := self * 10
+  let scaled = F64.floor (mag * U64.to_f64 scale + 0.5)
+  let total = F64.to_u64 scaled
+  let whole = total / scale
+  let frac = total % scale
+  out := append_u64 whole self
+  if p == 0:
+    return out
+  out := Array.push self 46
+  let divisor = scale / 10
+  for _ in 0..p:
+    out := Array.push self (U64.to_u8 (48 + (frac / divisor) % 10))
+    if divisor > 1:
+      divisor := self / 10
+  return out
+
+func parse_u32 (buf: Bytes) -> (start: U32) -> (end: U32): Maybe U32 =>
+  if start >= end or end > buf.length:
+    return $Nothing
+  let acc: U32 = 0
+  for i in start..end:
+    let b = buf[i]
+    if b < 48 or b > 57:
+      return $Nothing
+    let d = U8.to_u32 (b - 48)
+    if acc > 429496729 or (acc == 429496729 and d > 5):
+      return $Nothing
+    acc := self * 10 + d
+  return $Some acc
+
+func parse_i32 (buf: Bytes) -> (start: U32) -> (end: U32): Maybe I32 =>
+  if start >= end or end > buf.length:
+    return $Nothing
+  let negative = buf[start] == 45
+  let first = if negative then start + 1 else start
+  if first >= end:
+    return $Nothing
+  let acc: U32 = 0
+  let limit: U32 = if negative then 2147483648 else 2147483647
+  for i in first..end:
+    let b = buf[i]
+    if b < 48 or b > 57:
+      return $Nothing
+    let d = U8.to_u32 (b - 48)
+    if acc > limit / 10 or (acc == limit / 10 and d > limit % 10):
+      return $Nothing
+    acc := self * 10 + d
+  if negative:
+    return $Some (U32.to_i32 (0 - acc))
+  return $Some (U32.to_i32 acc)
+
+func parse_u64 (buf: Bytes) -> (start: U32) -> (end: U32): Maybe U64 =>
+  if start >= end or end > buf.length:
+    return $Nothing
+  let acc: U64 = 0
+  let max_div10: U64 = 1844674407370955161
+  for i in start..end:
+    let b = buf[i]
+    if b < 48 or b > 57:
+      return $Nothing
+    let d = U8.to_u64 (b - 48)
+    if acc > max_div10 or (acc == max_div10 and d > 5):
+      return $Nothing
+    acc := self * 10 + d
+  return $Some acc
+
+func parse_i64 (buf: Bytes) -> (start: U32) -> (end: U32): Maybe I64 =>
+  if start >= end or end > buf.length:
+    return $Nothing
+  let negative = buf[start] == 45
+  let first = if negative then start + 1 else start
+  if first >= end:
+    return $Nothing
+  let acc: U64 = 0
+  let limit: U64 = if negative then 9223372036854775808 else 9223372036854775807
+  for i in first..end:
+    let b = buf[i]
+    if b < 48 or b > 57:
+      return $Nothing
+    let d = U8.to_u64 (b - 48)
+    if acc > limit / 10 or (acc == limit / 10 and d > limit % 10):
+      return $Nothing
+    acc := self * 10 + d
+  if negative:
+    let zero: U64 = 0
+    return $Some (U64.to_i64 (zero - acc))
+  return $Some (U64.to_i64 acc)
+
+private func pow10_f64 (exp: U32): F64 =>
+  let result: F64 = 1.0
+  let base: F64 = 10.0
+  let e = exp
+  for ever:
+    if e == 0:
+      return result
+    if (e & 1) != 0:
+      result := self * base
+    base := self * self
+    e := self >> 1
+
+func parse_f64 (buf: Bytes) -> (start: U32) -> (end: U32): Maybe F64 =>
+  if start >= end or end > buf.length:
+    return $Nothing
+  let i = start
+  let negative = false
+  if buf[i] == 45:
+    negative := true
+    i := self + 1
+  else:
+    if buf[i] == 43:
+      i := self + 1
+  if i >= end:
+    return $Nothing
+  let sig: U64 = 0
+  let sig_digits: U32 = 0
+  let saw_digit = false
+  let exp10: I32 = 0
+  for ever:
+    if i >= end:
+      break
+    let b = buf[i]
+    if b < 48 or b > 57:
+      break
+    saw_digit := true
+    let d = U8.to_u64 (b - 48)
+    if sig != 0 or d != 0:
+      if sig_digits < 19:
+        sig := self * 10 + d
+        sig_digits := self + 1
+      else:
+        exp10 := self + 1
+    i := self + 1
+  if i < end and buf[i] == 46:
+    i := self + 1
+    for ever:
+      if i >= end:
+        break
+      let b = buf[i]
+      if b < 48 or b > 57:
+        break
+      saw_digit := true
+      let d = U8.to_u64 (b - 48)
+      if sig != 0 or d != 0:
+        if sig_digits < 19:
+          sig := self * 10 + d
+          sig_digits := self + 1
+          exp10 := self - 1
+      else:
+        exp10 := self - 1
+      i := self + 1
+  if not saw_digit:
+    return $Nothing
+  if i < end and (buf[i] == 101 or buf[i] == 69):
+    i := self + 1
+    let exp_neg = false
+    if i < end and buf[i] == 45:
+      exp_neg := true
+      i := self + 1
+    else:
+      if i < end and buf[i] == 43:
+        i := self + 1
+    if i >= end:
+      return $Nothing
+    let exp_mag: I32 = 0
+    let exp_digits: U32 = 0
+    for ever:
+      if i >= end:
+        break
+      let b = buf[i]
+      if b < 48 or b > 57:
+        return $Nothing
+      exp_digits := self + 1
+      if exp_mag < 10000:
+        exp_mag := self * 10 + U8.to_i32 (b - 48)
+      i := self + 1
+    if exp_digits == 0:
+      return $Nothing
+    exp10 := if exp_neg then self - exp_mag else self + exp_mag
+  if i != end:
+    return $Nothing
+  if sig == 0:
+    let zero: F64 = 0.0
+    return $Some (if negative then F64.neg zero else zero)
+  let value = U64.to_f64 sig
+  if exp10 > 0:
+    let pos = I32.to_u32 exp10
+    if pos > 308:
+      return $Nothing
+    value := self * pow10_f64 pos
+  else:
+    if exp10 < 0:
+      let neg_exp = I32.to_u32 (0 - exp10)
+      if neg_exp > 308:
+        let step1 = pow10_f64 308
+        let rem = neg_exp - 308
+        value := (self / step1) / pow10_f64 (if rem > 308 then 308 else rem)
+      else:
+        value := self / pow10_f64 neg_exp
+  if not (F64.is_finite value):
+    return $Nothing
+  return $Some (if negative then F64.neg value else value)

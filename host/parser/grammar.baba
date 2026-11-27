@@ -3,8 +3,10 @@ grammar Blot
 // Precedence and name resolution belong to the semantic checker, not the parser.
 token IDENT = /[a-z_][a-z0-9_]*/ ;
 token TYPE_IDENT = /[A-Z][A-Za-z0-9_]*/ ;
-token INTEGER = /(0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*)/ ;
-token FLOAT = /[0-9](_?[0-9])*(\.[0-9](_?[0-9])*([eE][+-]?[0-9](_?[0-9])*)?|[eE][+-]?[0-9](_?[0-9])*)/ ;
+token INTEGER = /(0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*)(_?(u8|u32|i32|u64|i64))?/ ;
+token FLOAT = /[0-9](_?[0-9])*((\.[0-9](_?[0-9])*([eE][+-]?[0-9](_?[0-9])*)?|[eE][+-]?[0-9](_?[0-9])*)(_?(f32|f64))?|_?(f32|f64))/ ;
+token CHAR = /'([^'\\\r\n]|\\(['"\\nrt0]|x[0-9A-Fa-f]{2}))'/ ;
+token BYTE_STRING = /b"([^"\\\r\n]|\\(["\\nrt0]|x[0-9A-Fa-f]{2}))*"/ ;
 token STRING = /"([^"\\\r\n]|\\["\\nrt])*"/ ;
 token INTRINSIC priority 3 = /@[a-z_][a-z0-9_]*(\.([a-z_][a-z0-9_]*|[A-Z][A-Za-z0-9_]*))*/ ;
 token PROOF_TYPE priority 4 = /@proof\.(U32Eq|U32Lt|U32Le|U32AddFits|U32SubFits|Index)/ ;
@@ -106,7 +108,7 @@ named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | comptime_access | member_access | slice_access)*) ;
 comptime_access = ("·" "(" name:source_identifier ")") ;
 member_access = ("." name:(source_identifier | TYPE_IDENT)) ;
-atom = (boolean | FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | spark_expression | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+atom = (boolean | FLOAT | INTEGER | CHAR | BYTE_STRING | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | spark_expression | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
 spark_expression = ("spark" "#" "[" body:collection_expression "|" pattern:pattern "<-" source:expression (".." end:expression)? "]") ;
 static_run = ("#" "run" value:expression) ;
 static_do = ("#" value:do_block) ;
@@ -135,12 +137,12 @@ case_expression = ("case" values:expression ("," values:expression)* "of" body:c
 case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
 case_arm = (alternatives:pattern_row ("|" alternatives:pattern_row)* ("if" guard:expression)? "=>" (body:suite | body:expression) LAYOUT_NEWLINE) ;
 pattern_row = (patterns:pattern ("," patterns:pattern)*) ;
-pattern = (source_identifier | INTEGER | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_pattern) ;
+pattern = (source_identifier | INTEGER | CHAR | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_pattern) ;
 boolean_pattern = (value:("true" | "false")) ;
 value_pattern = ("^" name:qualified_name) ;
 constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:record_pattern | payload:constructor_payload)?) ;
 // Braces after a constructor always name its fields, never a record payload.
-constructor_payload = (source_identifier | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_pattern) ;
+constructor_payload = (source_identifier | INTEGER | CHAR | constructor_pattern | pattern_group | value_pattern | boolean_pattern) ;
 qualified_constructor = (((source_identifier | TYPE_IDENT) ".")+ TYPE_IDENT) ;
 pattern_group = ("(" (value:pattern ("," value:pattern)* ","?)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;

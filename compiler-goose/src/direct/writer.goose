@@ -50,6 +50,21 @@ fn setWasmFeatures(relaxed_simd: bool, tail_calls: bool) {
     opt_relaxed_simd = relaxed_simd;
     opt_tail_calls = tail_calls;
 }
+// Configurable guest linear-memory budgets (defaults: 128 MiB stack, 128 MiB heap, 2 MiB transport).
+let default_stack_bytes: u32 = 134217728;
+let default_heap_bytes: u32 = 134217728;
+let default_transport_bytes: u32 = 2097152;
+var opt_stack_bytes: u32 = 134217728;
+var opt_heap_bytes: u32 = 134217728;
+var opt_transport_bytes: u32 = 2097152;
+fn stackBudget() -> u32 { return opt_stack_bytes; }
+fn heapBudget() -> u32 { return opt_heap_bytes; }
+fn transportBudget() -> u32 { return opt_transport_bytes; }
+fn setMemoryBudgets(stack_bytes: u32, heap_bytes: u32, transport_bytes: u32) {
+    opt_stack_bytes = stack_bytes;
+    opt_heap_bytes = heap_bytes;
+    opt_transport_bytes = transport_bytes;
+}
 let OP_drop: Op = 0x1a;
 let OP_select: Op = 0x1b;
 let OP_local_get: Op = 0x20;

@@ -518,12 +518,21 @@ fn lget(g: Generator&, id: u32) {
     let at = shadowIndex(id);
     let shadow = g.s.v128_shadows[at];
     if shadow.materialized_at != g.s.shadow_epoch {
-        var opcode = SIMD_i32x4_extract_lane;
-        if shadow.is_float { opcode = SIMD_f32x4_extract_lane; }
-        for lane in 0..4 {
-            opIndexRaw(g, OP_local_get, shadow.vloc);
-            simdLaneOp(g, opcode, lane as u8);
-            lset(g, shadow.w0 + (lane as u32));
+        if shadow.is_wide {
+            let opcode = if shadow.is_float { SIMD_f64x2_extract_lane } else { SIMD_i64x2_extract_lane };
+            for lane in 0..2 {
+                opIndexRaw(g, OP_local_get, shadow.vloc);
+                simdLaneOp(g, opcode, lane as u8);
+                lset(g, shadow.w0 + (lane as u32));
+            }
+        } else {
+            var opcode = SIMD_i32x4_extract_lane;
+            if shadow.is_float { opcode = SIMD_f32x4_extract_lane; }
+            for lane in 0..4 {
+                opIndexRaw(g, OP_local_get, shadow.vloc);
+                simdLaneOp(g, opcode, lane as u8);
+                lset(g, shadow.w0 + (lane as u32));
+            }
         }
         g.s.v128_shadows[at].materialized_at = g.s.shadow_epoch;
     }
@@ -1039,7 +1048,12 @@ fn local(g: Generator&, f: const Fn&, ty: ValType) -> u32 {
 fn local32(g: Generator&, f: const Fn&) -> u32 { return local(g, f, VT_i32); }
 fn localType(g: const Generator&, f: const Fn&, id: u32) -> ValType {
     if isShadowWord(id) {
-        if g.s.v128_shadows[shadowIndex(id)].is_float { return VT_f32; }
+        let shadow = g.s.v128_shadows[shadowIndex(id)];
+        if shadow.is_wide {
+            if shadow.is_float { return VT_f64; }
+            return VT_i64;
+        }
+        if shadow.is_float { return VT_f32; }
         return VT_i32;
     }
     return g.s.locals[f.locals_base + id];

@@ -81,18 +81,33 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
     U32: "4_294_967_295",
     Bool: "true",
     F32: "(-0.0)",
+    U8: "255u8",
+    I32: "(-42i32)",
+    U64: "18_446_744_073_709_551_615u64",
+    I64: "(-9_223_372_036_854_775_808i64)",
+    F64: "(-0.0f64)",
   };
   const arguments_: Record<ScalarType, ScalarValue> = {
     Unit: null,
     U32: 0xFFFFFFFF,
     Bool: true,
     F32: -0,
+    U8: 255,
+    I32: -42,
+    U64: 0xFFFF_FFFF_FFFF_FFFFn,
+    I64: -0x8000_0000_0000_0000n,
+    F64: -0,
   };
   const results: Record<ScalarType, ScalarValue> = {
     Unit: null,
     U32: 0xFFFFFFFF,
     Bool: false,
     F32: 1.1,
+    U8: 42,
+    I32: -7,
+    U64: 42n,
+    I64: -7n,
+    F64: 1.1,
   };
   const definitions = types.flatMap((parameter) =>
     types.map((result) =>

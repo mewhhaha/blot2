@@ -29,7 +29,7 @@ type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
 enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project,doc_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--check-only] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc doc-project ENTRY [--include-private] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --check-only (check, check-project) stops after semantic checking and skips ownership/uniqueness lowering.\n       --include-private (check-exports, doc-project) includes private declarations in the output.\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed SIMD (FMA, min/max, trunc).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--check-only] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc doc-project ENTRY [--include-private] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --check-only (check, check-project) stops after semantic checking and skips ownership/uniqueness lowering.\n       --include-private (check-exports, doc-project) includes private declarations in the output.\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed SIMD (FMA, min/max, trunc).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --stack-mb 1..1024 (build, build-project, serve-project) sets stack memory budget in MiB (default: 128).\n       --heap-mb 1..1024 (build, build-project, serve-project) sets heap memory budget in MiB (default: 128).\n       --transport-mb 1..1024 (build, build-project, serve-project) sets host transport budget in MiB (default: 2).\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -46,6 +46,7 @@ fn unsigned(text:const u8[:],maximum:u64)->u64,Error {
  var result:u64=0;for byte in text[start..] {if byte=='_' {continue;}if byte<'0'||byte>'9' {return 0,blot_error::Error.invalid_character;}let value=(byte-'0') as u64;if negative&&value!=0 {return 0,blot_error::Error.overflow;}if result>maximum/10||(result==maximum/10&&value>maximum%10) {return 0,blot_error::Error.overflow;}result=result*10+value;}return result,blot_error::Error.none;
 }
 fn workerCount(value:const u8[:])->u8,bool {let workers,error=unsigned(value,255);if error!=blot_error::Error.none||workers==0||workers>16 {return 0,false;}return workers as u8,true;}
+fn budgetMb(value:const u8[:])->u32,bool {let mb,error=unsigned(value,1024);if error!=blot_error::Error.none||mb==0||mb>1024 {return 0,false;}return mb as u32,true;}
 fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=blot_error::Error.none {return error;}return blot_main::configureInferenceBudget(limit);}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len&&text[..prefix.len]==prefix;}
 fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",doc_project=>"doc-project",lex=>"lex",parse=>"parse",check_exports=>"check-exports",check=>"check",build=>"build",dependencies=>"dependencies"}}
@@ -173,7 +174,7 @@ fn run(args:const Argument[:])->bool,Error {
   return accepted,blot_error::Error.none;
  }
  if args[1]=="serve-project" {
-  var policy=Policy{..};var relaxed_simd=false;var tail_calls=false;var test_mode=false;var at:i64=2;
+  var policy=Policy{..};var relaxed_simd=false;var tail_calls=false;var test_mode=false;var stack_mb:u32=128;var heap_mb:u32=128;var transport_mb:u32=2;var at:i64=2;
   while at<args.len {
    if args[at]=="--test" {test_mode=true;at+=1;continue;}
    if args[at]=="--relaxed-simd" {relaxed_simd=true;at+=1;continue;}
@@ -182,12 +183,17 @@ fn run(args:const Argument[:])->bool,Error {
    if at+1>=args.len {return false,blot_error::Error.invalid_serve_arguments;}let value=args[at+1];
    if args[at]=="--semantic-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.semantic_workers=workers;}
    else if args[at]=="--frontend-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.frontend_workers=workers;}
+   else if args[at]=="--stack-mb" {let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}stack_mb=mb;}
+   else if args[at]=="--heap-mb" {let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}heap_mb=mb;}
+   else if args[at]=="--transport-mb" {let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}transport_mb=mb;}
    else if args[at]=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {return false,error;}}
    else {return false,blot_error::Error.invalid_serve_arguments;}
    at+=2;
   }
+  if stack_mb+heap_mb+transport_mb>3584 {return false,blot_error::Error.invalid_serve_arguments;}
   blot_main::configureWasmFeatures(relaxed_simd,tail_calls);
   blot_main::configureTestMode(test_mode);
+  blot_main::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
   let error=blot_reuse_zig_project_server::run(blot_io::Reader{0},stdout,blot_main::configured_identity,policy);return error==blot_error::Error.none,error;
  }
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
@@ -197,7 +203,7 @@ fn run(args:const Argument[:])->bool,Error {
  if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
  if project_command||first_option<args.len {
   if command==Command.lex {return false,blot_error::Error.none;}
-  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var check_only=false;var include_private=false;var policy=Policy{..};var at=first_option;
+  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var check_only=false;var include_private=false;var stack_mb:u32=128;var heap_mb:u32=128;var transport_mb:u32=2;var custom_budgets=false;var policy=Policy{..};var at=first_option;
   while at<args.len {
    let arg=args[at];
    // Boolean flags taking no value.
@@ -211,6 +217,9 @@ fn run(args:const Argument[:])->bool,Error {
    if at+1>=args.len {return false,blot_error::Error.none;}let value=args[at+1];at+=2;
    if arg=="--semantic-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.semantic_workers=workers;semantic_workers=true;}
    else if arg=="--frontend-workers" {if !isBuild(command)&&command!=Command.check_project&&command!=Command.parse_project&&command!=Command.doc_project {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.frontend_workers=workers;}
+   else if arg=="--stack-mb" {if !isBuild(command) {return false,blot_error::Error.none;}let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.none;}stack_mb=mb;custom_budgets=true;}
+   else if arg=="--heap-mb" {if !isBuild(command) {return false,blot_error::Error.none;}let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.none;}heap_mb=mb;custom_budgets=true;}
+   else if arg=="--transport-mb" {if !isBuild(command) {return false,blot_error::Error.none;}let mb,valid=budgetMb(value);if !valid {return false,blot_error::Error.none;}transport_mb=mb;custom_budgets=true;}
    else if arg=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {return false,error;}}
    else if arg=="--std-root" {options.std_root=blot_support::some<const u8[:]>(value);}
    else if arg=="--alias" {var split:i64=-1;for byte,index in value {if byte=='=' {split=index;break;}}if split<0 {return false,blot_error::Error.none;}aliases.push(blot_reuse_project::Alias{value[..split],value[split+1..]});}
@@ -219,10 +228,12 @@ fn run(args:const Argument[:])->bool,Error {
    else if arg=="--dependencies" {if !isBuild(command)||dependency_path.present {return false,blot_error::Error.none;}dependency_path=blot_support::some<const u8[:]>(value);}
    else {return false,blot_error::Error.none;}
   }
+  if stack_mb+heap_mb+transport_mb>3584 {return false,blot_error::Error.none;}
   blot_main::configureWasmFeatures(relaxed_simd,tail_calls);
   blot_main::configureTestMode(test_mode);
+  blot_main::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
   options.aliases=aliases[..];
-  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
+  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls||custom_budgets {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
   var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}else if command==Command.doc_project {selected=Command.doc_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}

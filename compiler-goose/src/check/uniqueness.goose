@@ -3834,7 +3834,7 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
         let container = receiver(self_, m, children[0], 0, false, 0);
         return Value { exits: container.exits, .. };
     }
-    if operation == blot_backend_collection_ops::Op.get || operation == blot_backend_collection_ops::Op.simd_load {
+    if operation == blot_backend_collection_ops::Op.get || operation == blot_backend_collection_ops::Op.simd_load || operation == blot_backend_collection_ops::Op.simd_load_u8x16 || operation == blot_backend_collection_ops::Op.simd_load_f64x2 {
         var element = n.ty;
         if operation != blot_backend_collection_ops::Op.get { element = 0; }
         let container = receiver(self_, m, children[0], element, brief, lends_to);
@@ -3844,7 +3844,7 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
         return Value { exits: exits, .. };
     }
     if operation == blot_backend_collection_ops::Op.identity { return visit(self_, m, children[0]); }
-    if operation == blot_backend_collection_ops::Op.simd_store {
+    if operation == blot_backend_collection_ops::Op.simd_store || operation == blot_backend_collection_ops::Op.simd_store_u8x16 || operation == blot_backend_collection_ops::Op.simd_store_f64x2 {
         // Writes four elements in place and returns the same storage; requires
         // unique ownership of the target container.
         let container = visit(self_, m, children[0]);

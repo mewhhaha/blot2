@@ -2269,7 +2269,7 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
                 return value, true, error;
             },
-            simd_load, simd_store => {
+            simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
                 let container = g.s.vals[forwarded.start];
                 let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
                 if error != blot_direct_types::Error.none { return neverVal(), true, error; }
@@ -2277,14 +2277,31 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 if error != blot_direct_types::Error.none { return neverVal(), true, error; }
                 let step, error = stride(g, f, element, id);
                 if error != blot_direct_types::Error.none { return neverVal(), true, error; }
-                let address, error = simdAddress(g, f, container, index, step, id);
+                let is_u8x16 = operation == blot_backend_collection_ops::Op.simd_load_u8x16 || operation == blot_backend_collection_ops::Op.simd_store_u8x16;
+                let is_f64x2 = operation == blot_backend_collection_ops::Op.simd_load_f64x2 || operation == blot_backend_collection_ops::Op.simd_store_f64x2;
+                var lane_count: u32 = 4;
+                if is_u8x16 { lane_count = 16; } else if is_f64x2 { lane_count = 2; }
+                let address, error = simdAddress(g, f, container, index, step, id, 0, lane_count);
                 if error != blot_direct_types::Error.none { return neverVal(), true, error; }
                 if operation == blot_backend_collection_ops::Op.simd_load {
                     let value, error = simdLoadAt(g, f, address, element, step, id);
                     return value, true, error;
                 }
+                if operation == blot_backend_collection_ops::Op.simd_load_u8x16 {
+                    let value, error = simdLoadWideAt(g, f, address, false, id);
+                    return value, true, error;
+                }
+                if operation == blot_backend_collection_ops::Op.simd_load_f64x2 {
+                    let value, error = simdLoadWideAt(g, f, address, true, id);
+                    return value, true, error;
+                }
                 // Every argument has already run. The wrapper has no RHS
                 // evaluation between the first bounds check and the write.
+                if is_u8x16 || is_f64x2 {
+                    let value, error = simdStoreWideAt(g, f, container, index, address, is_f64x2,
+                        g.s.vals[forwarded.start + 2], true, id);
+                    return value, true, error;
+                }
                 let value, error = simdStoreAt(g, f, container, index, address, element, step,
                     g.s.vals[forwarded.start + 2], true, id);
                 return value, true, error;

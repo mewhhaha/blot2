@@ -11,18 +11,77 @@ fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
 
 // ----- host boundary -----------------------------------------------------
 
+fn packetElemStep(tag: blot_direct_types::Tag) -> u32 {
+    match tag {
+        u8_ => { return 1; },
+        u64_, i64_, f64_ => { return 8; },
+        _ => { return 4; },
+    }
+}
+// Reads and validates a host packet's element count against `transport_top` for
+// `elem_step` bytes per element (1, 4, or 8). Uses `rt.packet_length` for 4B.
+fn emitPacketLength(g: Generator&, f: Fn&, packet: u32, elem_step: u32) -> u32 {
+    let rt = g.runtime_();
+    let length = local32(g, f);
+    if elem_step == 4 {
+        lget(g, packet);
+        callf(g, rt.packet_length);
+        lset(g, length);
+        return length;
+    }
+    gget(g, rt.transport_cap);
+    op(g, OP_i32_eqz);
+    trap(g, f);
+    let end = local32(g, f);
+    gget(g, rt.transport_top);
+    lset(g, end);
+    lget(g, end);
+    i32Const(g, 4);
+    op(g, OP_i32_lt_u);
+    lget(g, packet);
+    gget(g, rt.transport_base);
+    op(g, OP_i32_lt_u);
+    op(g, OP_i32_or);
+    lget(g, packet);
+    i32Const(g, 3);
+    op(g, OP_i32_and);
+    op(g, OP_i32_or);
+    lget(g, packet);
+    lget(g, end);
+    i32Const(g, 4);
+    op(g, OP_i32_sub);
+    op(g, OP_i32_gt_u);
+    op(g, OP_i32_or);
+    trap(g, f);
+    lget(g, packet);
+    op(g, OP_i32_load);
+    uleb(g, 2);
+    uleb(g, 0);
+    ltee(g, length);
+    lget(g, end);
+    lget(g, packet);
+    op(g, OP_i32_sub);
+    i32Const(g, 4);
+    op(g, OP_i32_sub);
+    if elem_step == 8 {
+        i32Const(g, 3);
+        op(g, OP_i32_shr_u);
+    }
+    op(g, OP_i32_gt_u);
+    trap(g, f);
+    return length;
+}
 // A fresh fixed array from the host packet at `packet` (a local). When
 // `zero_copy` is true (pure non-callback entry parameter), open the transport
 // slice in place; `toPacket` copies with overlap-safe `memory.copy` and skips
 // zeroing so returning or aliasing the input remains sound.
 fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = false) -> Val, Error {
     let rt = g.runtime_();
-    let length = local32(g, f);
-    lget(g, packet);
-    callf(g, rt.packet_length);
-    lset(g, length);
     let elem_ty = g.types.node(ty).a;
-    let is_bool_arr = tagOf(g, elem_ty) == blot_direct_types::Tag.boolean;
+    let elem_tag = tagOf(g, elem_ty);
+    let is_bool_arr = elem_tag == blot_direct_types::Tag.boolean;
+    let elem_step = packetElemStep(elem_tag);
+    let length = emitPacketLength(g, f, packet, elem_step);
     let array_ty, error = g.types.intern(blot_direct_types::Tag.array, [elem_ty]);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if is_bool_arr {
@@ -61,7 +120,7 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
         i32Const(g, 4);
         op(g, OP_i32_add);
         lset(g, base);
-        let bytes = emitScaledBytes(g, f, length, 4);
+        let bytes = emitScaledBytes(g, f, length, elem_step);
         lget(g, bytes);
         gget(g, rt.transport_top);
         lget(g, base);
@@ -84,8 +143,10 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
     i32Const(g, 4);
     op(g, OP_i32_add);
     lget(g, length);
-    i32Const(g, 4);
-    op(g, OP_i32_mul);
+    if elem_step != 1 {
+        i32Const(g, elem_step);
+        op(g, OP_i32_mul);
+    }
     op(g, OP_prefix_fc);
     uleb(g, 10);
     op(g, 0);
@@ -136,19 +197,28 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     let rt = g.runtime_();
     let elem_ty, eerr = elementOf(g, f, value.ty, id);
     if eerr != blot_direct_types::Error.none { return 0, eerr; }
-    let is_bool_arr = tagOf(g, elem_ty) == blot_direct_types::Tag.boolean;
+    let elem_tag = tagOf(g, elem_ty);
+    let is_bool_arr = elem_tag == blot_direct_types::Tag.boolean;
+    let elem_step = packetElemStep(elem_tag);
     let length, error = lengthOf(g, f, value, id);
     if error != blot_direct_types::Error.none { return 0, error; }
-    let max_words = (rt.layout.transport_end - rt.layout.transport_base - 4) / 4;
+    let max_elems = (rt.layout.transport_end - rt.layout.transport_base - 4) / elem_step;
     lget(g, length);
-    i32Const(g, max_words);
+    i32Const(g, max_elems);
     op(g, OP_i32_gt_u);
     trap(g, f);
-    let bytes = emitScaledBytes(g, f, length, 4);
+    let bytes = emitScaledBytes(g, f, length, elem_step);
     let total = local32(g, f);
     lget(g, bytes);
-    i32Const(g, 4);
-    op(g, OP_i32_add);
+    if elem_step < 4 {
+        i32Const(g, 7);
+        op(g, OP_i32_add);
+        i32Const(g, 0xfffffffc);
+        op(g, OP_i32_and);
+    } else {
+        i32Const(g, 4);
+        op(g, OP_i32_add);
+    }
     lset(g, total);
     let packet = local32(g, f);
     lget(g, total);
@@ -766,8 +836,8 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
 
 // ----- ABI ---------------------------------------------------------------
 
-// ABI 8 value kinds (runtime_ir.Scalar), and callback import names.
-enum Abi { unit, u32_, bool_, f32_, array_u32, array_f32 }
+// ABI 8 value kinds (runtime_ir.Scalar + extended tags 14..23), and callback import names.
+enum Abi { unit, u32_, bool_, f32_, array_u32, array_f32, u8_, i32_, u64_, i64_, f64_, array_u8, array_i32, array_u64, array_i64, array_f64 }
 fn abiCode(kind: Abi) -> u8 {
     match kind {
         unit => { return 0; },
@@ -776,6 +846,16 @@ fn abiCode(kind: Abi) -> u8 {
         f32_ => { return 3; },
         array_u32 => { return 5; },
         array_f32 => { return 6; },
+        u8_ => { return 14; },
+        i32_ => { return 15; },
+        u64_ => { return 16; },
+        i64_ => { return 17; },
+        f64_ => { return 18; },
+        array_u8 => { return 19; },
+        array_i32 => { return 20; },
+        array_u64 => { return 21; },
+        array_i64 => { return 22; },
+        array_f64 => { return 23; },
     }
 }
 fn abiName(kind: Abi) -> Chars {
@@ -786,6 +866,16 @@ fn abiName(kind: Abi) -> Chars {
         f32_ => { return "f32"; },
         array_u32 => { return "array_u32"; },
         array_f32 => { return "array_f32"; },
+        u8_ => { return "u8"; },
+        i32_ => { return "i32"; },
+        u64_ => { return "u64"; },
+        i64_ => { return "i64"; },
+        f64_ => { return "f64"; },
+        array_u8 => { return "array_u8"; },
+        array_i32 => { return "array_i32"; },
+        array_u64 => { return "array_u64"; },
+        array_i64 => { return "array_i64"; },
+        array_f64 => { return "array_f64"; },
     }
 }
 fn abiKind(g: const Generator&, ty: Ty) -> Abi, bool {
@@ -795,20 +885,41 @@ fn abiKind(g: const Generator&, ty: Ty) -> Abi, bool {
         u32_ => { return Abi.u32_, true; },
         boolean => { return Abi.bool_, true; },
         f32_ => { return Abi.f32_, true; },
+        u8_ => { return Abi.u8_, true; },
+        i32_ => { return Abi.i32_, true; },
+        u64_ => { return Abi.u64_, true; },
+        i64_ => { return Abi.i64_, true; },
+        f64_ => { return Abi.f64_, true; },
         array => {
             let element = g.types.node(n.a).tag;
-            if element == blot_direct_types::Tag.u32_ { return Abi.array_u32, true; }
-            if element == blot_direct_types::Tag.f32_ { return Abi.array_f32, true; }
-            return Abi.unit, false;
+            match element {
+                u32_ => { return Abi.array_u32, true; },
+                f32_ => { return Abi.array_f32, true; },
+                u8_ => { return Abi.array_u8, true; },
+                i32_ => { return Abi.array_i32, true; },
+                u64_ => { return Abi.array_u64, true; },
+                i64_ => { return Abi.array_i64, true; },
+                f64_ => { return Abi.array_f64, true; },
+                _ => { return Abi.unit, false; },
+            }
         },
         _ => { return Abi.unit, false; },
     }
 }
 fn abiMachine(kind: Abi) -> ValType {
-    if kind == Abi.f32_ { return VT_f32; }
-    return VT_i32;
+    match kind {
+        f32_ => { return VT_f32; },
+        u64_, i64_ => { return VT_i64; },
+        f64_ => { return VT_f64; },
+        _ => { return VT_i32; },
+    }
 }
-fn isArray(kind: Abi) -> bool { return kind == Abi.array_u32 || kind == Abi.array_f32; }
+fn isArray(kind: Abi) -> bool {
+    match kind {
+        array_u32, array_f32, array_u8, array_i32, array_u64, array_i64, array_f64 => { return true; },
+        _ => { return false; },
+    }
+}
 // A Foreign host callback parameter: its argument and result kinds.
 fn callbackAbi(g: const Generator&, ty: Ty) -> Abi, Abi, bool {
     let n = g.types.node(ty);
@@ -1021,6 +1132,12 @@ fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body
         if error != blot_direct_types::Error.none { return error; }
         argument = made;
     } else if parameter != blot_direct_types::unit {
+        if parameter == blot_direct_types::u8_ {
+            lget(g, 0);
+            i32Const(g, 255);
+            op(g, OP_i32_and);
+            lset(g, 0);
+        }
         argument = valOf1(g, parameter, 0);
     }
     var result = neverVal();

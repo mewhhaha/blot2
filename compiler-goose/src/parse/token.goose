@@ -79,6 +79,8 @@ let kw_with: Tag = 73;
 let kw_fork: Tag = 74;
 let semicolon: Tag = 75;
 let kw_spark: Tag = 76;
+let char_literal: Tag = 77;
+let byte_string: Tag = 78;
 
 struct Token { tag: Tag, start: u32, end: u32 }
 fn text(value: Token, source: const u8[:]) -> const u8[:] { return source[value.start..value.end]; }

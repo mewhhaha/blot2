@@ -1,0 +1,47 @@
+import * as map from "std/map"
+import * as test from "std/test"
+import * as text from "std/text"
+
+private func map_checks (): Unit ! { test.Test } =>
+  // Generic Map Text -> U32 with growth, overwrite, and tombstones
+  let m: map.Map [Text, U32] = map.empty ()
+  m := map.insert map.hash_text text.equal "alpha" 10 self
+  m := map.insert map.hash_text text.equal "beta" 20 self
+  m := map.insert map.hash_text text.equal "gamma" 30 self
+  m := map.insert map.hash_text text.equal "beta" 25 self
+  use test.eq "generic len" 3 (map.length m)
+  use test.eq "get alpha" ($Some 10) (map.get map.hash_text text.equal "alpha" m)
+  use test.eq "get overwritten beta" ($Some 25) (map.get map.hash_text text.equal "beta" m)
+  use test.eq "get missing" $Nothing (map.get map.hash_text text.equal "delta" m)
+  m := map.remove map.hash_text text.equal "beta" self
+  use test.eq "len after remove" 2 (map.length m)
+  use test.holds_not "beta removed" (map.contains map.hash_text text.equal "beta" m)
+  m := map.insert map.hash_text text.equal "beta" 99 self
+  use test.eq "reinsert after tombstone" ($Some 99) (map.get map.hash_text text.equal "beta" m)
+
+  // Flat U32Map stress test across multiple resizes
+  let u32m = map.u32_with_capacity 4
+  for i in 0..200:
+    u32m := map.u32_insert (i * 7 + 3) (i * i) self
+  use test.eq "u32map len 200" 200 (map.u32_length u32m)
+  use test.eq "u32map lookup 0" ($Some 0) (map.u32_get 3 u32m)
+  use test.eq "u32map lookup 199" ($Some (199 * 199)) (map.u32_get (199 * 7 + 3) u32m)
+  for i in 0..100:
+    u32m := map.u32_remove (i * 7 + 3) self
+  use test.eq "u32map len 100" 100 (map.u32_length u32m)
+  use test.eq "u32map removed 50" $Nothing (map.u32_get (50 * 7 + 3) u32m)
+  use test.eq "u32map kept 150" ($Some (150 * 150)) (map.u32_get (150 * 7 + 3) u32m)
+
+  // Flat U64Map test
+  let u64m = map.u64_with_capacity 8
+  let k1: U64 = 0x123456789abcdef0
+  let v1: U64 = 0xfedcba9876543210
+  u64m := map.u64_insert k1 v1 self
+  case map.u64_get k1 u64m of
+    $Some got =>
+      use test.holds "u64map get" (got == v1)
+    $Nothing =>
+      use test.holds "u64map get" false
+  return ()
+
+io test_map (): test.Report => test.run map_checks

@@ -54,6 +54,8 @@ export default grammar({
         $.reflected_member,
         $.method_call,
         $.member,
+        $.byte_string_literal,
+        $.char_literal,
         $.text_literal,
         $.intrinsic,
         $.float,
@@ -443,6 +445,20 @@ export default grammar({
         field("name", choice($.identifier, $.type_identifier, $.integer)),
       ),
 
+    byte_string_literal: ($) =>
+      seq(
+        'b"',
+        repeat(choice(
+          $.text_fragment,
+          $.byte_escape_sequence,
+        )),
+        '"',
+      ),
+    byte_escape_sequence: (_) =>
+      token.immediate(/\\([ntr0"\\]|x[0-9A-Fa-f]{2})/),
+    char_literal: (_) =>
+      token(/'([^'\\\r\n]|\\(['"\\nrt0]|x[0-9A-Fa-f]{2}))'/),
+
     text_literal: ($) =>
       seq(
         '"',
@@ -459,9 +475,12 @@ export default grammar({
 
     float: (_) =>
       token(
-        /[0-9](_?[0-9])*(\.[0-9](_?[0-9])*([eE][+-]?[0-9](_?[0-9])*)?|[eE][+-]?[0-9](_?[0-9])*)/,
+        /[0-9](_?[0-9])*((\.[0-9](_?[0-9])*([eE][+-]?[0-9](_?[0-9])*)?|[eE][+-]?[0-9](_?[0-9])*)(_?(f32|f64))?|_?(f32|f64))/,
       ),
-    integer: (_) => token(/0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*/),
+    integer: (_) =>
+      token(
+        /(0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*)(_?(u8|u32|i32|u64|i64))?/,
+      ),
     boolean: (_) => choice("true", "false"),
     self: (_) => "self",
     intrinsic: (_) =>

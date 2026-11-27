@@ -81,22 +81,33 @@ written in this first annotation syntax.
 
 Every export is an entry declaration and takes exactly one argument and returns
 one value; an entry whose final type does not fit is a compile error
-(`entry_type`, or `entry_let_type` for a runtime-initialized value). Arguments
-are scalars, `Array U32`, `Array F32`, or a single scalar/numeric-array callback
-with exactly the closed `Foreign` row. Results are scalars or numeric arrays;
-exported constants remain scalars. Callback arguments/results use the same
-scalar and numeric-array types. Pure callbacks, unknown/open rows, callback
+(`entry_type`, or `entry_let_type` for a runtime-initialized value). Arguments are scalars (`Unit`, `U8`, `U32`, `I32`, `U64`, `I64`, `Bool`, `F32`,
+`F64`), numeric arrays (`Array U8`, `Array U32`, `Array I32`, `Array U64`,
+`Array I64`, `Array F32`, `Array F64`), or a single scalar/numeric-array
+callback with exactly the closed `Foreign` row. Results are scalars or numeric
+arrays; exported constants remain scalars. Callback arguments/results use the
+same scalar and numeric-array types. Pure callbacks, unknown/open rows, callback
 results, algebraic values and bundles are not host ABI values.
 
-| Blot type     | Adapter value                        | Wasm boundary representation  |
-| ------------- | ------------------------------------ | ----------------------------- |
-| Unit          | `null`                               | `i32`, canonical zero         |
-| U32           | integer from 0 through 2³²−1         | `i32`, same 32 bits           |
-| Bool          | `boolean`                            | `i32`, canonical 0 or 1       |
-| F32           | `number`, rounded with `Math.fround` | `f32`; NaN/infinities allowed |
-| Array U32     | copied `Uint32Array`                 | `i32` array pointer           |
-| Array F32     | copied `Float32Array`                | `i32` array pointer           |
-| Host callback | opaque capability token              | `externref`                   |
+| Blot type     | Adapter value                             | Wasm boundary representation  |
+| ------------- | ----------------------------------------- | ----------------------------- |
+| Unit          | `null`                                    | `i32`, canonical zero         |
+| U8            | integer from 0 through 255                | `i32`, low 8 bits             |
+| U32           | integer from 0 through 2³²−1              | `i32`, same 32 bits           |
+| I32           | integer from −2³¹ through 2³¹−1           | `i32`, two's complement       |
+| U64           | `bigint` from `0n` through `2n**64n - 1n` | `i64`, same 64 bits           |
+| I64           | `bigint` from `-(2n**63n)` to `2n**63n-1` | `i64`, two's complement       |
+| Bool          | `boolean`                                 | `i32`, canonical 0 or 1       |
+| F32           | `number`, rounded with `Math.fround`      | `f32`; NaN/infinities allowed |
+| F64           | `number` (IEEE-754 binary64)              | `f64`; NaN/infinities allowed |
+| Array U8      | copied `Uint8Array`                       | `i32` array pointer           |
+| Array U32     | copied `Uint32Array`                      | `i32` array pointer           |
+| Array I32     | copied `Int32Array`                       | `i32` array pointer           |
+| Array U64     | copied `BigUint64Array`                   | `i32` array pointer           |
+| Array I64     | copied `BigInt64Array`                    | `i32` array pointer           |
+| Array F32     | copied `Float32Array`                     | `i32` array pointer           |
+| Array F64     | copied `Float64Array`                     | `i32` array pointer           |
+| Host callback | opaque capability token                   | `externref`                   |
 
 **Scalar `F32` JS host-boundary NaN contract:** Array packets copy raw 32-bit
 IEEE-754 bits verbatim across Rust and JS/V8. Per the WebAssembly JS API
@@ -113,11 +124,12 @@ a scalar constant. The adapter does not expose the instance, arena or raw
 callable refs.
 
 Capability modules import only signature-specific adapters from `blot:host/1`:
-`call_<parameter>_<result>`, with lowercase `unit`, `u32`, `bool`, `f32`,
-`array_u32`, or `array_f32`. Each import takes `(externref, value)` and returns
-a value; array values are i32 pointers into the guest arena. For example,
-`call_u32_f32` has Wasm signature `(externref, i32) -> f32`. Signatures are
-deduplicated in first-export occurrence order. Scalar-only modules remain
+`call_<parameter>_<result>`, with lowercase `unit`, `u8`, `u32`, `i32`, `u64`,
+`i64`, `bool`, `f32`, `f64`, `array_u8`, `array_u32`, `array_i32`, `array_u64`,
+`array_i64`, `array_f32`, or `array_f64`. Each import takes `(externref, value)`
+and returns a value; array values are i32 pointers into the guest arena. For
+example, `call_u32_f32` has Wasm signature `(externref, i32) -> f32`. Signatures
+are deduplicated in first-export occurrence order. Scalar-only modules remain
 import-free.
 
 The wrapper creates an ordinary internal closure pointing to a signature stub.
@@ -187,12 +199,22 @@ payload is, in order:
 
 Names are a canonical unsigned LEB128 byte length followed by UTF-8 bytes,
 without normalization or BOM stripping. Scalar type tags are one byte:
-`0 = Unit`, `1 = U32`, `2 = Bool`, `3 = F32`. A callback parameter is tag `4`
-followed by its value parameter tag and value result tag. Numeric array value
-tags are `5 = Array U32` and `6 = Array F32`. Counts preserve export declaration
-order within functions and constants. Duplicate names, unknown tags/versions,
-invalid UTF-8, truncated or trailing bytes, and imports or exports inconsistent
-with the manifest are errors.
+`0 = Unit`, `1 = U32`, `2 = Bool`, `3 = F32`, and ABI 8 extended scalar tags
+`14 = U8`, `15 = I32`, `16 = U64`, `17 = I64`, `18 = F64`. A callback parameter
+is tag `4` followed by its value parameter tag and value result tag. Numeric
+array value tags are `5 = Array U32`, `6 = Array F32`, and ABI 8 extended array
+tags `19 = Array U8`, `20 = Array I32`, `21 = Array U64`, `22 = Array I64`,
+`23 = Array F64`. (Tags `7..13` remain reserved for earlier ABI profiles.)
+Counts preserve export declaration order within functions and constants.
+Duplicate names, unknown tags/versions, invalid UTF-8, truncated or trailing
+bytes, and imports or exports inconsistent with the manifest are errors.
+
+Memory budgets default to `128` MiB stack, `128` MiB heap, and `2` MiB host
+transport; builds can override them with `--stack-mb`, `--heap-mb`, and
+`--transport-mb` (`1..1024` MiB each, sum `<= 3584` MiB). Array packets use a
+little-endian U32 element count followed by contiguous 1-byte (`U8`), 4-byte
+(`U32`/`I32`/`F32`), or 8-byte (`U64`/`I64`/`F64`) little-endian elements, with
+the total allocation padded up to a 4-byte multiple.
 
 Test vectors (payload only): an empty module is `02 00 00`; a single export
 `main: (U32 -> U32 ! {Foreign}) -> U32` is

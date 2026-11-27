@@ -1,0 +1,366 @@
+//! Open-addressed linear-probing hash maps backed by uniquely owned flat arrays.
+//!
+//! Pure ownership (`own`) enables in-place slot updates and zero-copy growth
+//! without mutable references.
+
+// Standard non-cryptographic hash functions.
+func hash_u32 (value: U32): U32 =>
+  let x = value ^ (value >> 16)
+  x := self * 0x85ebca6b
+  x := self ^ (self >> 13)
+  x := self * 0xc2b2ae35
+  return x ^ (x >> 16)
+
+func hash_u64 (value: U64): U32 =>
+  let x = value ^ (value >> 30)
+  x := self * 0xbf58476d1ce4e5b9
+  x := self ^ (self >> 27)
+  x := self * 0x94d049bb133111eb
+  x := self ^ (self >> 31)
+  return U64.to_u32 (x ^ (x >> 32))
+
+func hash_bytes_range (buf: #[U8]) -> (start: U32) -> (end: U32): U32 =>
+  let h: U32 = 2166136261
+  for i in start..end:
+    h := (self ^ U8.to_u32 buf[i]) * 16777619
+  return h
+
+func hash_bytes (buf: #[U8]): U32 => hash_bytes_range buf 0 buf.length
+
+func hash_text (value: Text): U32 =>
+  let h: U32 = 2166136261
+  for cp in value:
+    h := (self ^ cp) * 16777619
+  return h
+
+private func next_pow2 (min_cap: U32): U32 =>
+  let cap: U32 = 8
+  for ever:
+    if cap >= min_cap or cap >= 0x40000000:
+      return cap
+    cap := self * 2
+
+// Generic open-addressed hash map storing cached hashes in each occupied slot.
+type Bucket [k, v] is data =
+  | $Empty
+  | $Tombstone
+  | $Occupied { key: k, value: v, hash: U32 }
+
+type Map [k, v] is data = $Map {
+  buckets: #[Bucket [k, v]],
+  count: U32,
+  used: U32,
+  mask: U32,
+}
+
+func with_capacity (min_entries: U32): Map [k, v] =>
+  let target = if min_entries == 0 then 8 else (min_entries * 10) / 7 + 1
+  let cap = next_pow2 target
+  return $Map {
+    buckets: @array.fill cap $Empty,
+    count: 0,
+    used: 0,
+    mask: cap - 1,
+  }
+
+func empty (): Map [k, v] => with_capacity 0
+
+func length (map: Map [k, v]): U32 =>
+  let $Map { count } = map
+  return count
+
+func get (hash_fn: k -> U32) -> (eq_fn: k -> k -> Bool) -> (key: k) -> (map: Map [k, v]): Maybe v =>
+  let $Map { buckets, mask } = map
+  let h = hash_fn key
+  let idx = h & mask
+  for ever:
+    case buckets[idx] of
+      $Empty =>
+        return $Nothing
+      $Tombstone =>
+        idx := (self + 1) & mask
+      $Occupied { key: ek, value: ev, hash: eh } =>
+        if eh == h and eq_fn ek key:
+          return $Some ev
+        idx := (self + 1) & mask
+
+func contains (hash_fn: k -> U32) -> (eq_fn: k -> k -> Bool) -> (key: k) -> (map: Map [k, v]): Bool =>
+  case get hash_fn eq_fn key map of
+    $Some _ => true
+    $Nothing => false
+
+private func rehash_buckets (old_buckets: #[Bucket [k, v]]) -> (new_cap: U32): Map [k, v] =>
+  let new_mask = new_cap - 1
+  let dst: #[Bucket [k, v]] = @array.fill new_cap $Empty
+  let count: U32 = 0
+  for i in 0..old_buckets.length:
+    case old_buckets[i] of
+      $Occupied { key: ek, value: ev, hash: eh } =>
+        let idx = eh & new_mask
+        for ever:
+          case dst[idx] of
+            $Empty =>
+              dst[idx] := $Occupied { key: ek, value: ev, hash: eh }
+              count := self + 1
+              break
+            _ =>
+              idx := (self + 1) & new_mask
+      _ =>
+        ()
+  return $Map { buckets: dst, count, used: count, mask: new_mask }
+
+func insert (hash_fn: k -> U32) -> (eq_fn: k -> k -> Bool) -> (key: k) -> (value: v) -> (map: own Map [k, v]): Map [k, v] =>
+  let $Map { buckets, count, used, mask } = map
+  let cap = mask + 1
+  if (used + 1) * 10 >= cap * 7:
+    let next_cap = if count * 2 < cap then cap else cap * 2
+    let grown = rehash_buckets buckets next_cap
+    let $Map { buckets: b2, count: c2, used: u2, mask: m2 } = grown
+    buckets := b2
+    count := c2
+    used := u2
+    mask := m2
+  let h = hash_fn key
+  let idx = h & mask
+  let first_tomb: U32 = 0xffffffff
+  for ever:
+    case buckets[idx] of
+      $Empty =>
+        let slot = if first_tomb != 0xffffffff then first_tomb else idx
+        buckets[slot] := $Occupied { key, value, hash: h }
+        let next_used = if first_tomb != 0xffffffff then used else used + 1
+        return $Map { buckets, count: count + 1, used: next_used, mask }
+      $Tombstone =>
+        if first_tomb == 0xffffffff:
+          first_tomb := idx
+        idx := (self + 1) & mask
+      $Occupied { key: ek, hash: eh } =>
+        if eh == h and eq_fn ek key:
+          buckets[idx] := $Occupied { key, value, hash: h }
+          return $Map { buckets, count, used, mask }
+        idx := (self + 1) & mask
+
+func remove (hash_fn: k -> U32) -> (eq_fn: k -> k -> Bool) -> (key: k) -> (map: own Map [k, v]): Map [k, v] =>
+  let $Map { buckets, count, used, mask } = map
+  let h = hash_fn key
+  let idx = h & mask
+  for ever:
+    case buckets[idx] of
+      $Empty =>
+        return $Map { buckets, count, used, mask }
+      $Tombstone =>
+        idx := (self + 1) & mask
+      $Occupied { key: ek, hash: eh } =>
+        if eh == h and eq_fn ek key:
+          buckets[idx] := $Tombstone
+          return $Map { buckets, count: count - 1, used, mask }
+        idx := (self + 1) & mask
+
+// Unboxed flat U32 -> U32 open-addressed map (zero boxing, zero indirect calls).
+// states: 0 = empty, 1 = occupied, 2 = tombstone.
+type U32Map is data = $U32Map {
+  states: #[U8],
+  keys: #[U32],
+  values: #[U32],
+  count: U32,
+  used: U32,
+  mask: U32,
+}
+
+func u32_with_capacity (min_entries: U32): U32Map =>
+  let target = if min_entries == 0 then 8 else (min_entries * 10) / 7 + 1
+  let cap = next_pow2 target
+  let z8: U8 = 0
+  let z32: U32 = 0
+  return $U32Map {
+    states: @array.fill cap z8,
+    keys: @array.fill cap z32,
+    values: @array.fill cap z32,
+    count: 0,
+    used: 0,
+    mask: cap - 1,
+  }
+
+func u32_length (map: U32Map): U32 =>
+  let $U32Map { count } = map
+  return count
+
+func u32_get (key: U32) -> (map: U32Map): Maybe U32 =>
+  let $U32Map { states, keys, values, mask } = map
+  let idx = hash_u32 key & mask
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      return $Nothing
+    if st == 1 and keys[idx] == key:
+      return $Some values[idx]
+    idx := (self + 1) & mask
+
+private func rehash_u32 (old_states: #[U8]) -> (old_keys: #[U32]) -> (old_values: #[U32]) -> (new_cap: U32): U32Map =>
+  let new_mask = new_cap - 1
+  let z8: U8 = 0
+  let z32: U32 = 0
+  let states: #[U8] = @array.fill new_cap z8
+  let keys: #[U32] = @array.fill new_cap z32
+  let values: #[U32] = @array.fill new_cap z32
+  let count: U32 = 0
+  for i in 0..old_states.length:
+    if old_states[i] == 1:
+      let k = old_keys[i]
+      let v = old_values[i]
+      let idx = hash_u32 k & new_mask
+      for ever:
+        if states[idx] == 0:
+          states[idx] := 1
+          keys[idx] := k
+          values[idx] := v
+          count := self + 1
+          break
+        idx := (self + 1) & new_mask
+  return $U32Map { states, keys, values, count, used: count, mask: new_mask }
+
+func u32_insert (key: U32) -> (value: U32) -> (map: own U32Map): U32Map =>
+  let $U32Map { states, keys, values, count, used, mask } = map
+  let cap = mask + 1
+  if (used + 1) * 10 >= cap * 7:
+    let next_cap = if count * 2 < cap then cap else cap * 2
+    let $U32Map { states: s2, keys: k2, values: v2, count: c2, used: u2, mask: m2 } = rehash_u32 states keys values next_cap
+    states := s2
+    keys := k2
+    values := v2
+    count := c2
+    used := u2
+    mask := m2
+  let idx = hash_u32 key & mask
+  let first_tomb: U32 = 0xffffffff
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      let slot = if first_tomb != 0xffffffff then first_tomb else idx
+      states[slot] := 1
+      keys[slot] := key
+      values[slot] := value
+      let next_used = if first_tomb != 0xffffffff then used else used + 1
+      return $U32Map { states, keys, values, count: count + 1, used: next_used, mask }
+    if st == 1 and keys[idx] == key:
+      values[idx] := value
+      return $U32Map { states, keys, values, count, used, mask }
+    if st == 2 and first_tomb == 0xffffffff:
+      first_tomb := idx
+    idx := (self + 1) & mask
+
+func u32_remove (key: U32) -> (map: own U32Map): U32Map =>
+  let $U32Map { states, keys, values, count, used, mask } = map
+  let idx = hash_u32 key & mask
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      return $U32Map { states, keys, values, count, used, mask }
+    if st == 1 and keys[idx] == key:
+      states[idx] := 2
+      return $U32Map { states, keys, values, count: count - 1, used, mask }
+    idx := (self + 1) & mask
+
+// Unboxed flat U64 -> U64 open-addressed map.
+type U64Map is data = $U64Map {
+  states: #[U8],
+  keys: #[U64],
+  values: #[U64],
+  count: U32,
+  used: U32,
+  mask: U32,
+}
+
+func u64_with_capacity (min_entries: U32): U64Map =>
+  let target = if min_entries == 0 then 8 else (min_entries * 10) / 7 + 1
+  let cap = next_pow2 target
+  let z8: U8 = 0
+  let z64: U64 = 0
+  return $U64Map {
+    states: @array.fill cap z8,
+    keys: @array.fill cap z64,
+    values: @array.fill cap z64,
+    count: 0,
+    used: 0,
+    mask: cap - 1,
+  }
+
+func u64_length (map: U64Map): U32 =>
+  let $U64Map { count } = map
+  return count
+
+func u64_get (key: U64) -> (map: U64Map): Maybe U64 =>
+  let $U64Map { states, keys, values, mask } = map
+  let idx = hash_u64 key & mask
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      return $Nothing
+    if st == 1 and keys[idx] == key:
+      return $Some values[idx]
+    idx := (self + 1) & mask
+
+private func rehash_u64 (old_states: #[U8]) -> (old_keys: #[U64]) -> (old_values: #[U64]) -> (new_cap: U32): U64Map =>
+  let new_mask = new_cap - 1
+  let z8: U8 = 0
+  let z64: U64 = 0
+  let states: #[U8] = @array.fill new_cap z8
+  let keys: #[U64] = @array.fill new_cap z64
+  let values: #[U64] = @array.fill new_cap z64
+  let count: U32 = 0
+  for i in 0..old_states.length:
+    if old_states[i] == 1:
+      let k = old_keys[i]
+      let v = old_values[i]
+      let idx = hash_u64 k & new_mask
+      for ever:
+        if states[idx] == 0:
+          states[idx] := 1
+          keys[idx] := k
+          values[idx] := v
+          count := self + 1
+          break
+        idx := (self + 1) & new_mask
+  return $U64Map { states, keys, values, count, used: count, mask: new_mask }
+
+func u64_insert (key: U64) -> (value: U64) -> (map: own U64Map): U64Map =>
+  let $U64Map { states, keys, values, count, used, mask } = map
+  let cap = mask + 1
+  if (used + 1) * 10 >= cap * 7:
+    let next_cap = if count * 2 < cap then cap else cap * 2
+    let $U64Map { states: s2, keys: k2, values: v2, count: c2, used: u2, mask: m2 } = rehash_u64 states keys values next_cap
+    states := s2
+    keys := k2
+    values := v2
+    count := c2
+    used := u2
+    mask := m2
+  let idx = hash_u64 key & mask
+  let first_tomb: U32 = 0xffffffff
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      let slot = if first_tomb != 0xffffffff then first_tomb else idx
+      states[slot] := 1
+      keys[slot] := key
+      values[slot] := value
+      let next_used = if first_tomb != 0xffffffff then used else used + 1
+      return $U64Map { states, keys, values, count: count + 1, used: next_used, mask }
+    if st == 1 and keys[idx] == key:
+      values[idx] := value
+      return $U64Map { states, keys, values, count, used, mask }
+    if st == 2 and first_tomb == 0xffffffff:
+      first_tomb := idx
+    idx := (self + 1) & mask
+
+func u64_remove (key: U64) -> (map: own U64Map): U64Map =>
+  let $U64Map { states, keys, values, count, used, mask } = map
+  let idx = hash_u64 key & mask
+  for ever:
+    let st = states[idx]
+    if st == 0:
+      return $U64Map { states, keys, values, count, used, mask }
+    if st == 1 and keys[idx] == key:
+      states[idx] := 2
+      return $U64Map { states, keys, values, count: count - 1, used, mask }
+    idx := (self + 1) & mask

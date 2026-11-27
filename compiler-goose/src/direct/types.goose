@@ -1215,13 +1215,19 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                 }
                 for position in 0..width {
                     var all_f32 = true;
+                    var all_f64 = true;
+                    var any_wide = false;
+                    var any_present = false;
                     var any_v128 = false;
                     for at in 0..(cases.len as i64) {
                         let start = self_.scratch[mark + at * 2];
                         let len = self_.scratch[mark + at * 2 + 1];
                         if position < len {
+                            any_present = true;
                             let kind = self_.layout_words[start + position];
                             if kind != blot_direct_writer::VT_f32 { all_f32 = false; }
+                            if kind != blot_direct_writer::VT_f64 { all_f64 = false; }
+                            if kind == blot_direct_writer::VT_i64 || kind == blot_direct_writer::VT_f64 { any_wide = true; }
                             if kind == blot_direct_writer::VT_v128 { any_v128 = true; }
                         }
                     }
@@ -1230,7 +1236,10 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                         self_.failure_reason = "SIMD payload in a sum type";
                         return Error.unsupported;
                     }
-                    if all_f32 { self_.pushScratchLayout(blot_direct_writer::VT_f32); } else { self_.pushScratchLayout(i32w); }
+                    if any_present && all_f64 { self_.pushScratchLayout(blot_direct_writer::VT_f64); }
+                    else if any_wide { self_.pushScratchLayout(blot_direct_writer::VT_i64); }
+                    else if any_present && all_f32 { self_.pushScratchLayout(blot_direct_writer::VT_f32); }
+                    else { self_.pushScratchLayout(i32w); }
                 }
                 self_.scratch_len = mark;
             }

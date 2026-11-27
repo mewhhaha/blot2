@@ -19,10 +19,15 @@ Quick, version-matched reference for humans and coding agents. Run `deno task bl
 
 ## 2. Scalars & Built-in Types
 
-- `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`), `F32` (`1.0`, `1e-5`).
+- `Unit` (`()`), `Bool` (`true`, `false`), `U8`, `U32`, `I32`, `U64`, `I64`, `F32`, `F64`.
+- Integer/float suffixes (optional `_`): `42u8`, `0xff_u8`, `100u32`, `-42i32`, `100u64`, `-9223372036854775808i64`, `1f32`, `1.5f64`. Unsuffixed integer defaults to `U32`, unsuffixed float defaults to `F32`.
+- Char literals (`'a'`, `'\n'`, `'\x1b'`, `'é'`) type-check to `U8` (default if `<= 255`) or `U32` (any Unicode scalar), and work in `case` patterns.
+- Byte-string literals (`b"hello\r\n\x00"`) have type `#[U8]` (see `std/bytes`).
 - Negative arguments need parens: `F32.abs (-2.0)`.
-- Arrays: `#[T]` (equivalent to `Array T`), fixed-length `#[N; T]`, borrowed read-only view `&[T]`, frozen shared handle `*T` (via `freeze x`).
+- Arrays: `#[T]` (equivalent to `Array T`), fixed-length `#[N; T]`, borrowed read-only view `&[T]`, frozen shared handle `*T` (via `freeze x`). Pre-size with `Array.with_capacity`, `Array.reserve`, bulk append with `Array.extend` / `Array.extend_view`.
 - Text: `Text` is a prelude alias for `#[U32]` Unicode scalar values; string literals (`"hi"`, `"é🙂"`) have type `Text` (see `std/text`).
+- Standard modules: `std/prelude`, `std/text`, `std/bytes`, `std/map` (open-addressed hash map `Map K V`), `std/simd` (`F32x4`, `I32x4`, `F64x2`, `U64x2`, `U8x16`, `I16x8`).
+- Wide 64×64->128 multiply: `U64.mul_wide a b` returns `(lo, hi)` as `(U64, U64)`.
 
 ## 3. Functions, Control Flow & Patterns
 
@@ -101,6 +106,7 @@ io run (): F32 =>
 deno task blot check app.blot                  # type-check with agent diagnostics
 deno task blot build app.blot build/app.wasm   # compile to Wasm ABI 8
 deno task blot build app.blot build/app.wasm --wasm3  # opt-in Wasm 3.0 (FMA + return_call)
+deno task blot build app.blot build/app.wasm --stack-mb 256 --heap-mb 256 --transport-mb 16  # custom memory budgets
 deno task blot fmt app.blot                    # format source
 deno task blot explain SPENT_VALUE             # explain any diagnostic code
 deno task blot explain --list                  # list all diagnostic codes

@@ -991,7 +991,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
             return handle, blot_direct_types::Error.none;
         },
-        simd_load, simd_store => {
+        simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let position, error = expr(g, f, children[1]);
@@ -1003,16 +1003,29 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let step, error = stride(g, f, element, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let core_ty = m.typeOf(children[0]);
-            let address, error = simdAddress(g, f, container, index, step, id, core_ty);
+            let is_u8x16 = operation == blot_backend_collection_ops::Op.simd_load_u8x16 || operation == blot_backend_collection_ops::Op.simd_store_u8x16;
+            let is_f64x2 = operation == blot_backend_collection_ops::Op.simd_load_f64x2 || operation == blot_backend_collection_ops::Op.simd_store_f64x2;
+            var lane_count: u32 = 4;
+            if is_u8x16 { lane_count = 16; } else if is_f64x2 { lane_count = 2; }
+            let address, error = simdAddress(g, f, container, index, step, id, core_ty, lane_count);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             if operation == blot_backend_collection_ops::Op.simd_load {
                 return simdLoadAt(g, f, address, element, step, id);
+            }
+            if operation == blot_backend_collection_ops::Op.simd_load_u8x16 {
+                return simdLoadWideAt(g, f, address, false, id);
+            }
+            if operation == blot_backend_collection_ops::Op.simd_load_f64x2 {
+                return simdLoadWideAt(g, f, address, true, id);
             }
             let lanes_value, error = expr(g, f, children[2]);
             if error != blot_direct_types::Error.none { return lanes_value, error; }
             var rhs_budget: i64 = 128;
             let rhs_safe = tagOf(g, container.ty) == blot_direct_types::Tag.array &&
                 (coreSizedLength(m, core_ty) != 0 || noStorageResize(g, m, children[2], rhs_budget));
+            if is_u8x16 || is_f64x2 {
+                return simdStoreWideAt(g, f, container, index, address, is_f64x2, lanes_value, rhs_safe, id, core_ty);
+            }
             return simdStoreAt(g, f, container, index, address, element, step, lanes_value, rhs_safe, id, core_ty);
         },
         flatten => {
@@ -1070,17 +1083,17 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         },
     }
 }
-// One logical bounds trap for the whole four-element interval. Testing
-// length before subtracting four keeps even a maximally large U32 index safe.
-fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id: u32, core_ty: TId = 0) -> u32, Error {
+// One logical bounds trap for the whole vector interval. Testing
+// length before subtracting lane_count keeps even a maximally large U32 index safe.
+fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id: u32, core_ty: TId = 0, lane_count: u32 = 4) -> u32, Error {
     if tagOf(g, container.ty) == blot_direct_types::Tag.array {
         let base, len = ensureCheckedArray(g, f, container);
         lget(g, len);
-        i32Const(g, 4);
+        i32Const(g, lane_count);
         op(g, OP_i32_lt_u);
         lget(g, index);
         lget(g, len);
-        i32Const(g, 4);
+        i32Const(g, lane_count);
         op(g, OP_i32_sub);
         op(g, OP_i32_gt_u);
         op(g, OP_i32_or);
@@ -1090,7 +1103,7 @@ fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id:
     // Views retain their existing handle and subrange checks.
     let last = local32(g, f);
     lget(g, index);
-    i32Const(g, 3);
+    i32Const(g, lane_count - 1);
     op(g, OP_i32_add);
     ltee(g, last);
     lget(g, index);
@@ -1099,6 +1112,32 @@ fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id:
     let _, error = elementAddress(g, f, container, last, id, core_ty);
     if error != blot_direct_types::Error.none { return 0, error; }
     return elementAddress(g, f, container, index, id, core_ty);
+}
+fn simdLoadWideAt(g: Generator&, f: Fn&, address: u32, is_float: bool, id: u32) -> Val, Error {
+    let elem = if is_float { blot_direct_types::f64_ } else { blot_direct_types::u64_ };
+    let lane_ty, error = g.types.tuple([elem, elem]);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    lget(g, address);
+    simdMemOp(g, SIMD_v128_load, if is_float { 3 } else { 0 }, 0);
+    return popV128(g, f, lane_ty), blot_direct_types::Error.none;
+}
+fn simdStoreWideAt(g: Generator&, f: Fn&, container: Val, index: u32, address: u32, is_float: bool, lanes_value: Val, rhs_safe: bool, id: u32, core_ty: TId = 0) -> Val, Error {
+    checkMutableOwner(g, f, container);
+    var target = address;
+    if !rhs_safe {
+        let step: u32 = if is_float { 8 } else { 1 };
+        let count: u32 = if is_float { 2 } else { 16 };
+        let recomputed, error = simdAddress(g, f, container, index, step, id, core_ty, count);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        target = recomputed;
+    }
+    recordBeforeWrite(g, f, w(g, container, 0), target, 0, 16);
+    let vector = ensureV128(g, f, lanes_value);
+    lget(g, target);
+    lget(g, vector);
+    simdMemOp(g, SIMD_v128_store, if is_float { 3 } else { 0 }, 0);
+    f.checked_elems_len = 0;
+    return container, blot_direct_types::Error.none;
 }
 fn hasV128Elements(element: Ty) -> bool {
     return element == blot_direct_types::f32_ || element == blot_direct_types::u32_;

@@ -55,7 +55,7 @@ struct Primitive {
     array_op: ArrayOp = blot_backend_collection_ops::Op.length,
     arity: u8
 }
-enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_, numeric_convert }
+enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_, numeric_convert, mul_wide, i8x16_splat, i8x16_add, i8x16_sub, i8x16_min_u, i8x16_max_u, i8x16_eq, i8x16_avgr_u, i8x16_bitmask, i8x16_narrow_u, i16x8_splat, i16x8_extend_low_u, i16x8_extend_high_u, i16x8_add, i16x8_sub, i16x8_mul, i16x8_shl, i16x8_shr_u, i16x8_shr_s, i16x8_min_u, i16x8_max_u }
 // The uses of these intrinsics in checking and lowering share one signature.
 struct NumericIntrinsic {
     input: u32 = 0,
@@ -789,6 +789,27 @@ fn opCode(value: Op) -> u32 {
         continue_ => { return 44; },
         not_ => { return 45; },
         numeric_convert => { return 46; },
+        mul_wide => { return 47; },
+        i8x16_splat => { return 48; },
+        i8x16_add => { return 49; },
+        i8x16_sub => { return 50; },
+        i8x16_min_u => { return 51; },
+        i8x16_max_u => { return 52; },
+        i8x16_eq => { return 53; },
+        i8x16_avgr_u => { return 54; },
+        i8x16_bitmask => { return 55; },
+        i8x16_narrow_u => { return 56; },
+        i16x8_splat => { return 57; },
+        i16x8_extend_low_u => { return 58; },
+        i16x8_extend_high_u => { return 59; },
+        i16x8_add => { return 60; },
+        i16x8_sub => { return 61; },
+        i16x8_mul => { return 62; },
+        i16x8_shl => { return 63; },
+        i16x8_shr_u => { return 64; },
+        i16x8_shr_s => { return 65; },
+        i16x8_min_u => { return 66; },
+        i16x8_max_u => { return 67; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -840,6 +861,27 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         44 => { return Op.continue_, blot_error::Error.none; },
         45 => { return Op.not_, blot_error::Error.none; },
         46 => { return Op.numeric_convert, blot_error::Error.none; },
+        47 => { return Op.mul_wide, blot_error::Error.none; },
+        48 => { return Op.i8x16_splat, blot_error::Error.none; },
+        49 => { return Op.i8x16_add, blot_error::Error.none; },
+        50 => { return Op.i8x16_sub, blot_error::Error.none; },
+        51 => { return Op.i8x16_min_u, blot_error::Error.none; },
+        52 => { return Op.i8x16_max_u, blot_error::Error.none; },
+        53 => { return Op.i8x16_eq, blot_error::Error.none; },
+        54 => { return Op.i8x16_avgr_u, blot_error::Error.none; },
+        55 => { return Op.i8x16_bitmask, blot_error::Error.none; },
+        56 => { return Op.i8x16_narrow_u, blot_error::Error.none; },
+        57 => { return Op.i16x8_splat, blot_error::Error.none; },
+        58 => { return Op.i16x8_extend_low_u, blot_error::Error.none; },
+        59 => { return Op.i16x8_extend_high_u, blot_error::Error.none; },
+        60 => { return Op.i16x8_add, blot_error::Error.none; },
+        61 => { return Op.i16x8_sub, blot_error::Error.none; },
+        62 => { return Op.i16x8_mul, blot_error::Error.none; },
+        63 => { return Op.i16x8_shl, blot_error::Error.none; },
+        64 => { return Op.i16x8_shr_u, blot_error::Error.none; },
+        65 => { return Op.i16x8_shr_s, blot_error::Error.none; },
+        66 => { return Op.i16x8_min_u, blot_error::Error.none; },
+        67 => { return Op.i16x8_max_u, blot_error::Error.none; },
         _ => { return Op.none, blot_error::Error.core_limit; },
     }
 }

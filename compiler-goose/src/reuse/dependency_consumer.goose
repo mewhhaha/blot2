@@ -132,6 +132,8 @@ fn tokenName(tag:blot_parse_token::Tag)->const u8[:] {
  if tag==blot_parse_token::kw_fork {return "kw_fork";}
  if tag==blot_parse_token::semicolon {return "semicolon";}
  if tag==blot_parse_token::kw_spark {return "kw_spark";}
+ if tag==blot_parse_token::char_literal {return "char_literal";}
+ if tag==blot_parse_token::byte_string {return "byte_string";}
  abort("invalid source token ordinal");
 }
 fn causeName(cause:blot_parse_syntax_diagnostics::Cause)->const u8[:] {

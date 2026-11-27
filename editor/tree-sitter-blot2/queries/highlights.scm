@@ -84,6 +84,10 @@
 (spread) @operator
 (forward_break "$" @punctuation.special)
 
+(byte_string_literal "b\"" @string)
+(byte_string_literal "\"" @string)
+(byte_escape_sequence) @constant.character.escape
+(char_literal) @constant.character
 (text_literal "\"" @string)
 (text_fragment) @string
 (escape_sequence) @constant.character.escape

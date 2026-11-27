@@ -6,8 +6,6 @@
 //! join ", " #["blot", "wasm", "docs"] // => "blot, wasm, docs"
 //! ```
 
-import * as simd from "./simd"
-
 // Text is a #[U32] of Unicode scalar values. Equality compares scalar
 // sequences exactly; it does not normalize Unicode.
 const empty: Text = ""
@@ -215,53 +213,10 @@ private func decimal_f32 (negative: Bool) -> (whole: U32) -> (digits: U32) -> (f
       return finish out
     divisor := self / 10
 
-private func u32_mul_wide (a: U32) -> (b: U32): (U32, U32) =>
-  let al = a & 0xffff
-  let ah = a >> 16
-  let bl = b & 0xffff
-  let bh = b >> 16
-  let p0 = al * bl
-  let p1 = al * bh
-  let p2 = ah * bl
-  let p3 = ah * bh
-  let mid = (p0 >> 16) + (p1 & 0xffff) + (p2 & 0xffff)
-  let lo = (p0 & 0xffff) | ((mid & 0xffff) << 16)
-  let hi = p3 + (p1 >> 16) + (p2 >> 16) + (mid >> 16)
-  return (hi, lo)
-
-private func u64_add_pow2 (hi: U32) -> (lo: U32) -> (shift: U32): (U32, U32) =>
-  if shift >= 32:
-    return (hi + (1 << (shift - 32)), lo)
-  let add = 1 << shift
-  let next_lo = lo + add
-  let carry = if next_lo < lo then 1 else 0
-  return (hi + carry, next_lo)
-
-private func u64_sub1 (hi: U32) -> (lo: U32): (U32, U32) =>
-  if lo == 0:
-    return (hi - 1, 0xffff_ffff)
-  return (hi, lo - 1)
-
-private func u64_shr_u32 (hi: U32) -> (lo: U32) -> (shift: U32): U32 =>
-  if shift == 32:
-    return hi
-  if shift > 32:
-    return hi >> (shift - 32)
-  return (lo >> shift) | (hi << (32 - shift))
-
-private func u64_ceil_shr_u32 (hi: U32) -> (lo: U32) -> (shift: U32): U32 =>
-  let (ah, al) = u64_add_pow2 hi lo shift
-  let (bh, bl) = u64_sub1 ah al
-  return u64_shr_u32 bh bl shift
-
-private func u64_sub1_shr_u32 (hi: U32) -> (lo: U32) -> (shift: U32): U32 =>
-  let (bh, bl) = u64_sub1 hi lo
-  return u64_shr_u32 bh bl shift
-
 func from_f32 (value: F32): Text =>
   if not (F32.eq value value):
     return "NaN"
-  let (bits, _, _, _) = simd.f32_bits (value, 0.0, 0.0, 0.0)
+  let bits = F32.to_bits value
   let negative = bits >= 0x8000_0000
   if not (F32.is_finite value):
     return if negative then "-inf" else "inf"
@@ -282,21 +237,25 @@ func from_f32 (value: F32): Text =>
   if frac_center == 0:
     return decimal_f32 negative whole 0 10
   let boundary = (abs_bits & 0x7f_ffff) == 0
-  let frac_lo = frac_center - (if boundary then 1 else 2)
-  let frac_hi = frac_center + 2
+  let frac_lo: U64 = U32.to_u64 (frac_center - (if boundary then 1 else 2))
+  let frac_hi: U64 = U32.to_u64 (frac_center + 2)
+  let frac_mid: U64 = U32.to_u64 frac_center
   let even = (abs_bits & 1) == 0
-  let factor = 1
+  let shift64: U64 = U32.to_u64 shift
+  let one64: U64 = 1
+  let pow_shift = one64 << shift64
+  let half_pow = one64 << (shift64 - 1)
+  let factor: U32 = 1
   // Stop at the shortest decimal fraction (1..9 places) whose exact value rounds to bits.
   for places in 0..9:
     factor := self * 10
-    let (lo_h, lo_l) = u32_mul_wide frac_lo factor
-    let (hi_h, hi_l) = u32_mul_wide frac_hi factor
-    let q_min = if even then u64_ceil_shr_u32 lo_h lo_l shift else u64_shr_u32 lo_h lo_l shift + 1
-    let q_max = if even then u64_shr_u32 hi_h hi_l shift else u64_sub1_shr_u32 hi_h hi_l shift
+    let factor64 = U32.to_u64 factor
+    let lo64 = frac_lo * factor64
+    let hi64 = frac_hi * factor64
+    let q_min = U64.to_u32 (if even then (lo64 + pow_shift - 1) >> shift64 else (lo64 >> shift64) + 1)
+    let q_max = U64.to_u32 (if even then hi64 >> shift64 else (hi64 - 1) >> shift64)
     if q_min <= q_max:
-      let (ch, cl) = u32_mul_wide frac_center factor
-      let (rh, rl) = u64_add_pow2 ch cl (shift - 1)
-      let raw = u64_shr_u32 rh rl shift
+      let raw = U64.to_u32 ((frac_mid * factor64 + half_pow) >> shift64)
       let digits = if raw < q_min then q_min else if raw > q_max then q_max else raw
       return decimal_f32 negative whole digits factor
   return hex_bits bits

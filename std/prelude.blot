@@ -356,6 +356,7 @@ func U64.from value : U64 => value.to_u64
 const U64.add = @u64.add
 const U64.sub = @u64.sub
 const U64.mul = @u64.mul
+const U64.mul_wide = @u64.mul_wide
 const U64.div = @u64.div
 const U64.rem = @u64.rem
 const U64.eq = @u64.eq
@@ -436,6 +437,63 @@ const F64.ceil = @f64.ceil
 const F64.trunc = @f64.trunc
 const F64.min = @f64.min
 const F64.max = @f64.max
+func F64.clamp (low: F64) -> (high: F64) -> (value: F64): F64 => F64.min high (F64.max low value)
+func F64.lerp (left: F64) -> (right: F64) -> (weight: F64): F64 => F64.add left (F64.mul (F64.sub right left) weight)
+func F64.square (value: F64): F64 => F64.mul value value
+func F64.is_finite (value: F64): Bool => F64.le (F64.abs value) 1.7976931348623157e308
+
+// Split 2*pi range reduction keeps F64 trig accurate for |radians| <= 1e6.
+private func f64_reduced_radians (value: F64): F64 =>
+  if F64.gt (F64.abs value) 1000000.0:
+    return F64.div 0.0 0.0
+  let turns = F64.floor (F64.add (F64.mul value 0.15915494309189533576888376337251) 0.5)
+  let r1 = F64.sub value (F64.mul turns 6.28318530717958623199592693708837)
+  return F64.sub r1 (F64.mul turns 2.4492935982947063544521318645828e-16)
+
+private func f64_sin_reduced (angle: F64): F64 =>
+  let half_pi: F64 = 1.57079632679489661923132169163975
+  let pi_hi: F64 = 3.14159265358979311599796346854419
+  let pi_lo: F64 = 1.224646799147353177226065932275e-16
+  let x = if F64.gt angle half_pi then F64.add (F64.sub pi_hi angle) pi_lo
+    else if F64.lt angle (F64.neg half_pi) then F64.sub (F64.sub (F64.neg pi_hi) angle) pi_lo
+    else angle
+  let s = F64.square x
+  let p = F64.add (-2.8114572543455208e-15) (F64.mul s 8.22063524662433e-18)
+  let p = F64.add (-1.6059043836821615e-10) (F64.mul s (F64.add 7.6471637318198165e-13 (F64.mul s p)))
+  let p = F64.add 2.5052108385441720e-8 (F64.mul s p)
+  let p = F64.add (-2.7557319223985893e-6) (F64.mul s p)
+  let p = F64.add 1.9841269841269841e-4 (F64.mul s p)
+  let p = F64.add (-8.3333333333333332e-3) (F64.mul s p)
+  let p = F64.add 1.6666666666666666e-1 (F64.mul s p)
+  return F64.sub x (F64.mul x (F64.mul s p))
+
+private func f64_cos_reduced (value: F64): F64 =>
+  let half_pi: F64 = 1.57079632679489661923132169163975
+  let pi_hi: F64 = 3.14159265358979311599796346854419
+  let pi_lo: F64 = 1.224646799147353177226065932275e-16
+  let angle = F64.abs value
+  let outside = F64.gt angle half_pi
+  let x = if outside then F64.add (F64.sub pi_hi angle) pi_lo else angle
+  let s = F64.square x
+  let p = F64.add 4.7794773323873853e-14 (F64.mul s (-1.5619206968586226e-16))
+  let p = F64.add (-1.1470745597729725e-11) (F64.mul s p)
+  let p = F64.add 2.0876756987868099e-9 (F64.mul s p)
+  let p = F64.add (-2.7557319223985893e-7) (F64.mul s p)
+  let p = F64.add 2.4801587301587302e-5 (F64.mul s p)
+  let p = F64.add (-1.3888888888888889e-3) (F64.mul s p)
+  let p = F64.add 4.1666666666666664e-2 (F64.mul s p)
+  let p = F64.add (-0.5) (F64.mul s p)
+  let res = F64.add 1.0 (F64.mul s p)
+  return if outside then F64.neg res else res
+
+func F64.sin (value: F64): F64 => f64_sin_reduced (f64_reduced_radians value)
+func F64.cos (value: F64): F64 => f64_cos_reduced (f64_reduced_radians value)
+func F64.sin_cos (value: F64): (F64, F64) =>
+  let angle = f64_reduced_radians value
+  return (f64_sin_reduced angle, f64_cos_reduced angle)
+func F64.tan (value: F64): F64 =>
+  let angle = f64_reduced_radians value
+  return F64.div (f64_sin_reduced angle) (f64_cos_reduced angle)
 const F64.to_u8 = @f64.to_u8
 const F64.to_u32 = @f64.to_u32
 const F64.to_i32 = @f64.to_i32

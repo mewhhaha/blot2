@@ -169,6 +169,8 @@ function wordsToProcessValue(
     }
     case "Array U32":
       return new Uint32Array(words);
+    default:
+      throw new Error(`Unsupported process wire tag ${schema.wireTag}`);
   }
 }
 
@@ -196,6 +198,8 @@ function processValueToWords(
     }
     case "Array U32":
       return new Uint32Array(value as Uint32Array);
+    default:
+      throw new Error(`Unsupported process wire tag ${schema.wireTag}`);
   }
 }
 

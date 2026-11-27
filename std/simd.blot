@@ -123,3 +123,78 @@ func f32_dot (left: F32x4) -> (right: F32x4) =>
 func f32_dot3 (left: F32x4) -> (right: F32x4) =>
   let (x, y, z, _) = f32_mul left right
   return (x + y) + z
+
+// Explicit 128-bit wide vectors: 2-lane F64, 2-lane U64 masks, 16-lane packed
+// U8 bytes, and 8-lane packed 16-bit integers. Each stays in a single v128
+// register via shadow tracking and lowers to two 64-bit words across boundaries.
+type F64x2 = (F64, F64)
+type U64x2 = (U64, U64)
+type U8x16 = (U64, U64)
+type I16x8 = (U64, U64)
+
+func f64_splat (value: F64): F64x2 => (value, value)
+func f64_add (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.add left right
+func f64_sub (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.sub left right
+func f64_mul (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.mul left right
+func f64_div (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.div left right
+func f64_min (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.min left right
+func f64_max (left: F64x2) -> (right: F64x2): F64x2 => @simd.f64x2.max left right
+func f64_abs (value: F64x2): F64x2 => @simd.f64x2.abs value
+func f64_neg (value: F64x2): F64x2 => @simd.f64x2.neg value
+func f64_ceil (value: F64x2): F64x2 => @simd.f64x2.ceil value
+func f64_floor (value: F64x2): F64x2 => @simd.f64x2.floor value
+func f64_trunc (value: F64x2): F64x2 => @simd.f64x2.trunc value
+func f64_sqrt (value: F64x2): F64x2 => @simd.f64x2.sqrt value
+func f64_eq (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.eq left right
+func f64_ne (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.ne left right
+func f64_lt (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.lt left right
+func f64_le (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.le left right
+func f64_gt (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.gt left right
+func f64_ge (left: F64x2) -> (right: F64x2): U64x2 => @simd.f64x2.ge left right
+func f64_select (mask: U64x2) -> (yes: F64x2) -> (no: F64x2): F64x2 => @simd.f64x2.select mask (yes, no)
+func f64_bits (lanes: F64x2): U64x2 => @simd.f64x2.bits lanes
+func f64_from_bits (lanes: U64x2): F64x2 => @simd.u64x2.from_bits lanes
+func f64_relaxed_madd (a: F64x2) -> (b: F64x2) -> (c: F64x2): F64x2 => @simd.f64x2.relaxed_madd a (b, c)
+func f64_relaxed_nmadd (a: F64x2) -> (b: F64x2) -> (c: F64x2): F64x2 => @simd.f64x2.relaxed_nmadd a (b, c)
+func f64_sum (values: F64x2): F64 =>
+  let (a, b) = values
+  return a + b
+func f64_dot (left: F64x2) -> (right: F64x2): F64 =>
+  let (a, b) = f64_mul left right
+  return a + b
+
+func u64_and (left: U64x2) -> (right: U64x2): U64x2 => @simd.u64x2.bit_and left right
+func u64_or (left: U64x2) -> (right: U64x2): U64x2 => @simd.u64x2.bit_or left right
+func u64_xor (left: U64x2) -> (right: U64x2): U64x2 => @simd.u64x2.bit_xor left right
+func u64_andnot (left: U64x2) -> (right: U64x2): U64x2 => @simd.u64x2.andnot left right
+func u64_not (lanes: U64x2): U64x2 => @simd.u64x2.not lanes
+func u64_select (mask: U64x2) -> (yes: U64x2) -> (no: U64x2): U64x2 => @simd.u64x2.select mask (yes, no)
+func u64_any_true (mask: U64x2): Bool => @simd.u64x2.any_true mask
+func u64_all_true (mask: U64x2): Bool => @simd.u64x2.all_true mask
+
+func u8_splat (value: U8): U8x16 => @simd.u8x16.splat value
+func u8_add (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.add left right
+func u8_sub (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.sub left right
+func u8_min (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.min left right
+func u8_max (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.max left right
+func u8_eq (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.eq left right
+func u8_avgr (left: U8x16) -> (right: U8x16): U8x16 => @simd.u8x16.avgr left right
+func u8_bitmask (lanes: U8x16): U32 => @simd.u8x16.bitmask lanes
+func u8_narrow (low: I16x8) -> (high: I16x8): U8x16 => @simd.u8x16.narrow low high
+
+func i16_splat (value: U32): I16x8 => @simd.i16x8.splat value
+func i16_extend_low_u (bytes: U8x16): I16x8 => @simd.i16x8.extend_low_u bytes
+func i16_extend_high_u (bytes: U8x16): I16x8 => @simd.i16x8.extend_high_u bytes
+func i16_add (left: I16x8) -> (right: I16x8): I16x8 => @simd.i16x8.add left right
+func i16_sub (left: I16x8) -> (right: I16x8): I16x8 => @simd.i16x8.sub left right
+func i16_mul (left: I16x8) -> (right: I16x8): I16x8 => @simd.i16x8.mul left right
+func i16_shl (count: U32) -> (lanes: I16x8): I16x8 => @simd.i16x8.shl lanes count
+func i16_shr_u (count: U32) -> (lanes: I16x8): I16x8 => @simd.i16x8.shr_u lanes count
+func i16_shr_s (count: U32) -> (lanes: I16x8): I16x8 => @simd.i16x8.shr_s lanes count
+func i16_min (left: I16x8) -> (right: I16x8): I16x8 => @simd.i16x8.min left right
+func i16_max (left: I16x8) -> (right: I16x8): I16x8 => @simd.i16x8.max left right
+
+func load_u8x16 (index: U32) -> values: U8x16 => @simd.load_u8x16 values index
+func store_u8x16 (index: U32) -> (lanes: U8x16) -> (values: own #[U8]): #[U8] => @simd.store_u8x16 values index lanes
+func load_f64x2 (index: U32) -> values: F64x2 => @simd.load_f64x2 values index
+func store_f64x2 (index: U32) -> (lanes: F64x2) -> (values: own #[F64]): #[F64] => @simd.store_f64x2 values index lanes

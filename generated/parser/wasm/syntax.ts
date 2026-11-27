@@ -94,6 +94,8 @@ export type MainTokenKind =
   | "TYPE_IDENT"
   | "INTEGER"
   | "FLOAT"
+  | "CHAR"
+  | "BYTE_STRING"
   | "STRING"
   | "INTRINSIC"
   | "PROOF_TYPE"

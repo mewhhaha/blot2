@@ -65,14 +65,52 @@ fn add(p: Parser&,source: const u8[:],tokens: const Token[:],tag: u32,a: u32,b: 
  return id;
 }
 fn numeric_failure(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,code: u32) -> Id { return add(p,source,tokens,a_numeric_error,code,t.start,t.end,t.start); }
+fn hex_digit_val(c: u8) -> u32, bool {
+ if c>='0' && c<='9' { return (c-'0') as u32, true; }
+ if c>='a' && c<='f' { return (c-'a'+10) as u32, true; }
+ if c>='A' && c<='F' { return (c-'A'+10) as u32, true; }
+ return 0, false;
+}
 fn integer_literal(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,tag: u32,negative: bool=false) -> Id {
  if p.failure!=blot_error::Error.none { return 0; }
- let value,err=blot_parse_lexer::integer_value(text(p,source,t));
+ let raw=text(p,source,t);
+ let _,suffix=blot_parse_lexer::number_suffix(raw);
+ let value,err=blot_parse_lexer::integer_value(raw);
  if err==blot_error::Error.integer_range { return numeric_failure(p,source,tokens,t,blot_parse_ast::numericcode_integer_range); }
  if err!=blot_error::Error.none { return fail(p,source,tokens,c_invalid_literal); } let high=(value>>32) as u32;
- var flags:u32=0; if high!=0 {flags=1;} if negative {flags|=2;}
+ var flags:u32=0; if high!=0 {flags=1;} if negative {flags|=2;} if suffix!=0 && suffix<=5 {flags|=(suffix<<4);}
  var start=t.start; if negative {start=tokens[p.index-2].start;}
  return add(p,source,tokens,tag,value as! u32,high,flags,start);
+}
+fn char_literal_node(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,tag: u32) -> Id {
+ if p.failure!=blot_error::Error.none { return 0; }
+ let raw=text(p,source,t);
+ if raw.len<3 || raw[0]!='\'' || raw[raw.len-1]!='\'' { return fail(p,source,tokens,c_invalid_literal); }
+ let inner=raw[1..raw.len-1];
+ var cp: u32=0;
+ if inner[0]=='\\' {
+  if inner.len==2 {
+   let e=inner[1];
+   if e=='n' { cp=10; }
+   else if e=='r' { cp=13; }
+   else if e=='t' { cp=9; }
+   else if e=='0' { cp=0; }
+   else if e=='\\' || e=='\'' || e=='"' { cp=e as u32; }
+   else { return fail(p,source,tokens,c_invalid_literal); }
+  } else if inner.len==4 && inner[1]=='x' {
+   let hi,ok1=hex_digit_val(inner[2]);
+   let lo,ok2=hex_digit_val(inner[3]);
+   if !ok1 || !ok2 { return fail(p,source,tokens,c_invalid_literal); }
+   cp=(hi<<4)|lo;
+  } else {
+   return fail(p,source,tokens,c_invalid_literal);
+  }
+ } else {
+  let decoded,err=blot_parse_lexer::decode_point(inner);
+  if err!=blot_error::Error.none { return fail(p,source,tokens,c_invalid_literal); }
+  cp=decoded;
+ }
+ return add(p,source,tokens,tag,cp,0,8,t.start);
 }
 fn extra(p: Parser&,source: const u8[:],tokens: const Token[:],values: const u32[:]) -> u32 {
  if p.failure!=blot_error::Error.none { return 0; }
@@ -149,6 +187,30 @@ fn string_symbol(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbo
  }
  let __cleanup_result_3_0: Symbol = intern(p,source,tokens,bytes.items); bytes.deinit(); return __cleanup_result_3_0;
  bytes.deinit(); }
+fn byte_string_symbol(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbol {
+ let t=expect(p,source,tokens,t_byte_string); if p.failure!=blot_error::Error.none { return 0; }
+ let raw=text(p,source,t); var bytes=Scratchu8Buffer {};  var i=2;
+ while i+1<raw.len {
+  var ch=raw[i];
+  if ch=='\\' {
+   i++; let e=raw[i];
+   if e=='n' { ch='\n'; }
+   else if e=='r' { ch='\r'; }
+   else if e=='t' { ch='\t'; }
+   else if e=='0' { ch=0; }
+   else if e=='"'||e=='\\' { ch=e; }
+   else if e=='x' && i+2<raw.len-1 {
+    let hi,ok1=hex_digit_val(raw[i+1]);
+    let lo,ok2=hex_digit_val(raw[i+2]);
+    if !ok1 || !ok2 { let res: Symbol = fail(p,source,tokens,c_invalid_literal); bytes.deinit(); return res; }
+    ch=((hi<<4)|lo) as u8;
+    i+=2;
+   } else { let res: Symbol = fail(p,source,tokens,c_invalid_literal); bytes.deinit(); return res; }
+  }
+  bytes.push(ch); i++;
+ }
+ let res: Symbol = intern(p,source,tokens,bytes.items); bytes.deinit(); return res;
+}
 recursive fn declaration(p: Parser&,source: const u8[:],tokens: const Token[:],declarations_seen: bool,body_declarations_seen: bool) -> Id {
  var private=false; var is_opaque=false;
  if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#"&&peek(p,tokens,1)==t_identifier&&peek(p,tokens,2)==t_identifier&&text(p,source,tokens[p.index+2])=="private" {
@@ -313,6 +375,8 @@ let t_kw_with=blot_parse_token::kw_with;
 let t_kw_fork=blot_parse_token::kw_fork;
 let t_semicolon=blot_parse_token::semicolon;
 let t_kw_spark=blot_parse_token::kw_spark;
+let t_char_literal=blot_parse_token::char_literal;
+let t_byte_string=blot_parse_token::byte_string;
 
 let a_invalid=blot_parse_ast::tag_invalid;
 let a_value_decl=blot_parse_ast::tag_value_decl;
@@ -959,9 +1023,11 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if !enter(p,source,tokens) { return 0; }  let t=current(p,source,tokens); let start=t.start;
  if t.tag==t_kw_true||t.tag==t_kw_false { advance(p,source,tokens); var value: u32=0; if t.tag==t_kw_true { value=1; } let __cleanup_result_39_0: Id = add(p,source,tokens,a_boolean,value,0,0,start); { p.depth--; } return __cleanup_result_39_0; }
  if t.tag==t_integer { advance(p,source,tokens); let __cleanup_result_40_0: Id = integer_literal(p,source,tokens,t,a_integer); { p.depth--; } return __cleanup_result_40_0; }
+ if t.tag==t_char_literal { advance(p,source,tokens); let res: Id = char_literal_node(p,source,tokens,t,a_integer); p.depth--; return res; }
  if t.tag==t_float {
   advance(p,source,tokens);
   let token_text=text(p,source,t);
+  let _,suffix=blot_parse_lexer::number_suffix(token_text);
   var bits,err=blot_parse_lexer::float_bits(token_text);
   var result:Id=0;
   if err==blot_error::Error.invalid_float {
@@ -970,11 +1036,17 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
    if err==blot_error::Error.float_range {bits=0x7f800000;}
    var wide,wide_error=blot_parse_lexer::decimal_bits(token_text,true);
    if wide_error==blot_error::Error.float_range {wide=0x7ff0000000000000;}
-   result=add(p,source,tokens,a_float,bits,wide as! u32,(wide>>32) as u32,start);
+   var a_word=bits;
+   var b_word=wide as! u32;
+   var c_word=(wide>>32) as u32;
+   if suffix==6 { b_word=1; c_word=0x7ff80001; }
+   else if suffix==7 { a_word=0x7fc00001; }
+   result=add(p,source,tokens,a_float,a_word,b_word,c_word,start);
   }
   p.depth--; return result;
  }
  if t.tag==t_string { let __cleanup_result_45_0: Id = add(p,source,tokens,a_string,string_symbol(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_45_0; }
+ if t.tag==t_byte_string { let res: Id = add(p,source,tokens,a_string,byte_string_symbol(p,source,tokens),1,0,start); p.depth--; return res; }
  if t.tag==t_intrinsic {
   advance(p,source,tokens);
   let staging,has_staging=blot_check_typed_staging::lookup(text(p,source,t)); if has_staging { p.tree.has_typed_staging=true; }
@@ -1459,6 +1531,7 @@ recursive fn pattern(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
   p.depth--; return result;
  }
  if eat(p,source,tokens,t_integer) { let __cleanup_result_72_0: Id = integer_literal(p,source,tokens,t,a_pattern_integer); { p.depth--; } return __cleanup_result_72_0; }
+ if eat(p,source,tokens,t_char_literal) { let res: Id = char_literal_node(p,source,tokens,t,a_pattern_integer); p.depth--; return res; }
  if eat(p,source,tokens,t_hash) { let name=constructor_pattern_name(p,source,tokens); var payload: Id=0; if at(p,source,tokens,t_l_brace) { payload=constructor_fields(p,source,tokens); } else if pattern_tag(current(p,source,tokens).tag) { payload=pattern(p,source,tokens); } let __cleanup_result_73_0: Id = add(p,source,tokens,a_pattern_constructor,name,payload,0,start); { p.depth--; } return __cleanup_result_73_0; }
  if at(p,source,tokens,t_l_brace) { let __cleanup_result_74_0: Id = constructor_fields(p,source,tokens); { p.depth--; } return __cleanup_result_74_0; }
  if eat(p,source,tokens,t_l_paren) { var values=ScratchIdBuffer {};  var tuple=false; while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_paren) { values.push(pattern(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } tuple=true; } expect(p,source,tokens,t_r_paren); if !tuple&&values.len==1 { let __cleanup_result_75_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_71_0: Id = __cleanup_result_75_0; values.deinit(); return __cleanup_result_71_0; } let __cleanup_result_76_0: Id = list_node(p,source,tokens,a_pattern_product,values.items,start); { p.depth--; } let __cleanup_result_72_0: Id = __cleanup_result_76_0; values.deinit(); return __cleanup_result_72_0;  values.deinit(); }
@@ -1486,7 +1559,7 @@ recursive fn case_expression(p: Parser&,source: const u8[:],tokens: const Token[
  expect(p,source,tokens,t_dedent); let inputs=list(p,source,tokens,values.items); let cases=list(p,source,tokens,arms.items); let __cleanup_result_78_0: Id = add(p,source,tokens,a_case_expr,extra(p,source,tokens,[inputs.start,inputs.len]),cases.start,cases.len,start); arms.deinit(); values.deinit(); return __cleanup_result_78_0;
  arms.deinit(); values.deinit(); }
 fn operator_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_dollar||tag==t_star||tag==t_caret||tag==t_pipe||tag==t_kw_and||tag==t_kw_or; }
-fn atom_tag(tag: Tag) -> bool { return tag==t_integer||tag==t_float||tag==t_string||tag==t_intrinsic||tag==t_identifier||tag==t_type_identifier||tag==t_selector||tag==t_hash||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_colon||tag==t_kw_true||tag==t_kw_false||tag==t_kw_spark; }
+fn atom_tag(tag: Tag) -> bool { return tag==t_integer||tag==t_char_literal||tag==t_float||tag==t_string||tag==t_byte_string||tag==t_intrinsic||tag==t_identifier||tag==t_type_identifier||tag==t_selector||tag==t_hash||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_colon||tag==t_kw_true||tag==t_kw_false||tag==t_kw_spark; }
 fn type_atom_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_type_identifier||tag==t_intrinsic||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_caret||tag==t_symbol; }
 fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i64) -> bool {
  let idx=p.index+offset; if idx>=tokens.len { return false; }
@@ -1498,7 +1571,7 @@ fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i6
 fn is_statement_tag(tag: blot_parse_ast::Tag) -> bool {
  return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
 }
-fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
+fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_char_literal||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
 fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&) -> Parser {
  return Parser {pool:pool,tree:tree};
 }

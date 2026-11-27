@@ -174,6 +174,7 @@ struct V128Shadow {
     w0: u32,
     vloc: u32,
     is_float: bool,
+    is_wide: bool = false,
     depth: u32,
     materialized_at: u64 = 0,
 }
@@ -729,7 +730,13 @@ fn runtime_(g: Generator&) -> const Runtime& {
             hf = unitsHaveFork(g.units);
             hp = unitsHavePersistentState(g.units);
         }
-        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, blot_direct_runtime::Budgets {}, hf, hp);
+        let budgets = blot_direct_runtime::Budgets {
+            stack: blot_direct_writer::stackBudget(),
+            heap: blot_direct_writer::heapBudget(),
+            transport: blot_direct_writer::transportBudget(),
+            ..
+        };
+        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, budgets, hf, hp);
         g.s.has_rt = true;
     }
     return g.s.rt;

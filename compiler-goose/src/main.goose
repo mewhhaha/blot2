@@ -16,7 +16,11 @@ fn refreshIdentity() {
  let relaxed=blot_direct_writer::relaxedSimdEnabled();
  let tails=blot_direct_writer::tailCallsEnabled();
  let test_mode=blot_direct_writer::testModeEnabled();
- if limit==blot_source_identity::inference_budget && !relaxed && !tails && !test_mode {
+ let sb=blot_direct_writer::stackBudget();
+ let hb=blot_direct_writer::heapBudget();
+ let tb=blot_direct_writer::transportBudget();
+ let default_budgets=sb==blot_direct_writer::default_stack_bytes && hb==blot_direct_writer::default_heap_bytes && tb==blot_direct_writer::default_transport_bytes;
+ if limit==blot_source_identity::inference_budget && !relaxed && !tails && !test_mode && default_budgets {
   configured_identity=blot_source_identity::digest;
   return;
  }
@@ -36,6 +40,14 @@ fn refreshIdentity() {
   hash.update(flags);
  }
  if test_mode {hash.update("test-mode");}
+ if !default_budgets {
+  hash.update("memory-budgets");
+  var bbuf:u8[12]=[0;12];
+  blot_bytes::put_u32(bbuf,0,sb);
+  blot_bytes::put_u32(bbuf,4,hb);
+  blot_bytes::put_u32(bbuf,8,tb);
+  hash.update(bbuf);
+ }
  configured_identity=hash.final();
 }
 fn configureInferenceBudget(limit:u64)->Error {
@@ -49,6 +61,10 @@ fn configureWasmFeatures(relaxed_simd:bool,tail_calls:bool) {
 }
 fn configureTestMode(enabled:bool) {
  blot_direct_writer::setTestMode(enabled);
+ refreshIdentity();
+}
+fn configureMemoryBudgets(stack_mb:u32,heap_mb:u32,transport_mb:u32) {
+ blot_direct_writer::setMemoryBudgets(stack_mb*1048576,heap_mb*1048576,transport_mb*1048576);
  refreshIdentity();
 }
 export "blot_goose_main" fn mainEntry()->i32 {

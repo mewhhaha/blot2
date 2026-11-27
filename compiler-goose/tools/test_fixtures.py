@@ -272,6 +272,21 @@ keep 100% identical exit codes and diagnostics (`exit_diffs=0`, `diag_diffs=0`);
 modules from the new `r.reserve` runtime helper and best-fit reuse) plus `+4`
 prelude body elaborations/lowerings.
 
+SIMD, Stdlib & Language Literals/ABI Checkpoint 2 (27 November 2026) added
+`F64x2`/`U64x2`/`U8x16`/`I16x8` SIMD intrinsics and `@simd.load_{u8x16,f64x2}` /
+`@simd.store_{u8x16,f64x2}`, `@u64.mul_wide` (`U64.mul_wide`, runtime and `#do:`
+staging), `F64` math helpers (`clamp`/`lerp`/`square`/`is_finite`/`sin`/`cos`/
+`sin_cos`/`tan`) in `std/prelude.blot`, `std/bytes.blot` and `std/map.blot`, a
+fix for 64-bit payload slot merging in multi-variant unboxed sums, char literals
+(`'a'`, escapes, Unicode) and byte-string literals (`b"..."`), numeric literal
+suffixes (`u8`/`u32`/`i32`/`u64`/`i64`/`f32`/`f64`), ABI 8 extended scalar and
+array tags `14..23` (`U8`/`I32`/`U64`/`I64`/`F64` scalars, arrays, constants,
+and `Foreign` callbacks), and `--stack-mb`/`--heap-mb`/`--transport-mb` budget
+flags. Re-recorded `expected.json`: all 109 fixtures keep 100% identical exit
+codes, diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
+`wasm_diffs=0`); only prelude frontend/lower work counters updated (`+12`
+prelude body elaborations/lowerings).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

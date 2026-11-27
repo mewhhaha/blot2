@@ -174,23 +174,121 @@ export interface MemoryShape {
   readonly maximumPages?: number;
 }
 
-const scalarTypes = ["Unit", "U32", "Bool", "F32"] as const;
+const scalarTypes = [
+  "Unit",
+  "U32",
+  "Bool",
+  "F32",
+  "U8",
+  "I32",
+  "U64",
+  "I64",
+  "F64",
+] as const;
 export type ScalarType = typeof scalarTypes[number];
 export type ScalarValue<T extends ScalarType = ScalarType> = T extends "Unit"
   ? null
   : T extends "Bool" ? boolean
+  : T extends "U64" | "I64" ? bigint
   : number;
 
-export type ArrayType = "Array U32" | "Array F32";
+export type ArrayType =
+  | "Array U32"
+  | "Array F32"
+  | "Array U8"
+  | "Array I32"
+  | "Array U64"
+  | "Array I64"
+  | "Array F64";
 export type ValueType = ScalarType | ArrayType;
 export type ValueOf<T extends ValueType> = T extends "Array U32" ? Uint32Array
   : T extends "Array F32" ? Float32Array
+  : T extends "Array U8" ? Uint8Array
+  : T extends "Array I32" ? Int32Array
+  : T extends "Array U64" ? BigUint64Array
+  : T extends "Array I64" ? BigInt64Array
+  : T extends "Array F64" ? Float64Array
   : T extends ScalarType ? ScalarValue<T>
   : never;
 export type GuestValue = ValueOf<ValueType>;
 
 function isArrayType(type: ValueType | OwnerType): type is ArrayType {
-  return type === "Array U32" || type === "Array F32";
+  return typeof type === "string" && type.startsWith("Array ");
+}
+
+function scalarTypeFromTag(tag: number): ScalarType | undefined {
+  switch (tag) {
+    case 0:
+      return "Unit";
+    case 1:
+      return "U32";
+    case 2:
+      return "Bool";
+    case 3:
+      return "F32";
+    case 14:
+      return "U8";
+    case 15:
+      return "I32";
+    case 16:
+      return "U64";
+    case 17:
+      return "I64";
+    case 18:
+      return "F64";
+    default:
+      return undefined;
+  }
+}
+
+function arrayTypeFromTag(tag: number): ArrayType | undefined {
+  switch (tag) {
+    case 5:
+      return "Array U32";
+    case 6:
+      return "Array F32";
+    case 19:
+      return "Array U8";
+    case 20:
+      return "Array I32";
+    case 21:
+      return "Array U64";
+    case 22:
+      return "Array I64";
+    case 23:
+      return "Array F64";
+    default:
+      return undefined;
+  }
+}
+
+function arrayElementBytes(type: ArrayType): 1 | 4 | 8 {
+  switch (type) {
+    case "Array U8":
+      return 1;
+    case "Array U32":
+    case "Array I32":
+    case "Array F32":
+      return 4;
+    case "Array U64":
+    case "Array I64":
+    case "Array F64":
+      return 8;
+  }
+}
+
+function wasmValTypeCode(type: ValueType): number {
+  switch (type) {
+    case "F32":
+      return 125;
+    case "F64":
+      return 124;
+    case "U64":
+    case "I64":
+      return 126;
+    default:
+      return 127;
+  }
 }
 
 export interface CallbackType {
@@ -510,7 +608,7 @@ class AbiReader {
   }
 
   scalar(tag = this.byte()): ScalarType {
-    const type = scalarTypes[tag];
+    const type = scalarTypeFromTag(tag);
     if (type === undefined) {
       throw new GuestError("invalid_abi", `Unknown scalar ABI tag ${tag}`);
     }
@@ -518,9 +616,7 @@ class AbiReader {
   }
 
   value(tag = this.byte()): ValueType {
-    if (tag === 5) return "Array U32";
-    if (tag === 6) return "Array F32";
-    return this.scalar(tag);
+    return arrayTypeFromTag(tag) ?? this.scalar(tag);
   }
 
   publicValue(tag = this.byte()): ValueType | OwnerType {
@@ -619,13 +715,11 @@ const wireSchemaKinds: readonly WireSchemaKind[] = [
 ];
 
 function valueTypeFromTag(tag: number): ValueType {
-  if (tag === 5) return "Array U32";
-  if (tag === 6) return "Array F32";
-  const scalar = scalarTypes[tag];
-  if (scalar === undefined) {
+  const type = arrayTypeFromTag(tag) ?? scalarTypeFromTag(tag);
+  if (type === undefined) {
     throw new GuestError("invalid_abi", `Unknown value ABI tag ${tag}`);
   }
-  return scalar;
+  return type;
 }
 
 function parseWireSchema(
@@ -1597,7 +1691,7 @@ function scalarToWasm(
   value: unknown,
   code: "invalid_argument" | "host_result",
   label: string,
-): number {
+): number | bigint {
   switch (type) {
     case "Unit":
       if (value === null) return 0;
@@ -1605,20 +1699,55 @@ function scalarToWasm(
     case "Bool":
       if (typeof value === "boolean") return value ? 1 : 0;
       break;
+    case "U8":
+      if (
+        typeof value === "number" && Number.isInteger(value) && value >= 0 &&
+        value <= 0xFF
+      ) return value;
+      break;
     case "U32":
       if (
         typeof value === "number" && Number.isInteger(value) && value >= 0 &&
         value <= 0xFFFFFFFF
       ) return value;
       break;
+    case "I32":
+      if (
+        typeof value === "number" && Number.isInteger(value) &&
+        value >= -0x80000000 && value <= 0x7FFFFFFF
+      ) return value;
+      break;
+    case "U64":
+      if (
+        typeof value === "bigint" && value >= 0n &&
+        value <= 0xFFFF_FFFF_FFFF_FFFFn
+      ) return BigInt.asIntN(64, value);
+      break;
+    case "I64":
+      if (
+        typeof value === "bigint" && value >= -0x8000_0000_0000_0000n &&
+        value <= 0x7FFF_FFFF_FFFF_FFFFn
+      ) return value;
+      break;
     case "F32":
       if (typeof value === "number") return Math.fround(value);
+      break;
+    case "F64":
+      if (typeof value === "number") return value;
       break;
   }
   throw new GuestError(code, `${label} must be ${type}`);
 }
 
 function scalarFromWasm(type: ScalarType, value: unknown): ScalarValue {
+  if (type === "U64" || type === "I64") {
+    if (typeof value !== "bigint") {
+      throw new GuestError("invalid_abi", `Wasm ${type} value is not a bigint`);
+    }
+    return type === "U64"
+      ? BigInt.asUintN(64, value)
+      : BigInt.asIntN(64, value);
+  }
   if (typeof value !== "number") {
     throw new GuestError("invalid_abi", `Wasm ${type} value is not a number`);
   }
@@ -1629,6 +1758,9 @@ function scalarFromWasm(type: ScalarType, value: unknown): ScalarValue {
     case "Bool":
       if (value === 0 || value === 1) return value === 1;
       break;
+    case "U8":
+      if (Number.isInteger(value) && value >= 0 && value <= 0xFF) return value;
+      break;
     case "U32":
       if (
         Number.isInteger(value) && value >= -0x80000000 && value <= 0x7FFFFFFF
@@ -1636,8 +1768,17 @@ function scalarFromWasm(type: ScalarType, value: unknown): ScalarValue {
         return value >>> 0;
       }
       break;
+    case "I32":
+      if (
+        Number.isInteger(value) && value >= -0x80000000 && value <= 0x7FFFFFFF
+      ) {
+        return value | 0;
+      }
+      break;
     case "F32":
       return Math.fround(value);
+    case "F64":
+      return value;
   }
   throw new GuestError("invalid_abi", `Non-canonical Wasm ${type} value`);
 }
@@ -1652,6 +1793,7 @@ function arrayRange(
   arena: GuestArena,
   pointer: unknown,
   length: number,
+  elemBytes: 1 | 4 | 8 = 4,
 ): number {
   if (
     typeof pointer !== "number" || !Number.isInteger(pointer) ||
@@ -1665,11 +1807,61 @@ function arrayRange(
   if (
     address < 4 || address % 4 !== 0 ||
     address > arena.memory.buffer.byteLength - 4 ||
-    length > (arena.memory.buffer.byteLength - address - 4) / 4
+    length > (arena.memory.buffer.byteLength - address - 4) / elemBytes
   ) {
     throw new GuestError("invalid_abi", "Array lies outside the guest arena");
   }
   return address;
+}
+
+type GuestTypedArray =
+  | Uint8Array
+  | Uint32Array
+  | Int32Array
+  | Float32Array
+  | BigUint64Array
+  | BigInt64Array
+  | Float64Array;
+
+function arrayClassName(type: ArrayType): string {
+  switch (type) {
+    case "Array U8":
+      return "Uint8Array";
+    case "Array U32":
+      return "Uint32Array";
+    case "Array I32":
+      return "Int32Array";
+    case "Array F32":
+      return "Float32Array";
+    case "Array U64":
+      return "BigUint64Array";
+    case "Array I64":
+      return "BigInt64Array";
+    case "Array F64":
+      return "Float64Array";
+  }
+}
+
+function isMatchingTypedArray(
+  type: ArrayType,
+  value: unknown,
+): value is GuestTypedArray {
+  switch (type) {
+    case "Array U8":
+      return value instanceof Uint8Array;
+    case "Array U32":
+      return value instanceof Uint32Array;
+    case "Array I32":
+      return value instanceof Int32Array;
+    case "Array F32":
+      return value instanceof Float32Array;
+    case "Array U64":
+      return value instanceof BigUint64Array;
+    case "Array I64":
+      return value instanceof BigInt64Array;
+    case "Array F64":
+      return value instanceof Float64Array;
+  }
 }
 
 function arrayToWasm(
@@ -1680,42 +1872,57 @@ function arrayToWasm(
   code: "invalid_argument" | "host_result" = "invalid_argument",
   batch?: NumericArrayCall,
 ): number {
-  if (
-    !(type === "Array U32"
-      ? argument instanceof Uint32Array
-      : argument instanceof Float32Array)
-  ) {
+  if (!isMatchingTypedArray(type, argument)) {
     throw new GuestError(
       code,
-      `${name} argument must be ${
-        type === "Array U32" ? "Uint32Array" : "Float32Array"
-      }`,
+      `${name} argument must be ${arrayClassName(type)}`,
     );
   }
-  const values = argument as Uint32Array | Float32Array;
+  const values = argument;
+  const elemBytes = arrayElementBytes(type);
   const prefix = batch?.prefix;
   const prefixLength = prefix?.length ?? 0;
   const length = prefixLength + values.length;
-  if (length >= 1_073_741_823) {
+  const payloadBytes = length * elemBytes;
+  if (payloadBytes > 0xFFFF_FFF8) {
     throw new GuestError(
       code,
       `${name} array byte count exceeds the Wasm32 address range`,
     );
   }
+  const allocBytes = payloadBytes + 4 + ((4 - (payloadBytes & 3)) & 3);
   const pointer = arrayRange(
     arena,
-    arena.allocate((length + 1) * 4),
+    arena.allocate(allocBytes),
     length,
+    elemBytes,
   );
   // Allocation may grow memory, so acquire a fresh view only afterwards.
   const view = new DataView(arena.memory.buffer);
   view.setUint32(pointer, length, true);
-  batch?.observeCopy?.("guestInput", length * 4);
+  batch?.observeCopy?.("guestInput", payloadBytes);
   if (prefixLength && prefix) copyArrayWords(view, pointer + 4, prefix);
-  let words: Uint32Array;
-  if (values instanceof Uint32Array) words = values;
-  else words = new Uint32Array(values.buffer, values.byteOffset, values.length);
-  copyArrayWords(view, pointer + 4 + prefixLength * 4, words);
+  const dataStart = pointer + 4 + prefixLength * 4;
+  if (elemBytes === 1) {
+    const bytes = values as Uint8Array;
+    if (bytes.buffer instanceof ArrayBuffer) {
+      new Uint8Array(view.buffer, dataStart, bytes.length).set(bytes);
+    } else {
+      for (let index = 0; index < bytes.length; index++) {
+        view.setUint8(dataStart + index, bytes[index]);
+      }
+    }
+  } else if (elemBytes === 4) {
+    const words = values instanceof Uint32Array
+      ? values
+      : new Uint32Array(values.buffer, values.byteOffset, values.length);
+    copyArrayWords(view, dataStart, words);
+  } else {
+    const words = values instanceof BigUint64Array
+      ? values
+      : new BigUint64Array(values.buffer, values.byteOffset, values.length);
+    copyArrayWords64(view, dataStart, words);
+  }
   return pointer;
 }
 
@@ -1740,42 +1947,89 @@ function copyArrayWords(view: DataView, start: number, words: Uint32Array) {
   }
 }
 
+function copyArrayWords64(
+  view: DataView,
+  start: number,
+  words: BigUint64Array,
+) {
+  const { length, byteLength } = words;
+  if (littleEndian && length > 16 && words.buffer instanceof ArrayBuffer) {
+    new Uint8Array(view.buffer, start, byteLength).set(
+      new Uint8Array(words.buffer, words.byteOffset, byteLength),
+    );
+  } else {
+    for (let index = 0; index < length; index++) {
+      view.setBigUint64(start + index * 8, words[index], true);
+    }
+  }
+}
+
+function allocateTypedArray(type: ArrayType, length: number): GuestTypedArray {
+  switch (type) {
+    case "Array U8":
+      return new Uint8Array(length);
+    case "Array U32":
+      return new Uint32Array(length);
+    case "Array I32":
+      return new Int32Array(length);
+    case "Array F32":
+      return new Float32Array(length);
+    case "Array U64":
+      return new BigUint64Array(length);
+    case "Array I64":
+      return new BigInt64Array(length);
+    case "Array F64":
+      return new Float64Array(length);
+  }
+}
+
 function arrayFromWasm(
   arena: GuestArena,
   type: ArrayType,
   result: unknown,
   batch?: NumericArrayCall,
-): Uint32Array | Float32Array {
-  const pointer = arrayRange(arena, result, 0);
+): GuestTypedArray {
+  const elemBytes = arrayElementBytes(type);
+  const pointer = arrayRange(arena, result, 0, elemBytes);
   // Guest execution may also grow memory; never retain the input view.
   const view = new DataView(arena.memory.buffer);
   const length = view.getUint32(pointer, true);
-  arrayRange(arena, pointer, length);
+  arrayRange(arena, pointer, length, elemBytes);
+  const payloadBytes = length * elemBytes;
   // The ABI wrapper has already packed this payload, even if its length is
   // wrong for the registered batch. Refuse before the additional host copy.
-  batch?.observeCopy?.("guestPack", length * 4);
+  batch?.observeCopy?.("guestPack", payloadBytes);
   if (batch && length !== batch.resultLength) {
     throw new GuestError(
       "invalid_abi",
       "Numeric batch result has the wrong length",
     );
   }
-  const values = type === "Array U32"
-    ? new Uint32Array(length)
-    : new Float32Array(length);
-  batch?.observeCopy?.("guestOutput", length * 4);
-  if (littleEndian && length > 32) {
+  const values = allocateTypedArray(type, length);
+  batch?.observeCopy?.("guestOutput", payloadBytes);
+  if (elemBytes === 1) {
+    (values as Uint8Array).set(
+      new Uint8Array(arena.memory.buffer, pointer + 4, length),
+    );
+  } else if (littleEndian && length > (elemBytes === 8 ? 16 : 32)) {
     // Still copy out: the arena is reset/reused after the invocation, and a
     // host callback must never receive a mutable alias into guest storage.
     new Uint8Array(values.buffer).set(
       new Uint8Array(arena.memory.buffer, pointer + 4, values.byteLength),
     );
-  } else {
-    const output = type === "Array U32"
-      ? values as Uint32Array
+  } else if (elemBytes === 4) {
+    const output = values instanceof Uint32Array
+      ? values
       : new Uint32Array(values.buffer);
     for (let index = 0; index < length; index++) {
       output[index] = view.getUint32(pointer + 4 + index * 4, true);
+    }
+  } else {
+    const output = values instanceof BigUint64Array
+      ? values
+      : new BigUint64Array(values.buffer);
+    for (let index = 0; index < length; index++) {
+      output[index] = view.getBigUint64(pointer + 4 + index * 8, true);
     }
   }
   return values;
@@ -1897,8 +2151,7 @@ function typedCleanupImport(
   signature: CallbackType,
   callback: CallableFunction,
 ): WebAssembly.ImportValue {
-  let parameter = 127;
-  if (signature.parameter === "F32") parameter = 125;
+  const parameter = wasmValTypeCode(signature.parameter);
   let handle = 111;
   if (signature.lifetime === "owned") handle = 127;
   let parameters = [2, handle, parameter];
@@ -2070,7 +2323,11 @@ export async function instantiateGuest(
     }
     return arrayFromWasm(arena, type, value);
   }
-  function hostResult(type: ValueType, value: unknown, name: string): number {
+  function hostResult(
+    type: ValueType,
+    value: unknown,
+    name: string,
+  ): number | bigint {
     const label = `Host callback result during ${name}`;
     if (!isArrayType(type)) {
       return scalarToWasm(type, value, "host_result", label);
@@ -2085,7 +2342,7 @@ export async function instantiateGuest(
     result: unknown,
     name: string,
     taskContext: number | undefined,
-  ): Promise<number> {
+  ): Promise<number | bigint> {
     let value: unknown;
     try {
       value = await result;
@@ -2115,9 +2372,9 @@ export async function instantiateGuest(
     if (signature.lifetime === "owned") bindings ??= new Map();
     const invokeImport = (
       reference: unknown,
-      value: number,
+      value: number | bigint,
       data?: number,
-    ): number | Promise<number> => {
+    ): number | bigint | Promise<number | bigint> => {
       let invocation: NonNullable<typeof active> | undefined = active;
       if (signature.lifetime === "owned") {
         const binding = bindings!.get(Number(reference) >>> 0);
@@ -2139,7 +2396,7 @@ export async function instantiateGuest(
       }
       if (
         signature.dataSchema !== undefined &&
-          (value >>> 0) !== invocation.signature.dataSchema ||
+          ((value as number) >>> 0) !== invocation.signature.dataSchema ||
         signature.dataSchema === undefined &&
           invocation.signature.dataSchema !== undefined
       ) {
@@ -2179,7 +2436,7 @@ export async function instantiateGuest(
           argument = copyData(
             arena.memory,
             dataSchemas,
-            value >>> 0,
+            (value as number) >>> 0,
             data >>> 0,
           );
         } catch (cause) {
@@ -2667,6 +2924,11 @@ export async function instantiateGuest(
     ...scalarTypes,
     "Array U32",
     "Array F32",
+    "Array U8",
+    "Array I32",
+    "Array U64",
+    "Array I64",
+    "Array F64",
   ];
   function createCapability<P extends ValueType, R extends ValueType>(
     definition: AsyncHostCallback<P, R>,
@@ -2773,12 +3035,14 @@ export async function instantiateGuest(
       if (!ownerInput && typeof fn.result === "string") continue;
       let parameter = 127;
       if (typeof fn.parameter === "string") {
-        if (fn.parameter === "F32") parameter = 125;
+        parameter = wasmValTypeCode(fn.parameter);
       } else if (fn.parameter.kind === "owner") {
-        if (fn.parameter.fresh === "F32") parameter = 125;
+        if (fn.parameter.fresh !== undefined) {
+          parameter = wasmValTypeCode(fn.parameter.fresh);
+        }
       } else parameter = 111;
       let result = 127;
-      if (fn.result === "F32") result = 125;
+      if (typeof fn.result === "string") result = wasmValTypeCode(fn.result);
       const entries: [string, number][] = [[fn.name, parameter]];
       if (ownerInput && (fn.parameter as OwnerType).fresh !== undefined) {
         entries.push([`blot:owner_call/${fn.name}`, 127]);
@@ -2908,7 +3172,7 @@ export async function instantiateGuest(
     if (fn.multiplicity === "once" && consumedOnce!.has(name)) {
       throw new GuestError("once_reused", `${name} has already been invoked`);
     }
-    let value: number | object;
+    let value: number | bigint | object;
     let exportedName = name;
     let movedOwner: PublicOwnerState | undefined;
     let argumentType: ValueType | undefined;
@@ -3226,7 +3490,7 @@ export async function instantiateGuest(
           dataSchema: owner.schema,
         }),
       });
-      callbacks.set(capability, (value) => call(value));
+      callbacks.set(capability, (value) => call(value as DataValue));
       return capability;
     },
     capability: (definition) => createCapability(definition, false),

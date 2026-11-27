@@ -167,6 +167,7 @@ export function parserSource(
         chainContinuation = (previous.type === "named" && (
           previous.kind === "IDENT" || previous.kind === "TYPE_IDENT" ||
           previous.kind === "INTEGER" || previous.kind === "FLOAT" ||
+          previous.kind === "CHAR" || previous.kind === "BYTE_STRING" ||
           previous.kind === "STRING"
         )) ||
           ["true", "false", ")", "]", "}", "\uE002"].includes(previous.text);
