@@ -70,6 +70,7 @@ io const answer = func (input: U32) => return do:
 Deno.test("owned source operators honor associated declarations without changing explicit primitives", async () => {
   await compileAndRun(
     `
+func (+) left -> right => return @type.call "add" left right
 type Number is data = $Number U32
 const Number.add = func (left: Number) -> (right: U32) => return do:
   let $Number value = left

@@ -38,7 +38,6 @@ export default grammar({
         $.lambda_header,
         $.type_header,
         $.curried_type_header,
-        $.infix_function,
         $.forward_break,
         $.declaration_tag,
         $.constructor_reference,
@@ -97,7 +96,10 @@ export default grammar({
         2,
         prec.right(seq(
           choice($.binding_keyword, $.entry_binding, $.private_binding),
-          field("name", choice($.identifier, $.qualified_function_name)),
+          field(
+            "name",
+            choice($.identifier, $.qualified_function_name, $.operator_name),
+          ),
           optional($.binding_annotation),
           alias("=", $.operator),
           choice($.lambda_header, $.grouped_lambda),
@@ -209,12 +211,17 @@ export default grammar({
           seq(
             optional(alias("private", $.private_modifier)),
             "func",
-            field("name", choice($.identifier, $.qualified_function_name)),
+            field(
+              "name",
+              choice($.identifier, $.qualified_function_name, $.operator_name),
+            ),
             field("parameter", $._parameter),
             repeat(seq("->", field("parameter", $._parameter))),
           ),
         ),
       ),
+
+    operator_name: ($) => prec(2, seq("(", field("symbol", $.operator), ")")),
 
     _parameter: ($) =>
       choice(
@@ -381,17 +388,6 @@ export default grammar({
     type_parameter_field: ($) =>
       seq(field("name", $.identifier), ":", $._type_parameter),
 
-    infix_function: ($) =>
-      seq(
-        "`",
-        repeat(seq(
-          field("qualifier", choice($.identifier, $.type_identifier)),
-          ".",
-        )),
-        field("name", $.identifier),
-        "`",
-      ),
-
     forward_break: (_) => seq("break", alias(token(/\$[ \t]+/), "$")),
 
     constructor_marker: (_) => prec(-1, "$"),
@@ -516,10 +512,6 @@ export default grammar({
         "data",
         "type",
         "is",
-        "infixl",
-        "infixr",
-        "infix",
-        "prefix",
         "effect",
         "use",
         "rec",

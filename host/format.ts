@@ -138,12 +138,6 @@ export async function formatSource(source: string): Promise<string> {
             }
           }
         }
-        if (node.kind === "named_operator") {
-          // Only the opening backtick hugs the name; the right operand keeps
-          // its space after the closing one.
-          const opening = nested.find((child) => child.text === "`");
-          if (opening) tightAfter.add(Number(opening.offset));
-        }
         if (
           node.kind === "receive" ||
           (node.kind === "expression" && nested[0]?.text === "|" &&
@@ -163,7 +157,6 @@ export async function formatSource(source: string): Promise<string> {
       let line = 0;
       let text = "";
       let previous: { text: string; start: number; end: number } | undefined;
-      let backtick = false;
       for (let index = 0; index < lexed.tokenTape.length; index++) {
         const token = lexed.tokenTape.token(index)!;
         if (
@@ -197,7 +190,20 @@ export async function formatSource(source: string): Promise<string> {
           } else if (["(", "["].includes(previous.text)) space = false;
           else if (["(", "["].includes(value)) {
             space = !adjacent ||
-              ["=", ":=", "=>", "->", "<-", ","].includes(previous.text);
+              [
+                "=",
+                ":=",
+                "=>",
+                "->",
+                "<-",
+                ",",
+                "{",
+                "func",
+                "const",
+                "let",
+                "as",
+              ]
+                .includes(previous.text);
           } else if (value === ".") space = !adjacent;
           else if (
             previous.text === "." ||
@@ -207,10 +213,6 @@ export async function formatSource(source: string): Promise<string> {
           else if (tightAfter.has(previous.start)) space = false;
           else if (tightBefore.has(token.span.start)) space = false;
           else if (value === "}" && previous.text === "{") space = false;
-          if (value === "`") {
-            if (backtick) space = false;
-            backtick = !backtick;
-          } else if (backtick) space = false;
         }
         if (space) text += " ";
         text += value;

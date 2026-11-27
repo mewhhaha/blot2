@@ -566,7 +566,7 @@ Deno.test("manifest discovery compiles each test with its own relative imports a
         path,
         `import { local } from "./helper"
 import { shared } from "math/value"
-io test_imports () => return shared + local == ${42 + index}
+io test_imports () => return @u32.eq (@u32.add shared local) ${42 + index}
 `,
       );
     }

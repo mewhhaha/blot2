@@ -1,6 +1,25 @@
 // The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
-// Arithmetic operators use ordinary functions with compile-time associated dispatch.
-// Boolean and/or are reserved short-circuit operators.
+// Standard operators are ordinary functions built on @type.call and @pipe.
+// Boolean and/or and $ application remain language syntax.
+
+func (+) left -> right => @type.call "add" left right
+func (-) left -> right => @type.call "sub" left right
+func (*) left -> right => @type.call "mul" left right
+func (/) left -> right => @type.call "div" left right
+func (%) left -> right => @type.call "rem" left right
+func (&) left -> right => @type.call "bit_and" left right
+func (|) left -> right => @type.call "bit_or" left right
+func (^) left -> right => @type.call "bit_xor" left right
+func (<<) value -> count => @type.call "shl" value count
+func (>>) value -> count => @type.call "shr" value count
+func (==) left -> right => @type.call "eq" left right
+func (!=) left -> right => @type.call "ne" left right
+func (<) left -> right => @type.call "lt" left right
+func (<=) left -> right => @type.call "le" left right
+func (>) left -> right => @type.call "gt" left right
+func (>=) left -> right => @type.call "ge" left right
+func (|>) value -> function => @pipe value function
+func (<|) function -> value => @pipe value function
 
 func add left -> right => @type.call "add" left right
 func sub left -> right => @type.call "sub" left right
@@ -77,11 +96,11 @@ const U32.shl = @u32.shl
 const U32.shr = @u32.shr
 func U32.abs value => value
 const U32.eq = @u32.eq
+const U32.ne = @u32.ne
 const U32.lt = @u32.lt
-func U32.ne left -> right => Bool.not (U32.eq left right)
-func U32.le left -> right => Bool.not (U32.lt right left)
-func U32.gt left -> right => U32.lt right left
-func U32.ge left -> right => Bool.not (U32.lt left right)
+const U32.le = @u32.le
+const U32.gt = @u32.gt
+const U32.ge = @u32.ge
 const U32.to_f32 = @u32.to_f32
 
 const F32.add = @f32.add

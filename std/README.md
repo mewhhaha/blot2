@@ -212,18 +212,18 @@ U32 literals are decimal or hexadecimal, optionally separated by underscores:
 | `U32.eq`, `ne`, `lt`, `le`, `gt`, `ge` | Binary comparisons to Bool |
 | `U32.to_f32 value`                     | Rounded numeric conversion |
 
-The prelude's arithmetic and comparison operators call generic functions such as
-`add`, `mul`, and `lt`. `1.0 + 2.0` selects `F32.add`; `1 + 2` selects
-`U32.add`. `/` also supports U32 division. There is no implicit numeric
+The prelude defines all standard symbolic operators as ordinary Blot source functions:
+`+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+via `@type.call`, plus `|>` and `<|` via `@pipe`. `1.0 + 2.0` selects `F32.add`; `1 + 2`
+selects `U32.add`. `/` also supports U32 division. There is no implicit numeric
 conversion: use `42.0`, `U32.to_f32 42`, or `from 42` when an F32 result is
 required by the context.
 
-The generic functions use `@type.call "add" left right`. At compile time this
-tries `LeftType.add(left, right)`, then `RightType.add(left, right)` if the
-first function cannot accept both operands. Arguments keep their original order.
+The generic operator functions use `@type.call "add" left right`. At compile time this
+resolves a trait method or associated function `LeftType.add(left, right)` on the left
+operand's type. Arguments keep their original order.
 The selected function determines the result type and effects. A matching left
-implementation takes precedence; an incompatible return annotation is an error,
-not a reason to switch to the right implementation.
+implementation takes precedence; an incompatible return annotation is an error.
 
 Nominal types can define associated functions in their owning module:
 
@@ -250,25 +250,15 @@ code, so a call with no implementation (`true + false`) in a declaration no
 entry reaches is type checked but not reported. `@type.call` also accepts other
 literal member names, such as `"distance"`.
 
-Operators are source-defined aliases for functions, not compiler arithmetic
-special cases. Backticks also call a named function infix:
+Operators are ordinary functions named in parentheses (`func (++) a -> b => ...`,
+`const (><) = ...`, `import { (++) } from "./ops"`). Precedence and associativity are
+lexical (determined by the operator's spelling with no `infix` declarations). Application
+binds tighter than operators. `and` and `or` are reserved short-circuit Boolean keywords:
+the right operand runs only when the left operand does not determine the result.
 
-```blot
-const plus = func left -> right => return U32.add left right
-io const answer = func () => return 20 `plus` 22
-```
-
-Custom fixity declarations belong before other declarations. Application binds
-tighter than operators. See the
-[compiler syntax reference](../host/README.md#prelude-and-operators) for
-precedence/associativity. `and` and `or` are reserved Boolean operators. They
-short-circuit: the right operand runs only when the left operand does not
-determine the result.
-
-The prelude also defines `infixr 0 ($) = apply`. Like Haskell's application
-spelling, `f $ g $ x` groups as `f (g x)` and binds below arithmetic and default
-backtick operators. Unlike Haskell, Blot still evaluates ordinary arguments
-eagerly; `$` neither defers work nor handles effects.
+`$` (precedence 0, right-associative) is built-in application syntax: `f $ g $ x` groups
+as `f (g x)` and binds below arithmetic and pipes. Unlike Haskell, Blot still evaluates
+ordinary arguments eagerly; `$` neither defers work nor handles effects.
 
 ```blot
 io const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
@@ -523,7 +513,8 @@ For a complete small program, see
 | Form                                 | Behavior                                                       |
 | ------------------------------------ | -------------------------------------------------------------- |
 | `from value`                         | Converts using the expected destination type's `from` function |
-| `value \|> transform`                | Applies `transform` to `value`                                 |
+| `value \|> transform`                | Applies `transform` to `value` (defined via `@pipe`)           |
+| `transform <\| value`                | Applies `transform` to `value` (right-associative `@pipe`)     |
 | `.name`                              | Selects a field or receiver member as a function               |
 | `:value`, `:(expression)`            | Creates an ordinary `Type` witness                             |
 | `left and right`, `left or right`    | Short-circuits primitive Boolean operands                      |
@@ -532,11 +523,11 @@ For a complete small program, see
 | `value << bits`, `value >> bits`     | U32 shifts, masking the count to its low five bits             |
 | `bit_not value`                      | U32 complement                                                 |
 
-From low to high, infix precedences are `$` (0), `|>` (5), `or` (20), `and`
-(25), comparisons (30), `|` (40), `^` (45), `&` (50), shifts (55), addition and
-subtraction (60), and multiplication, division, remainder (70). `$`, `and`, and
-`or` associate right; comparisons are non-associative; the other listed
-operators associate left.
+From low to high, lexical infix precedences are `$` (0, right), `|>` (5, left) /
+`<|` (5, right), `$`… (10, right), `or` (20, right), `and` (25, right), comparisons
+`== != < <= > >=` (30, non-associative) and other `= ! < >`-prefixed (30, left),
+`|`… (40, left), `^`… (45, left), `&`… (50, left), shifts `<< >> <<< >>>` (55, left),
+`+ - ~ ?`-prefixed (60, left), `* / %`-prefixed (70, left), and `**`… (75, right).
 
 `from` is ordinary source. Its body uses the general result-directed intrinsic
 `@type.result "member" value`; there is no compiler rule for the name `from`.

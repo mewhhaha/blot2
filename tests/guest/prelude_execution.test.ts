@@ -2,7 +2,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { equal } from "./compile_helpers.ts";
 
 const prelude = `
-infixl 60 (+) = add
+const (+) = add
 const add = func left => return func right => return @type.call "add" left right
 const U32.add = func left => return func right => return @u32.sub left right
 const F32.add = func left => return func right => return @f32.add left right

@@ -6,9 +6,12 @@ import {
 
 Deno.test("qualified pure associated calls compose with ambient handled effects", async () => {
   for (const name of ["associated", "associated-direct"]) {
-    const source = await Deno.readTextFile(
+    const raw = await Deno.readTextFile(
       new URL(`../../compiler-goose/tests/fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
     );
+    const source = name === "associated"
+      ? `func (+) left -> right => return @type.call "add" left right\n${raw}`
+      : raw;
     await compileAndRun(source, (guest) => {
       equal(guest.read("folded"), 42);
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 42);

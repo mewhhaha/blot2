@@ -801,7 +801,7 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 | `forall`, `exists`, `pack`, `unpack`, `@code.*`, `@proof.*`, `@usage.*` | Monomorphized generics, `#[n; T]`, `#run`, `#for` |
 | Untyped `#quote` / `#(...)` macros | Typed body-only `#for` / `#if` over `#fields` / `#variants` |
 | `=> return do:` with `break value`, `#do:` | `=> expr` or `=>` suite with `return`; `break` is loop-only |
-| Custom `infix`/`infixl`/`infixr`, `\|>`, `$` app, `.x` selectors, `:x` witnesses | Fixed operator table, `.name` chaining, explicit type args |
+| Custom `infix`/`infixl`/`infixr`, backtick infix, `.x` selectors, `:x` witnesses | Lexical operator precedence (`func (++) ...`), prelude operators via `@type.call` / `@pipe`, `.name` chaining, explicit type args |
 | `Bool.not`, `@panic`, `@hole`, `@storage.copy` | `not`, `panic`, `_`, `copy` |
 
 ---

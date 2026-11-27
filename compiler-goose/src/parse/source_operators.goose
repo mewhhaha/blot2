@@ -131,7 +131,9 @@ recursive fn scope<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,cont
 recursive fn loop_scope<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,pattern_id: Id,body: Id,depth: i64) { self_.loops++; scope(self_,tree,pool,context,locals,pattern_id,body,depth); self_.loops--; }
 fn operator<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,is_named: bool,id: Id) {
  if pool.get(symbol)=="and"||pool.get(symbol)=="or" { return; } let point=origin(tree,id);
- if is_named { name(self_,tree,pool,context,locals,symbol,id,point); } else if !context.source_symbolic_declared(symbol) { fail(self_,tree,pool,context,locals,c_unknown_operator,id,point,symbol); }
+ if is_named { name(self_,tree,pool,context,locals,symbol,id,point); return; }
+ if stopped(self_,tree,pool,context,locals)||context.source_editor_probe(id) { return; }
+ if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_operator,id,point,symbol); } }
 }
 recursive fn primitive<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,head: Id,argument_count: i64,depth: i64) {
  if stopped(self_,tree,pool,context,locals) { return; } let symbol=tree.node(head).a;

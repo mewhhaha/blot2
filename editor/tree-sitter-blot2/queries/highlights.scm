@@ -29,7 +29,6 @@
 (opaque_header "opaque" @keyword.storage.type)
 (implementation_header "impl" @keyword.storage.type)
 (implementation_header (private_modifier) @keyword.storage.modifier)
-["infixl" "infixr" "infix" "prefix"] @keyword.directive
 ["rec" "own"] @keyword.storage.modifier
 ["if" "then" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
@@ -68,9 +67,7 @@
 (named_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
 (qualified_function_name name: (identifier) @function)
 (qualified_function_name owner: (identifier) @namespace)
-(infix_function "`" @operator)
-(infix_function name: (identifier) @function)
-(infix_function qualifier: (identifier) @namespace)
+(operator_name symbol: (operator) @operator)
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
 (completion_constructor_pattern (identifier) @variable.parameter)

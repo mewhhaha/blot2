@@ -301,6 +301,27 @@ diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
 `wasm_diffs=0`); only prelude frontend/lower work counters updated (`+5`
 prelude body elaborations/lowerings).
 
+Lexical-Precedence Custom Operators & Std Prelude Operators (27 November 2026)
+replaced hardcoded binary operator dispatch in the compiler with context-free
+lexical precedence/associativity (`parse/parser.goose::lexical_fixity`),
+parenthesized operator names `(op)` across declarations, imports/exports,
+atoms, patterns, and module-qualified lookups (`mod.(op)`), the 2-arg `@pipe`
+intrinsic, `Parameters.direct_op` direct-forwarder propagation (wired through
+`dependency-wire-model.json` and regenerated adapters), `@u32.{ne,le,gt,ge}`
+primitives, and moving all 17 binary operators plus `<|` into `std/prelude.blot`
+via `@type.call` and `@pipe` (leaving only short-circuit `and`/`or` and `$`
+application as built-in binary syntax). Also fixed `exact_argument_types`
+covariant effect opening in associated/trait dispatch. Re-recorded
+`expected.json`: 0 exit-code diffs, 0 emitted-function diffs; 105 of 109
+fixtures stay bit-for-bit Wasm-identical while 4 polymorphic-dispatch fixtures
+change by a net -6 bytes (`direct/closures.blot` 6270->6263 B,
+`nominal/generic-fields-and-associated.blot` 4591->4584 B,
+`direct/generic_comprehensions.blot` 7249->7253 B,
+`result_selected_operand.blot` 5169->5173 B); 1 diagnostic updates
+(`nominal/ordered-right-fallback.blot`: `ambiguous_operator` ->
+`missing_associated` with `{"operation": "+", "member": "add"}`); and prelude
+work counters increase uniformly by `+18` body elaborations/lowerings.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

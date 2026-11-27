@@ -405,22 +405,35 @@ const value=f {y:2.0,x:40}
   equal(formatted.includes("combine point { x: y }"), true);
 });
 
-Deno.test("formatter accepts nominal record patterns and spaces named operators", async () => {
-  const source = `type Vec2 is data = $Vec2 { x: F32, y: F32 }
-const plus=func left=> return func right=> return left+right
+Deno.test("formatter accepts nominal record patterns and custom symbolic operators", async () => {
+  const source = `import {(++),(+~) as (+|)} from "./ops"
+type Vec2 is data = $Vec2 { x: F32, y: F32 }
+func (><) (left:U32)->(right:U32):U32=> left*10+right
 const length=func value=> return do:
     let $Vec2 {x,y:height}=value
     break x+height
 const first=func value=> return case value of
     $Some ($Vec2 {x}) => x
     _ => 0.0
-const sum=func ()=> return 20 \`plus\` 22
+const sum=func ()=> return 4><2
+const ref=func ()=> return (+) 20 22
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
+  equal(
+    formatted.includes('import { (++), (+~) as (+|) } from "./ops"'),
+    true,
+  );
+  equal(
+    formatted.includes(
+      "func (><) (left: U32) -> (right: U32): U32 => left * 10 + right",
+    ),
+    true,
+  );
   equal(formatted.includes("let $Vec2 { x, y: height } = value"), true);
   equal(formatted.includes("$Some ($Vec2 { x }) => x"), true);
-  equal(formatted.includes("20 `plus` 22"), true);
+  equal(formatted.includes("4 >< 2"), true);
+  equal(formatted.includes("(+) 20 22"), true);
 });
 
 // Every public example and std module formats idempotently, and the formatted

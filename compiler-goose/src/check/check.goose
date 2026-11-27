@@ -869,7 +869,7 @@ fn message(self_:Diagnostic)->const u8[:] {
         guard_fallthrough => {return "let-else fallback must exit its enclosing do block";},
         product_arity => {return "cannot unify products with different element counts";},
         unknown_value => {if self_.implicit_type_witness {return "unknown value: Type";}return "unknown value";},
-        unknown_operator => {return "operator has no source fixity declaration";},
+        unknown_operator => {return "operator is not declared in scope";},
         operator_associativity => {return "operators at equal precedence need compatible associativity or explicit parentheses";},
         operator_header_order => {return "operator declarations must precede values and data declarations";},
         operator_precedence => {return "operator precedence must be between 0 and 255";},
@@ -1082,7 +1082,6 @@ fn sourceRecordTarget(self_:Engine&,symbol:u32)->u32,blot_error::Error {let scal
 fn sourceMissingRecordField(self_:const Engine&,symbol:u32,fields:const u32[:])->blot_support::Option<u32> {let constructor:u32={let scalar_lookup_12 .= self_.catalogs.constructor_names.get(self_.catalogKey(symbol));if !scalar_lookup_12 {return blot_support::none<u32>();}let scalar_value_12:u32=scalar_lookup_12;scalar_value_12};let payload=self_.constructors[constructor].payload;if payload==0 {return blot_support::none<u32>();}let record=self_.types.node(payload);if record.tag!=blot_check_types::Tag.record {return blot_support::none<u32>();}for index in 0..record.b {let field=self_.types.recordField(record,index).name;var supplied=false;for id in fields {if self_.tree.node(id).a==field {supplied=true;break;}}if !supplied && self_.constructorFieldDefault(constructor,field)==0 {return blot_support::some(field);}}return blot_support::none<u32>();}
 fn sourceIntrinsicArity(self_:const Engine&,symbol:u32)->blot_support::Option<i64> {return exactIntrinsicArity(self_.pool.get(symbol));}
 fn sourceIntrinsicKnown(self_:const Engine&,symbol:u32)->bool {return intrinsicArity(self_.pool.get(symbol)).present;}
-fn sourceSymbolicDeclared(self_:const Engine&,symbol:u32)->bool {let text=self_.pool.get(symbol);return text=="|>" || symbolOperator(text)!=blot_check_types::Operator.none;}
 fn sourceOperatorTargetExists(self_:Engine&,name:u32)->bool,blot_error::Error {if self_.hasCatalogBinding(name) {return true,blot_error::Error.none;}let key=self_.catalogKey(name);return self_.catalogs.constructor_names.contains(key) || self_.catalogOperationTemplate(name).present,blot_error::Error.none;}
 fn sourceQualifiedExists(self_:const Engine&,namespace_:u32,member:u32)->bool {let key=Qualified{namespace_,member, ..};return self_.hasQualified(key) || self_.catalogs.nominal_names.contains(key) || self_.catalogs.effect_family_names.contains(key) || self_.catalogs.effect_operation_names.contains(key);}
 fn sourceValueExists(self_:Engine&,name:u32)->bool,blot_error::Error {let exists,err=self_.sourceOperatorTargetExists(name);if err!=blot_error::Error.none || exists {return exists,err;}let key=self_.catalogKey(name);if self_.catalogs.nominal_names.contains(key) || self_.catalogs.effect_family_names.contains(key) {return true,blot_error::Error.none;}let text=self_.pool.get(name);let separator=firstDot(text);var root=name;if separator.present {let value,present=self_.pool.lookup(text[..separator.value]);if !present {return false,blot_error::Error.none;}root=value;}if root!=name {let suffix=text[self_.pool.get(root).len+1..];let dot=firstDot(suffix);var end=suffix.len;if dot.present {end=dot.value;}let member,present=self_.pool.lookup(suffix[..end]);if present && self_.hasQualified(Qualified{root,member, ..}) {return true,blot_error::Error.none;}}
@@ -1154,7 +1153,6 @@ fn source_private_constructor(self_:const Engine&,name:u32)->bool {return self_.
 fn source_type_application(self_:const Engine&,name:u32)->bool {return self_.sourceTypeApplication(name);}
 fn source_record_field_exists(self_:const Engine&,name:u32,field:u32)->bool,bool {let value=self_.sourceRecordFieldExists(name,field);return value.value,value.present;}
 fn source_missing_record_field(self_:const Engine&,name:u32,fields:const u32[:])->u32,bool {let value=self_.sourceMissingRecordField(name,fields);return value.value,value.present;}
-fn source_symbolic_declared(self_:const Engine&,name:u32)->bool {return self_.sourceSymbolicDeclared(name);}
 fn source_intrinsic_known(self_:const Engine&,name:u32)->bool {return self_.sourceIntrinsicKnown(name);}
 fn source_intrinsic_arity(self_:const Engine&,name:u32)->i64,bool {let value=self_.sourceIntrinsicArity(name);return value.value,value.present;}
 fn source_non_callable_effect(self_:const Engine&,name:u32)->bool {return self_.sourceNonCallableEffect(name);}
@@ -1334,7 +1332,6 @@ fn lookup(self_:const Engine&,name:u32)->blot_support::Option<u32> {var index=se
 fn inList(values:const u32[:],wanted:u32)->bool {for value in values {if value==wanted {return true;}}return false;}
 fn catalogKey(self_:const Engine&,name:u32)->Qualified {let qualified=self_.qualifiedKey(name);if qualified.present {return qualified.value;}return Qualified{0,name, ..};}
 fn memberOperator(name:const u8[:])->blot_check_types::Operator {if name=="add" {return blot_check_types::Operator.add;}if name=="sub" {return blot_check_types::Operator.sub;}if name=="mul" {return blot_check_types::Operator.mul;}if name=="div" {return blot_check_types::Operator.div;}if name=="rem" {return blot_check_types::Operator.rem;}if name=="eq" {return blot_check_types::Operator.equal;}if name=="ne" {return blot_check_types::Operator.not_equal;}if name=="lt" {return blot_check_types::Operator.less;}if name=="le" {return blot_check_types::Operator.less_equal;}if name=="gt" {return blot_check_types::Operator.greater;}if name=="ge" {return blot_check_types::Operator.greater_equal;}if name=="bit_and" {return blot_check_types::Operator.bit_and;}if name=="bit_or" {return blot_check_types::Operator.bit_or;}if name=="bit_xor" {return blot_check_types::Operator.bit_xor;}if name=="shl" {return blot_check_types::Operator.shift_left;}if name=="shr" {return blot_check_types::Operator.shift_right;}return blot_check_types::Operator.none;}
-fn symbolOperator(name:const u8[:])->blot_check_types::Operator {if name=="+" {return blot_check_types::Operator.add;}if name=="-" {return blot_check_types::Operator.sub;}if name=="*" {return blot_check_types::Operator.mul;}if name=="/" {return blot_check_types::Operator.div;}if name=="%" {return blot_check_types::Operator.rem;}if name=="==" {return blot_check_types::Operator.equal;}if name=="!=" {return blot_check_types::Operator.not_equal;}if name=="<" {return blot_check_types::Operator.less;}if name=="<=" {return blot_check_types::Operator.less_equal;}if name==">" {return blot_check_types::Operator.greater;}if name==">=" {return blot_check_types::Operator.greater_equal;}if name=="&" {return blot_check_types::Operator.bit_and;}if name=="|" {return blot_check_types::Operator.bit_or;}if name=="^" {return blot_check_types::Operator.bit_xor;}if name=="<<" {return blot_check_types::Operator.shift_left;}if name==">>" {return blot_check_types::Operator.shift_right;}return blot_check_types::Operator.none;}
 fn identityOf(self_:const Engine&,ty:u32)->blot_support::Option<Identity> {return blot_check_types::receiverIdentity(self_.types.node(self_.types.head(ty,0)));}
 fn indexAssociated(self_:Engine&)->blot_error::Error {
     for slot in 0..(self_.imported_global_order.capacity as i64) {if !blot_support_zigmap::used(self_.zig_orders,self_.imported_global_order,slot as u32) {continue;}let key=blot_support_zigmap::keyAt(self_.zig_orders,self_.imported_global_order,slot as u32);let found .= self_.imported_globals.get(key);assert(found!=null);let target:ExternalTarget=found;let text=self_.pool.get(key);let dot=lastDot(text);if !dot.present {continue;}let head=text[..dot.value];let name,present=self_.pool.lookup(head);if !present {continue;}if self_.builtin_catalog || self_.catalogs.nominal_names.contains(Qualified{0,name, ..}) {let binding,err=self_.importedBinding(target);if err!=blot_error::Error.none {return err;}if binding.present {self_.catalogs.globals.insert(key,binding.value);blot_support_zigmap::put(self_.zig_orders,self_.global_order,key,0);}}}
@@ -1345,7 +1342,7 @@ fn indexAssociated(self_:Engine&)->blot_error::Error {
 }
 enum AssociatedChoice {absent,waiting,selected {ty:u32,binding:u32}}
 recursive fn tryAssociated(self_:Engine&,identity:Identity,member:u32,operator:blot_check_types::Operator,left:u32,right:u32,source:u32)->AssociatedChoice,blot_error::Error {var index:u32=0;if member==0 {let found:u32={let scalar_lookup_19 .= self_.catalogs.associated_ops.get(AssociatedKey{identity,operator, ..});if !scalar_lookup_19 {return AssociatedChoice.absent,blot_error::Error.none;}let scalar_value_19:u32=scalar_lookup_19;scalar_value_19};index=found;}else {let found:u32={let scalar_lookup_20 .= self_.catalogs.associated_members.get(AssociatedMember{identity,member, ..});if !scalar_lookup_20 {return AssociatedChoice.absent,blot_error::Error.none;}let scalar_value_20:u32=scalar_lookup_20;scalar_value_20};index=found;}let binding,err=self_.associatedBinding(index);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let prepared,err=self_.prepareSelectedGlobal(binding);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}if !prepared {return AssociatedChoice.waiting,blot_error::Error.none;}let point=self_.types.mark();let pending=self_.pending.len;self_.mark_depth+=1;let choice,err=tryAssociatedBody(self_,binding,left,right,source,point,pending);self_.mark_depth-=1;return choice,err;}
-fn tryAssociatedBody(self_:Engine&,binding:u32,left:u32,right:u32,source:u32,point:blot_check_types::Mark,pending:i64)->AssociatedChoice,blot_error::Error {let function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let expected,err=self_.invocationBinary(left,right,result);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let err=self_.types.unify(function,expected);if err!=blot_error::Error.none {if err==blot_error::Error.type_mismatch || err==blot_error::Error.infinite_type || err==blot_error::Error.effect_mismatch || err==blot_error::Error.infinite_effect {self_.types.rollback(point);self_.pending.resize(pending);return AssociatedChoice.absent,blot_error::Error.none;}return AssociatedChoice.absent,err;}self_.dispatch_signatures[source]=expected;return AssociatedChoice.selected{result,binding, ..},blot_error::Error.none;}
+fn tryAssociatedBody(self_:Engine&,binding:u32,left:u32,right:u32,source:u32,point:blot_check_types::Mark,pending:i64)->AssociatedChoice,blot_error::Error {var function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}if self_.exact_argument_types {let resolved_fn,rerr=self_.types.resolve(function,0);if rerr!=blot_error::Error.none {return AssociatedChoice.absent,rerr;}let opened_fn,oerr=self_.types.openCovariant(resolved_fn);if oerr!=blot_error::Error.none {return AssociatedChoice.absent,oerr;}function=opened_fn;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let expected,err=self_.invocationBinary(left,right,result);if err!=blot_error::Error.none {return AssociatedChoice.absent,err;}let err=self_.types.unify(function,expected);if err!=blot_error::Error.none {if err==blot_error::Error.type_mismatch || err==blot_error::Error.infinite_type || err==blot_error::Error.effect_mismatch || err==blot_error::Error.infinite_effect {self_.types.rollback(point);self_.pending.resize(pending);return AssociatedChoice.absent,blot_error::Error.none;}return AssociatedChoice.absent,err;}self_.dispatch_signatures[source]=expected;return AssociatedChoice.selected{result,binding, ..},blot_error::Error.none;}
 recursive fn dispatch(self_:Engine&,left:u32,right:u32,member:u32,operator:blot_check_types::Operator,source:u32,direct:bool)->blot_support::Option<u32>,blot_error::Error {let a,err=self_.types.resolve(left,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let b,err=self_.types.resolve(right,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let an=self_.types.node(a);let bn=self_.types.node(b);if an.tag==blot_check_types::Tag.variable || bn.tag==blot_check_types::Tag.variable {return blot_support::none<u32>(),blot_error::Error.none;}
     let identity=self_.identityOf(a);if identity.present {let choice,err=self_.tryAssociated(identity.value,member,operator,a,b,source);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}match choice {absent=>{},waiting=>{return blot_support::none<u32>(),blot_error::Error.none;},selected value=>{if direct {self_.resolved[source]=value.binding;}self_.dispatch_side=blot_reuse_dispatch_explanation::Side.left;return blot_support::some(value.ty),blot_error::Error.none;},}}
     let scalar_a=blot_check_types::isNumeric(an.tag) || an.tag==blot_check_types::Tag.boolean;let scalar_b=blot_check_types::isNumeric(bn.tag) || bn.tag==blot_check_types::Tag.boolean;
@@ -1382,7 +1379,7 @@ fn explainSelected(self_:Engine&,left:u32,member:u32,operator:blot_check_types::
 }
 fn explainResult(self_:Engine&,destination:u32,member:u32)->blot_error::Error {var builder=blot_reuse_dispatch_explanation::Builder{..};var err=self_.explainOperand(builder,blot_reuse_dispatch_explanation::Side.destination,destination,member,blot_check_types::Operator.none);if err==blot_error::Error.none {err=self_.attachExplanation(builder,member,blot_check_types::Operator.none);}builder.deinit();return err;}
 fn explainReceiver(self_:Engine&,receiver:u32,member:u32)->blot_error::Error {var builder=blot_reuse_dispatch_explanation::Builder{..};let spelling,err=self_.spellType(builder,receiver);if err!=blot_error::Error.none {builder.deinit();return err;}builder.add(blot_reuse_dispatch_explanation::Side.receiver,blot_support::some(spelling),blot_reuse_dispatch_explanation::Outcome.no_member);let err=self_.attachExplanation(builder,member,blot_check_types::Operator.none);builder.deinit();return err;}
-recursive fn resultDispatch(self_:Engine&,input:u32,expected:u32,member:u32,source:u32,direct:bool)->blot_support::Option<u32>,blot_error::Error {let destination,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let identity=self_.identityOf(destination);if !identity.present {return blot_support::none<u32>(),blot_error::Error.none;}let index:u32={let scalar_lookup_21 .= self_.catalogs.associated_members.get(AssociatedMember{identity.value,member, ..});if !scalar_lookup_21 {return blot_support::none<u32>(),blot_error::Error.none;}let scalar_value_21:u32=scalar_lookup_21;scalar_value_21};let binding,err=self_.associatedBinding(index);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let prepared,err=self_.prepareSelectedGlobal(binding);if err!=blot_error::Error.none || !prepared {return blot_support::none<u32>(),err;}let function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let expected_function,err=self_.invocation(input,destination);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.constrain(function,expected_function,source);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.dispatch_signatures[source]=expected_function;if direct {self_.resolved[source]=binding;}return blot_support::some(destination),blot_error::Error.none;}
+recursive fn resultDispatch(self_:Engine&,input:u32,expected:u32,member:u32,source:u32,direct:bool)->blot_support::Option<u32>,blot_error::Error {let destination,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let identity=self_.identityOf(destination);if !identity.present {return blot_support::none<u32>(),blot_error::Error.none;}let index:u32={let scalar_lookup_21 .= self_.catalogs.associated_members.get(AssociatedMember{identity.value,member, ..});if !scalar_lookup_21 {return blot_support::none<u32>(),blot_error::Error.none;}let scalar_value_21:u32=scalar_lookup_21;scalar_value_21};let binding,err=self_.associatedBinding(index);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let prepared,err=self_.prepareSelectedGlobal(binding);if err!=blot_error::Error.none || !prepared {return blot_support::none<u32>(),err;}var function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}if self_.exact_argument_types {let resolved_fn,rerr=self_.types.resolve(function,0);if rerr!=blot_error::Error.none {return blot_support::none<u32>(),rerr;}let opened_fn,oerr=self_.types.openCovariant(resolved_fn);if oerr!=blot_error::Error.none {return blot_support::none<u32>(),oerr;}function=opened_fn;}let expected_function,err=self_.invocation(input,destination);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.constrain(function,expected_function,source);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.dispatch_signatures[source]=expected_function;if direct {self_.resolved[source]=binding;}return blot_support::some(destination),blot_error::Error.none;}
 fn typeVariable(self_:Engine&,name:u32,source:u32)->u32,blot_error::Error {for entry,index in self_.row_env.items {if entry.name==name {var point=source;if index<self_.inherited_rows {point=self_.annotation_binding;}let err=self_.diagnostic(Code.annotation_kind_mismatch,point);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}}var index=self_.type_env.items.len;while index!=0 {index-=1;if self_.type_env.items[index].name==name {return self_.type_env.items[index].ty,blot_error::Error.none;}}let ty,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}if self_.closed_type_variables {let err=self_.diagnostic(Code.unsupported_type,source);return ty,err;}let growth=self_.type_env.append(Engine_type_env{name,ty, ..});return ty,growth;}
 fn rowVariable(self_:Engine&,name:u32,source:u32)->u32,blot_error::Error {var type_index=self_.type_env.items.len;while type_index!=0 {type_index-=1;let entry=self_.type_env.items[type_index];if entry.name!=name {continue;}let leaf=self_.types.node(self_.types.head(entry.ty,0));if (leaf.tag==blot_check_types::Tag.bound && leaf.b==1) || (leaf.tag==blot_check_types::Tag.rigid && leaf.c==1) {break;}var point=source;if type_index<self_.inherited_types {point=self_.annotation_binding;}let err=self_.diagnostic(Code.annotation_kind_mismatch,point);if err!=blot_error::Error.none {return 0,err;}return self_.types.freshEffects();}var index=self_.row_env.items.len;while index!=0 {index-=1;if self_.row_env.items[index].name==name {return self_.row_env.items[index].row,blot_error::Error.none;}}let row,err=self_.types.freshEffects();if err!=blot_error::Error.none {return 0,err;}if self_.closed_type_variables && !self_.implicit_row_parameters {let err=self_.diagnostic(Code.invalid_effect_annotation,source);return row,err;}let growth=self_.row_env.append(Engine_row_env{name,row, ..});return row,growth;}
 fn annotationChildTrivial(self_:const Engine&,id:u32)->bool {
@@ -2129,6 +2126,51 @@ fn ownParameters(tree:const blot_parse_ast::Tree&,body:u32)->u32 {
 // Records which parameters each top-level named function takes over, and
 // refuses `own` anywhere else: function types do not carry it yet, so only a
 // function that is called by name can be held to it.
+fn unwrapGroupNode(tree:const blot_parse_ast::Tree&,original:u32)->u32 {
+ var id=original;
+ while id!=0 && tree.node(id).tag==blot_parse_ast::tag_group {id=tree.node(id).a;}
+ return id;
+}
+fn directOperatorKind(tree:const blot_parse_ast::Tree&,pool:const blot_parse_symbols::Pool&,declaration_id:u32)->u8 {
+ let decl=tree.value_decl(declaration_id);
+ if decl.annotation!=0 || decl.where_node!=0 || decl.attributes.len!=0 || decl.runtime {return 0;}
+ let outer=unwrapGroupNode(tree,decl.body);
+ if outer==0 || tree.node(outer).tag!=blot_parse_ast::tag_lambda {return 0;}
+ let outer_node=tree.node(outer);
+ if outer_node.c!=0 {return 0;}
+ let p0=tree.parameter(outer_node.a);
+ if p0.is_unit || p0.own || p0.annotation!=0 || p0.where_node!=0 || p0.name==0 {return 0;}
+ let inner=unwrapGroupNode(tree,outer_node.b);
+ if inner==0 || tree.node(inner).tag!=blot_parse_ast::tag_lambda {return 0;}
+ let inner_node=tree.node(inner);
+ if inner_node.c!=0 {return 0;}
+ let p1=tree.parameter(inner_node.a);
+ if p1.is_unit || p1.own || p1.annotation!=0 || p1.where_node!=0 || p1.name==0 || p1.name==p0.name {return 0;}
+ let body=unwrapGroupNode(tree,inner_node.b);
+ if body==0 || tree.node(body).tag!=blot_parse_ast::tag_apply {return 0;}
+ let app2=tree.node(body);
+ let mid=unwrapGroupNode(tree,app2.a);
+ if mid==0 || tree.node(mid).tag!=blot_parse_ast::tag_apply {return 0;}
+ let app1=tree.node(mid);
+ let a1_node=tree.node(unwrapGroupNode(tree,app1.b));
+ let a2_node=tree.node(unwrapGroupNode(tree,app2.b));
+ let head1=unwrapGroupNode(tree,app1.a);
+ if head1!=0 && tree.node(head1).tag==blot_parse_ast::tag_intrinsic && pool.get(tree.node(head1).a)=="@pipe" {
+  if a1_node.tag==blot_parse_ast::tag_name && a2_node.tag==blot_parse_ast::tag_name {
+   if a1_node.a==p0.name && a2_node.a==p1.name {return 2;}
+   if a1_node.a==p1.name && a2_node.a==p0.name {return 3;}
+  }
+  return 0;
+ }
+ if head1==0 || tree.node(head1).tag!=blot_parse_ast::tag_apply {return 0;}
+ let app0=tree.node(head1);
+ let head0=unwrapGroupNode(tree,app0.a);
+ if head0==0 || tree.node(head0).tag!=blot_parse_ast::tag_intrinsic || pool.get(tree.node(head0).a)!="@type.call" {return 0;}
+ let lit=tree.node(unwrapGroupNode(tree,app0.b));
+ if lit.tag!=blot_parse_ast::tag_string || lit.b!=0 {return 0;}
+ if a1_node.tag==blot_parse_ast::tag_name && a2_node.tag==blot_parse_ast::tag_name && a1_node.a==p0.name && a2_node.a==p1.name {return 1;}
+ return 0;
+}
 fn ownParameterHeaders(self_:Engine&)->blot_error::Error {
  var roots:dictionary<u32,bool> =dictionary<u32,bool>{};
  for id in self_.tree.roots.items {if self_.tree.node(id).tag==blot_parse_ast::tag_value_decl {roots.insert(id,true);}}
@@ -2139,6 +2181,7 @@ fn ownParameterHeaders(self_:Engine&)->blot_error::Error {
   // An entry's result goes to the host, which copies it, so an entry may
   // return what it shares; a caller inside the program cannot rely on it.
   binding.capability_parameters.owned_results=!self_.tree.value_decl(binding.declaration).runtime && !self_.tree.value_decl(binding.declaration).exported;
+  binding.capability_parameters.direct_op=directOperatorKind(self_.tree,self_.pool,binding.declaration);
   if !binding.named_function {continue;}
   let body=self_.tree.value_decl(binding.declaration).body;
   binding.capability_parameters.own=ownParameters(self_.tree,body);
@@ -2146,6 +2189,23 @@ fn ownParameterHeaders(self_:Engine&)->blot_error::Error {
   while at!=0 && self_.tree.node(at).tag==blot_parse_ast::tag_lambda && index<32 {named.insert(self_.tree.node(at).a,true);index+=1;at=self_.tree.node(at).b;}
   // How many arguments a call must give before the function runs.
   if binding.capability_parameters.own!=0 {binding.capability_parameters.own_count=index as u8;}
+ }
+ // Propagate direct_op through simple global aliases like `const (+) = add`.
+ for bi in 0..self_.bindings.len {
+  let binding=self_.bindings[bi];
+  if binding.kind!=blot_reuse_principal_interface::Kind.global || binding.capability_parameters.direct_op!=0 || !roots.contains(binding.declaration) {continue;}
+  let decl=self_.tree.value_decl(binding.declaration);
+  if decl.annotation!=0 || decl.where_node!=0 || decl.attributes.len!=0 || decl.runtime {continue;}
+  let body=unwrapGroupNode(self_.tree,decl.body);
+  if body!=0 && self_.tree.node(body).tag==blot_parse_ast::tag_name {
+   let found .= self_.catalogs.globals.get(self_.tree.node(body).a);
+   if found {
+    let target:u32=found;
+    if target!=(bi as u32) && self_.bindings[target].capability_parameters.direct_op!=0 {
+     self_.bindings[bi].capability_parameters.direct_op=self_.bindings[target].capability_parameters.direct_op;
+    }
+   }
+  }
  }
  let count=self_.tree.nodes.items.len;
  for id in 0..count {
@@ -2210,6 +2270,9 @@ let comptime_meta_tag_base:u32=0x40000000;
 let handle_site_tag_base:u32=0x80000000;
 let handle_composite_let_tag:u32=0x80000001;
 let handle_materialized_tag:u32=0x80000002;
+let pipe_binary_tag:u32=0x80000003;
+let pipe_flipped_binary_tag:u32=0x80000004;
+let binary_dispatch_tag_base:u32=0xc0000000;
 struct LocalHandler { binding:u32=0, source:u32=0, family_idx:u32=0, effect_nom:u32=0, shadowed_start:i64=0, shadowed_len:i64=0, ops_start:i64=0, ops_len:i64=0, args_start:i64=0, args_len:i64=0, consumed:bool=false, materialized:bool=false, has_effects:bool=false }
 var local_handlers:LocalHandler[1024]=[LocalHandler{};1024];
 var local_handlers_len:i64=0;
@@ -4140,7 +4203,8 @@ fn findTraitMethodBinding(self_:Engine&,ty:u32,name:u32,source:u32)->blot_suppor
     return blot_support::none<u32>(),ty,false,blot_error::Error.none;
 }
 recursive fn projectTraitMethod(self_:Engine&,receiver:u32,template_binding:u32,name:u32,source:u32)->FieldProjection,blot_error::Error {
-    let function,err=self_.instantiate(template_binding,source);if err!=blot_error::Error.none {return FieldProjection{..},err;}
+    var function,err=self_.instantiate(template_binding,source);if err!=blot_error::Error.none {return FieldProjection{..},err;}
+    if self_.exact_argument_types {let resolved_fn,rerr=self_.types.resolve(function,0);if rerr!=blot_error::Error.none {return FieldProjection{..},rerr;}let opened_fn,oerr=self_.types.openCovariant(resolved_fn);if oerr!=blot_error::Error.none {return FieldProjection{..},oerr;}function=opened_fn;}
     let result,err=self_.types.fresh();if err!=blot_error::Error.none {return FieldProjection{..},err;}
     var param0=receiver;
     {let callee,rerr=self_.types.resolve(function,0);if rerr!=blot_error::Error.none {return FieldProjection{..},rerr;}
@@ -4178,7 +4242,7 @@ recursive fn projectField(self_:Engine&,original:u32,name:u32,source:u32,writabl
 recursive fn projectKnownField(self_:Engine&,ty:u32,node:blot_check_types::Node,name:u32,source:u32,writable:bool,request:blot_support::Option<PendingObligation>,variants:IdBuffer&)->FieldProjection,blot_error::Error {var effective_ty=ty;var effective_node=node;var from_shared=false;if !writable {let unwrapped=blot_check_storage_types::sharedInner(self_.types,ty);if unwrapped.present {let inner,err=self_.types.resolve(unwrapped.value,0);if err!=blot_error::Error.none {return FieldProjection{..},err;}effective_ty=inner;effective_node=self_.types.node(inner);from_shared=true;}}let physical,err=projectPhysicalField(self_,effective_ty,effective_node,name,source,variants);if err!=blot_error::Error.none {return FieldProjection{..},err;}if physical.early {return FieldProjection{physical.root,0, ..},blot_error::Error.none;}var result=physical.root;var identity=physical.identity;if from_shared && result!=0 && !blot_check_storage_types::isShared(self_.types,self_.types.head(result,0)) {let holds,err=self_.holdsStorage(result,0);if err!=blot_error::Error.none {return FieldProjection{..},err;}if holds {let shared_res,err=blot_check_storage_types::make(self_.types,blot_check_storage_types::shared,result);if err!=blot_error::Error.none {return FieldProjection{..},err;}result=shared_res;}}var method=blot_support::none<u32>();var method_ty=effective_ty;var from_array_fallback=false;if !writable {let receiver=self_.identityOf(effective_ty);if receiver.present {let scalar_lookup_62 .= self_.catalogs.associated_members.get(AssociatedMember{identity:receiver.value,member:name, ..});if scalar_lookup_62 {let index:u32=scalar_lookup_62;method=blot_support::some(index);}}if !method.present {let arr_elem=blot_check_storage_types::arrayElement(self_.types,effective_ty);if arr_elem.present {let scalar_lookup_arr .= self_.catalogs.associated_members.get(AssociatedMember{identity:Identity{0,0xffffffff, ..},member:name, ..});if scalar_lookup_arr {let index:u32=scalar_lookup_arr;let arr_ty,err=self_.types.array(arr_elem.value);if err!=blot_error::Error.none {return FieldProjection{..},err;}method=blot_support::some(index);method_ty=arr_ty;from_array_fallback=true;}}}if method.present && (from_shared || from_array_fallback) {let binding,err=self_.associatedBinding(method.value);if err!=blot_error::Error.none {return FieldProjection{..},err;}if (self_.bindings[binding].capability_parameters.own & 1)!=0 {method=blot_support::none<u32>();}}}if method.present {if result!=0 {let err=self_.diagnostic(Code.ambiguous_member,source);if err!=blot_error::Error.none {return FieldProjection{..},err;}}else {let root,err=projectMethod(self_,method_ty,name,source,request,method.value);if err!=blot_error::Error.none {return FieldProjection{..},err;}result=root;identity=Identity{0,0, ..};variants.clear();}}else if result==0 {if !writable {let trait_binding,trait_recv,trait_ambig,terr=self_.findTraitMethodBinding(ty,name,source);if terr!=blot_error::Error.none {return FieldProjection{..},terr;}if trait_ambig {let fresh,ferr=self_.types.fresh();return FieldProjection{fresh,0, ..},ferr;}if trait_binding.present {return self_.projectTraitMethod(trait_recv,trait_binding.value,name,source);}}var code=Code.missing_member;if writable {code=Code.missing_field;}let err=self_.diagnostic(code,source);if err!=blot_error::Error.none {return FieldProjection{..},err;}if !writable {let err=self_.explainReceiver(ty,name);if err!=blot_error::Error.none {return FieldProjection{..},err;}}let root,err=self_.types.fresh();return FieldProjection{root,0, ..},err;}let projection=self_.projection_catalog.len as u32;let span,err=self_.types.saveList(variants.items);if err!=blot_error::Error.none {return FieldProjection{..},err;}self_.projection_catalog.push(Projection{nominal:identity,field:name,variants:span, ..});return FieldProjection{result,projection, ..},blot_error::Error.none;}
 recursive fn projectPhysicalField(self_:Engine&,ty:u32,node:blot_check_types::Node,name:u32,source:u32,variants:IdBuffer&)->PhysicalField,blot_error::Error {var result=PhysicalField{..};if node.tag==blot_check_types::Tag.record {for index in 0..node.b {let field=self_.types.recordField(node,index);if field.name==name {result.root=field.ty;let err=variants.append(0);if err!=blot_error::Error.none {return result,err;}let err=variants.append(index as u32);if err!=blot_error::Error.none {return result,err;}break;}}}else if node.tag==blot_check_types::Tag.nominal && !blot_check_storage_types::identity(node.a,node.b).present {result.identity=Identity{node.a,node.b, ..};let index=self_.nominalIndex(result.identity);if !index.present {let root,err=self_.diagnosticFresh(Code.unknown_field,source);return PhysicalField{root:root,early:true, ..},err;}let definition=self_.nominals[index.value];if definition.is_opaque && definition.identity.unit!=self_.unit && !self_.catalogs.associated_members.contains(AssociatedMember{identity:result.identity,member:name, ..}) {let root,err=self_.diagnosticFresh(Code.private_access,source);return PhysicalField{root:root,early:true, ..},err;}let constructors=equation_type_ids.alloc_slice(definition.constructors.len);let type_span_74=checkedTypeList(self_.types,definition.constructors);for index in 0..(type_span_74.len as i64) {let value=self_.types.list(type_span_74)[index];constructors[index]=value;}let root,err=projectConstructorFields(self_,ty,name,source,constructors,variants);equation_type_ids.free_slice(constructors);if err!=blot_error::Error.none {return result,err;}result.root=root;}return result,blot_error::Error.none;}
 recursive fn projectConstructorFields(self_:Engine&,ty:u32,name:u32,source:u32,constructors:const u32[:],variants:IdBuffer&)->u32,blot_error::Error {var result:u32=0;for constructor in constructors {let definition=self_.constructors[constructor];let use,err=self_.constructorStorageType(constructor);if err!=blot_error::Error.none {return 0,err;}let function=self_.types.node(use);if function.tag!=blot_check_types::Tag.function {result=0;break;}let err=self_.constrain(function.b,ty,source);if err!=blot_error::Error.none {return 0,err;}let root,err=self_.types.resolve(function.a,0);if err!=blot_error::Error.none {return 0,err;}let payload=self_.types.node(root);if payload.tag!=blot_check_types::Tag.record {result=0;break;}var found:u32=0;for index in 0..payload.b {let field=self_.types.recordField(payload,index);if field.name==name {found=field.ty;let err=variants.append(definition.tag);if err!=blot_error::Error.none {return 0,err;}let err=variants.append(index as u32);if err!=blot_error::Error.none {return 0,err;}break;}}if found==0 {result=0;break;}if result==0 {result=found;}else {let err=self_.constrain(result,found,source);if err!=blot_error::Error.none {return 0,err;}}}return result,blot_error::Error.none;}
-recursive fn projectMethod(self_:Engine&,ty:u32,name:u32,source:u32,request:blot_support::Option<PendingObligation>,index:u32)->u32,blot_error::Error {let binding,err=self_.associatedBinding(index);if err!=blot_error::Error.none {return 0,err;}let state .= self_.global_states.get(binding);var active=false;if state {active=state.state==State.active;}var open_self=false;if !active && request.present {let pending=request.value;if pending.owner==binding && self_.bindings[binding].scheme.root==0 {let state .= self_.global_states.get(binding);if state && state.state==State.complete {var requirement=pending.value;requirement.kind=blot_check_types::ObligationKind.receiver;requirement.other=blot_check_types::unit;let open,err=self_.requirementOpen(requirement);if err!=blot_error::Error.none {return 0,err;}open_self=open;}}}var waiting=false;if !active && !open_self {let prepared,err=self_.prepareSelectedGlobal(binding);if err!=blot_error::Error.none {return 0,err;}waiting=!prepared;}let retained=!active && self_.retainsSelfMember(binding,self_.associated[index]);if active || open_self || retained || waiting {let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let function,err=self_.invocation(ty,result);if err!=blot_error::Error.none {return 0,err;}self_.dispatch_signatures[source]=function;var deferred=PendingObligation{ value:blot_check_types::Obligation{ ty:ty, kind:blot_check_types::ObligationKind.receiver, source:source, name:name, result:result, other:blot_check_types::unit, signature:function, .. }, owner:self_.current, scope:self_.qualification_scope, .. };if request.present {deferred=request.value;}deferred.value.ty=ty;deferred.value.kind=blot_check_types::ObligationKind.receiver;if waiting {deferred.value.kind=blot_check_types::ObligationKind.field;}deferred.value.name=name;deferred.value.other=blot_check_types::unit;deferred.value.result=result;deferred.value.signature=function;deferred.value.source=source;deferred.method_member=!waiting;deferred.wait_target=0;if waiting {deferred.wait_target=binding;}if deferred.origin==0 {let origin,err=self_.projectionOrigin(source,name,true);if err!=blot_error::Error.none {return 0,err;}deferred.origin=origin;}self_.pushPending(deferred);return result,blot_error::Error.none;}let start=self_.pending.len;let function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return 0,err;}var projected_origin=blot_support::none<u32>();for &pending in self_.pending[start..] {if pending.value.explicit || pending.value.kind!=blot_check_types::ObligationKind.receiver || self_.types.node(self_.types.head(pending.value.other,0)).tag!=blot_check_types::Tag.unit {continue;}if !projected_origin.present {if request.present && request.value.origin!=0 {projected_origin=blot_support::some(request.value.origin);}else {let origin,err=self_.projectionOrigin(source,name,true);if err!=blot_error::Error.none {return 0,err;}projected_origin=blot_support::some(origin);}}if projected_origin.value!=0 {pending.origin=projected_origin.value;}}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}var receiver=ty;{let callee,err=self_.types.resolve(function,0);if err!=blot_error::Error.none {return 0,err;}let shape=self_.types.node(callee);if shape.tag==blot_check_types::Tag.function {let first=self_.types.node(self_.types.head(shape.a,0));if first.tag==blot_check_types::Tag.usage && first.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {let wrapped,err=self_.types.usage(ty,blot_parse_ast::usagekind_own,0);if err!=blot_error::Error.none {return 0,err;}receiver=wrapped;}}}let expected,err=self_.invocation(receiver,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(function,expected,source);if err!=blot_error::Error.none {return 0,err;}self_.dispatch_signatures[source]=expected;return result,blot_error::Error.none;}
+recursive fn projectMethod(self_:Engine&,ty:u32,name:u32,source:u32,request:blot_support::Option<PendingObligation>,index:u32)->u32,blot_error::Error {let binding,err=self_.associatedBinding(index);if err!=blot_error::Error.none {return 0,err;}let state .= self_.global_states.get(binding);var active=false;if state {active=state.state==State.active;}var open_self=false;if !active && request.present {let pending=request.value;if pending.owner==binding && self_.bindings[binding].scheme.root==0 {let state .= self_.global_states.get(binding);if state && state.state==State.complete {var requirement=pending.value;requirement.kind=blot_check_types::ObligationKind.receiver;requirement.other=blot_check_types::unit;let open,err=self_.requirementOpen(requirement);if err!=blot_error::Error.none {return 0,err;}open_self=open;}}}var waiting=false;if !active && !open_self {let prepared,err=self_.prepareSelectedGlobal(binding);if err!=blot_error::Error.none {return 0,err;}waiting=!prepared;}let retained=!active && self_.retainsSelfMember(binding,self_.associated[index]);if active || open_self || retained || waiting {let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let function,err=self_.invocation(ty,result);if err!=blot_error::Error.none {return 0,err;}self_.dispatch_signatures[source]=function;var deferred=PendingObligation{ value:blot_check_types::Obligation{ ty:ty, kind:blot_check_types::ObligationKind.receiver, source:source, name:name, result:result, other:blot_check_types::unit, signature:function, .. }, owner:self_.current, scope:self_.qualification_scope, .. };if request.present {deferred=request.value;}deferred.value.ty=ty;deferred.value.kind=blot_check_types::ObligationKind.receiver;if waiting {deferred.value.kind=blot_check_types::ObligationKind.field;}deferred.value.name=name;deferred.value.other=blot_check_types::unit;deferred.value.result=result;deferred.value.signature=function;deferred.value.source=source;deferred.method_member=!waiting;deferred.wait_target=0;if waiting {deferred.wait_target=binding;}if deferred.origin==0 {let origin,err=self_.projectionOrigin(source,name,true);if err!=blot_error::Error.none {return 0,err;}deferred.origin=origin;}self_.pushPending(deferred);return result,blot_error::Error.none;}let start=self_.pending.len;var function,err=self_.instantiate(binding,source);if err!=blot_error::Error.none {return 0,err;}if self_.exact_argument_types {let resolved_fn,rerr=self_.types.resolve(function,0);if rerr!=blot_error::Error.none {return 0,rerr;}let opened_fn,oerr=self_.types.openCovariant(resolved_fn);if oerr!=blot_error::Error.none {return 0,oerr;}function=opened_fn;}var projected_origin=blot_support::none<u32>();for &pending in self_.pending[start..] {if pending.value.explicit || pending.value.kind!=blot_check_types::ObligationKind.receiver || self_.types.node(self_.types.head(pending.value.other,0)).tag!=blot_check_types::Tag.unit {continue;}if !projected_origin.present {if request.present && request.value.origin!=0 {projected_origin=blot_support::some(request.value.origin);}else {let origin,err=self_.projectionOrigin(source,name,true);if err!=blot_error::Error.none {return 0,err;}projected_origin=blot_support::some(origin);}}if projected_origin.value!=0 {pending.origin=projected_origin.value;}}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}var receiver=ty;{let callee,err=self_.types.resolve(function,0);if err!=blot_error::Error.none {return 0,err;}let shape=self_.types.node(callee);if shape.tag==blot_check_types::Tag.function {let first=self_.types.node(self_.types.head(shape.a,0));if first.tag==blot_check_types::Tag.usage && first.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {let wrapped,err=self_.types.usage(ty,blot_parse_ast::usagekind_own,0);if err!=blot_error::Error.none {return 0,err;}receiver=wrapped;}}}let expected,err=self_.invocation(receiver,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(function,expected,source);if err!=blot_error::Error.none {return 0,err;}self_.dispatch_signatures[source]=expected;return result,blot_error::Error.none;}
 fn retainsSelfMember(self_:const Engine&,binding:u32,member:Associated)->bool {let declaration=self_.bindings[binding].declaration;let state .= self_.global_states.get(binding);if !state || state.state!=State.complete {return false;}let range=self_.pendingRange([binding]);for pending in self_.pending[range.start..range.end] {if pending.owner!=binding || pending.scope!=declaration || !pending.method_member || (!pending.suspended && !state.on_stack) || pending.solved || pending.covered || pending.declared {continue;}let requirement=pending.value;if requirement.explicit || requirement.kind!=blot_check_types::ObligationKind.receiver || requirement.name!=member.member || self_.types.node(self_.types.head(requirement.other,0)).tag!=blot_check_types::Tag.unit {continue;}let receiver=self_.identityOf(requirement.ty);if receiver.present && receiver.value==member.identity {return true;}}return false;}
 // Keep symbol identity across recursive work; symbol storage may grow.
 struct NameParts {name:u32,position:i64=0,finished:bool=false}
@@ -4201,7 +4265,16 @@ recursive fn recordConstructorFields(self_:Engine&,id:u32,constructor:u32,functi
 recursive fn typeConstructorValue(self_:Engine&,key:Qualified)->blot_support::Option<u32>,blot_error::Error {if key.namespace_!=0 && self_.lookup(key.namespace_).present {return blot_support::none<u32>(),blot_error::Error.none;}var catalog:u32=0;block {let found:u32={let scalar_lookup_64 .= self_.catalogs.nominal_names.get(key);if !scalar_lookup_64 {return blot_support::none<u32>(),blot_error::Error.none;}let scalar_value_64:u32=scalar_lookup_64;scalar_value_64};catalog=found;}let alias,err=self_.resolveAlias(catalog);if err!=blot_error::Error.none || alias!=0 {return blot_support::none<u32>(),err;}let root,err=self_.types.typeConstructor(self_.nominals[catalog].identity);return blot_support::some(root),err;}
 recursive fn shorthand(self_:Engine&,id:u32,name:u32)->u32,blot_error::Error {return self_.shorthandBefore(id,name,self_.env.len);}
 recursive fn shorthandBefore(self_:Engine&,id:u32,name:u32,limit:i64)->u32,blot_error::Error {for offset in 0..limit {let entry=self_.env[limit-offset-1];if entry.name==name {if isWithLocked(entry.binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}let lh_rej,lh_err=self_.checkLocalHandlerOrCompositeUse(entry.binding,id);if lh_err!=blot_error::Error.none {return 0,lh_err;}if lh_rej {return self_.types.fresh();}self_.resolved[id]=entry.binding;return self_.instantiate(entry.binding,id);}}let binding,err=self_.globalBinding(name);if err!=blot_error::Error.none {return 0,err;}if binding.present {return self_.globalReference(binding.value,id);}return self_.diagnosticFresh(Code.unknown_name,id);}
-recursive fn associatedApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let outer=self_.tree.node(id);if self_.tree.node(outer.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let middle=self_.tree.node(outer.a);if self_.tree.node(middle.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let inner=self_.tree.node(middle.a);let head=self_.tree.node(inner.a);if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@type.call" {return blot_support::none<u32>(),blot_error::Error.none;}let literal=self_.tree.node(inner.b);if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let root,err=self_.diagnosticFresh(Code.call_arity,inner.b);return blot_support::some(root),err;}let left,err=self_.expression(middle.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let right,err=self_.expression(outer.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let operation=memberOperator(self_.pool.get(literal.a));let dispatched,err=self_.dispatch(left,right,literal.a,operation,id,true);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}if dispatched.present {return dispatched,blot_error::Error.none;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let signature,err=self_.invocationBinary(left,right,result);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:left, kind:blot_check_types::ObligationKind.dispatch, source:id, name:literal.a, result:result, other:right, signature:signature, operator:operation, .. }, owner:self_.current, direct:true, .. });return blot_support::some(result),err;}
+recursive fn pipeApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {
+ let outer=self_.tree.node(id);
+ if self_.tree.node(outer.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}
+ let inner=self_.tree.node(outer.a);
+ let head=self_.tree.node(inner.a);
+ if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@pipe" {return blot_support::none<u32>(),blot_error::Error.none;}
+ let value,err=self_.checkPipe(inner.b,outer.b,id);
+ return blot_support::some(value),err;
+}
+recursive fn associatedApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let outer=self_.tree.node(id);if self_.tree.node(outer.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let middle=self_.tree.node(outer.a);if self_.tree.node(middle.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let inner=self_.tree.node(middle.a);let head=self_.tree.node(inner.a);if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@type.call" {return blot_support::none<u32>(),blot_error::Error.none;}let literal=self_.tree.node(inner.b);if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let root,err=self_.diagnosticFresh(Code.call_arity,inner.b);return blot_support::some(root),err;}let operation=memberOperator(self_.pool.get(literal.a));let value,err=self_.checkDispatchBinary(middle.b,outer.b,literal.a,operation,id);return blot_support::some(value),err;}
 recursive fn resultApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let outer=self_.tree.node(id);let inner=self_.tree.node(outer.a);if inner.tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let head=self_.tree.node(inner.a);if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@type.result" {return blot_support::none<u32>(),blot_error::Error.none;}var member=inner.b;while self_.tree.node(member).tag==blot_parse_ast::tag_group {member=self_.tree.node(member).a;}let literal=self_.tree.node(member);if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let root,err=self_.diagnosticFresh(Code.literal_required,member);return blot_support::some(root),err;}let input,err=self_.expression(outer.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let signature,err=self_.invocation(input,result);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:input, kind:blot_check_types::ObligationKind.result_dispatch, source:id, name:literal.a, result:result, signature:signature, .. }, owner:self_.current, direct:true, .. });return blot_support::some(result),err;}
 recursive fn productProjection(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let node=self_.tree.node(id);if self_.tree.node(node.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let inner=self_.tree.node(node.a);if self_.tree.node(inner.a).tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(self_.tree.node(inner.a).a)!="@product.get" {return blot_support::none<u32>(),blot_error::Error.none;}let index=self_.tree.node(node.b);
  if index.tag==blot_parse_ast::tag_integer && index.b!=0 {
@@ -4784,7 +4857,7 @@ fn resolve(self_:DiscoveryResolver&,kind:blot_reuse_global_references::Kind,name
 fn discoveryReference(self_:Engine&,kind:blot_reuse_global_references::Kind,name:u32,member:u32,locals:const u32[:])->blot_support::Option<u32>,blot_error::Error {var selected=blot_support::none<u32>();match kind {
  name => {if !self_.discoveryShadowed(locals,name) {let scalar_lookup_80 .= self_.catalogs.globals.get(name);if scalar_lookup_80 {let binding:u32=scalar_lookup_80;selected=blot_support::some(binding);}if !selected.present {let text=self_.pool.get(name);let dot=firstByte(text,'.');if dot>=0 {let root,present=self_.pool.lookup(text[..dot]);if present {let scalar_lookup_81 .= self_.catalogs.globals.get(root);if scalar_lookup_81 {let binding:u32=scalar_lookup_81;selected=blot_support::some(binding);}}}}}},
  qualified => {if !self_.discoveryShadowed(locals,name) {let scalar_lookup_82 .= self_.catalogs.qualified.get(Qualified{namespace_:name,member:member, ..});if scalar_lookup_82 {let binding:u32=scalar_lookup_82;selected=blot_support::some(binding);}}},
- operator => {},
+ operator => {if !self_.discoveryShadowed(locals,name) {let scalar_lookup_op .= self_.catalogs.globals.get(name);if scalar_lookup_op {let binding:u32=scalar_lookup_op;selected=blot_support::some(binding);}}},
  }if !selected.present || self_.bindings[selected.value].kind!=blot_reuse_principal_interface::Kind.global {return blot_support::none<u32>(),blot_error::Error.none;}return selected,blot_error::Error.none;}
 fn flushGlobalDiagnostics(self_:Engine&,binding:u32)->blot_error::Error {
     var start:i64=0;var count:i64=0;
@@ -4854,7 +4927,7 @@ fn scalarIntrinsicSpec(name:const u8[:])->u8 {
  if name.len<7 || name[0]!=64 || name[4]!=46 {return 0;}
  if name[1]==117 && name[2]==51 && name[3]==50 {
   let m=name[5..];
-  if m.len==2 {if m=="eq" || m=="lt" {return 3;}return 0;}
+  if m.len==2 {if m=="eq" || m=="ne" || m=="lt" || m=="le" || m=="gt" || m=="ge" {return 3;}return 0;}
   if m.len==3 {if m=="add" || m=="sub" || m=="mul" || m=="div" || m=="rem" || m=="shl" || m=="shr" {return 2;}return 0;}
   if m.len==6 {if m=="to_f32" {return 1;}if m=="bit_or" {return 2;}return 0;}
   if m.len==7 && (m=="bit_and" || m=="bit_xor") {return 2;}
@@ -4885,7 +4958,7 @@ fn intrinsicArity(name:const u8[:])->blot_support::Option<i64> {
  let storage=blot_check_storage_ops::lookup(name);if storage.present {return blot_support::some(blot_check_storage_ops::arity(storage.value) as i64);}let staging,present=blot_check_typed_staging::lookup(name);if present {return blot_support::some(blot_check_typed_staging::arity(staging) as i64);}let simd_=blot_backend_simd_intrinsics::lookup(name);if simd_.present {return blot_support::some(simd_.value.arity as i64);}let collection=blot_backend_collection_ops::lookup(name);if collection.present {return blot_support::some(collection.value.arity as i64);}
  if name=="@hole" {return blot_support::some(0 as i64);}
  for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
- for candidate in ["@handle","@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
+ for candidate in ["@handle","@pipe","@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
  for candidate in ["@state.reader","@state.writer","@effect.state","@array.set","@type.call"] {if name==candidate {return blot_support::some(3 as i64);}}
  for candidate in ["@effect.run","@effect.reader","@effect.writer"] {if name==candidate {return blot_support::some(4 as i64);}}return blot_support::none<i64>();
 }
@@ -5506,7 +5579,7 @@ recursive fn applicationAfterArity(self_:Engine&,id:u32,node:blot_parse_ast::Nod
  let reflection,err=self_.reflectionApplication(id);if err!=blot_error::Error.none {return 0,err;}if reflection.present {return reflection.value,blot_error::Error.none;}let handle_i,err=self_.handleIntrinsicApplication(id);if err!=blot_error::Error.none {return 0,err;}if handle_i.present {return handle_i.value,blot_error::Error.none;}let handle_r,err=self_.handleRunApplication(id,leaf);if err!=blot_error::Error.none {return 0,err;}if handle_r.present {return handle_r.value,blot_error::Error.none;}let state,err=self_.builtinStateApplication(id);if err!=blot_error::Error.none {return 0,err;}if state.present {return state.value,blot_error::Error.none;}let runner,err=self_.effectRunnerApplication(id);if err!=blot_error::Error.none {return 0,err;}if runner.present {return runner.value,blot_error::Error.none;}let provider,err=self_.providerApplication(id);if err!=blot_error::Error.none {return 0,err;}if provider.present {return provider.value,blot_error::Error.none;}
  let head=self_.tree.node(node.a);
  if head.tag==blot_parse_ast::tag_intrinsic && self_.pool.get(head.a)=="@panic" {var argument=node.b;while self_.tree.node(argument).tag==blot_parse_ast::tag_group {argument=self_.tree.node(argument).a;}if self_.tree.node(argument).tag!=blot_parse_ast::tag_string {let err=self_.diagnostic(Code.call_arity,argument);if err!=blot_error::Error.none {return 0,err;}}return blot_check_types::never,blot_error::Error.none;}
- let projection,err=self_.productProjection(id);if err!=blot_error::Error.none {return 0,err;}if projection.present {return projection.value,blot_error::Error.none;}let associated,err=self_.associatedApplication(id);if err!=blot_error::Error.none {return 0,err;}if associated.present {return associated.value,blot_error::Error.none;}let result,err=self_.resultApplication(id);if err!=blot_error::Error.none {return 0,err;}if result.present {return result.value,blot_error::Error.none;}return self_.ordinaryApplication(id,leaf);
+ let projection,err=self_.productProjection(id);if err!=blot_error::Error.none {return 0,err;}if projection.present {return projection.value,blot_error::Error.none;}let piped,err=self_.pipeApplication(id);if err!=blot_error::Error.none {return 0,err;}if piped.present {return piped.value,blot_error::Error.none;}let associated,err=self_.associatedApplication(id);if err!=blot_error::Error.none {return 0,err;}if associated.present {return associated.value,blot_error::Error.none;}let result,err=self_.resultApplication(id);if err!=blot_error::Error.none {return 0,err;}if result.present {return result.value,blot_error::Error.none;}return self_.ordinaryApplication(id,leaf);
 }
 recursive fn ordinaryApplication(self_:Engine&,id:u32,leaf:u32)->u32,blot_error::Error {
     let node=self_.tree.node(id);
@@ -5984,88 +6057,198 @@ fn operatorMethodName(op:blot_check_types::Operator)->const u8[:] {
         _=>{return "";},
     }
 }
+recursive fn checkPipe(self_:Engine&,value_source:u32,fn_source:u32,id:u32)->u32,blot_error::Error {
+ let left,err=self_.checkArgument(value_source);if err!=blot_error::Error.none {return 0,err;}
+ let right_raw,err=self_.expression(fn_source);if err!=blot_error::Error.none {return 0,err;}
+ let resolved,err=self_.types.resolve(right_raw,0);if err!=blot_error::Error.none {return 0,err;}
+ let opened,err=self_.types.openCovariant(resolved);if err!=blot_error::Error.none {return 0,err;}
+ var fn_ty=opened;
+ let qid,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,err;}
+ let qn=self_.types.node(qid);
+ if qn.tag==blot_check_types::Tag.usage && (qn.b==blot_parse_ast::usagekind_once || qn.b==blot_parse_ast::usagekind_many || qn.b==blot_parse_ast::usagekind_cleanup || qn.b==blot_parse_ast::usagekind_concurrent) {fn_ty=qn.a;}
+ else {let shared_fn=blot_check_storage_types::sharedInner(self_.types,qid);if shared_fn.present {fn_ty=shared_fn.value;}}
+ self_.expr_types[fn_source]=fn_ty;
+ let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}
+ var given=left;
+ let fn_root,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,err;}
+ let fn_node=self_.types.node(fn_root);
+ if fn_node.tag==blot_check_types::Tag.function {
+  let wanted,err=self_.types.resolve(fn_node.a,0);if err!=blot_error::Error.none {return 0,err;}
+  let wrapper=self_.types.node(wanted);
+  if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {
+   let wrapped,err=self_.types.usage(left,blot_parse_ast::usagekind_own,0);if err!=blot_error::Error.none {return 0,err;}
+   given=wrapped;
+  } else {
+   let actual=self_.types.head(left,0);let actual_node=self_.types.node(actual);let actual_info=blot_check_storage_types::info(self_.types,actual);
+   if wrapper.tag==blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.variable {
+    let readable=blot_check_storage_types::readableElement(self_.types,actual);
+    if readable.present && (!actual_info.present || actual_info.value.kind!=blot_check_storage_types::view) {
+     let err=self_.constrain(readable.value,wrapper.a,id);if err!=blot_error::Error.none {return 0,err;}
+     given=wanted;
+    }
+   }
+  }
+ }
+ let inv,err=self_.invocation(given,result);if err!=blot_error::Error.none {return 0,err;}
+ let err=self_.constrain(fn_ty,inv,id);if err!=blot_error::Error.none {return 0,err;}
+ return result,blot_error::Error.none;
+}
+recursive fn checkDispatchBinary(self_:Engine&,left_source:u32,right_source:u32,member:u32,op_kind:blot_check_types::Operator,id:u32)->u32,blot_error::Error {
+ let expected=self_.expectedExpression(id);
+ let left_literal=self_.numericLiteralSyntax(left_source);
+ let right_literal=self_.numericLiteralSyntax(right_source);
+ var inferred_right:u32=0;
+ var left_expected=expected;
+ if left_literal && !right_literal {
+  let right,err=operatorArgument(self_,right_source,false,expected);if err!=blot_error::Error.none {return 0,err;}
+  inferred_right=right;
+  left_expected=self_.types.head(right,0);
+ }
+ let lv,lerr=operatorArgument(self_,left_source,left_literal,left_expected);
+ if lerr!=blot_error::Error.none {return 0,lerr;}
+ if self_.member_templates.len!=0 && member!=0 {
+  let tb,trecv,tambig,terr=self_.findTraitMethodBinding(lv,member,id);if terr!=blot_error::Error.none {return 0,terr;}
+  if tambig {
+   let _,rerr=rightOperatorArgument(self_,right_source,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
+   return self_.types.fresh();
+  }
+  if tb.present {
+   self_.resolved[id]=tb.value;var fn_ty,ferr=self_.instantiate(tb.value,id);if ferr!=blot_error::Error.none {return 0,ferr;}
+   if self_.exact_argument_types {let resolved_fn,rerr=self_.types.resolve(fn_ty,0);if rerr!=blot_error::Error.none {return 0,rerr;}let opened_fn,oerr=self_.types.openCovariant(resolved_fn);if oerr!=blot_error::Error.none {return 0,oerr;}fn_ty=opened_fn;}
+   self_.dispatch_signatures[id]=fn_ty;let after,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
+   let inv1,i1err=self_.invocation(trecv,after);if i1err!=blot_error::Error.none {return 0,i1err;}
+   let c1err=self_.constrain(fn_ty,inv1,id);if c1err!=blot_error::Error.none {return 0,c1err;}
+   let rv,rerr=rightOperatorArgument(self_,right_source,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
+   let res,reserr=self_.types.fresh();if reserr!=blot_error::Error.none {return 0,reserr;}
+   let inv2,i2err=self_.invocation(rv,res);if i2err!=blot_error::Error.none {return 0,i2err;}
+   let c2err=self_.constrain(after,inv2,id);return res,c2err;
+  }
+ }
+ let rv,rerr=rightOperatorArgument(self_,right_source,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
+ let dispatched,derr=self_.dispatch(lv,rv,member,op_kind,id,true);if derr!=blot_error::Error.none {return 0,derr;}
+ if dispatched.present {return dispatched.value,blot_error::Error.none;}
+ let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}
+ let signature,err=self_.invocationBinary(lv,rv,result);if err!=blot_error::Error.none {return 0,err;}
+ let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:lv, kind:blot_check_types::ObligationKind.dispatch, source:id, name:member, result:result, other:rv, signature:signature, operator:op_kind, .. }, owner:self_.current, direct:true, .. });
+ return result,err;
+}
+recursive fn applyBinaryArg(self_:Engine&,callee_raw:u32,arg_source:u32,id:u32)->u32,bool,blot_error::Error {
+ let resolved,err=self_.types.resolve(callee_raw,0);if err!=blot_error::Error.none {return 0,false,err;}
+ let opened,err=self_.types.openCovariant(resolved);if err!=blot_error::Error.none {return 0,false,err;}
+ var fn_ty=opened;
+ let qid,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,false,err;}
+ let qn=self_.types.node(qid);
+ if qn.tag==blot_check_types::Tag.usage && (qn.b==blot_parse_ast::usagekind_once || qn.b==blot_parse_ast::usagekind_many || qn.b==blot_parse_ast::usagekind_cleanup || qn.b==blot_parse_ast::usagekind_concurrent) {fn_ty=qn.a;}
+ else {let shared_fn=blot_check_storage_types::sharedInner(self_.types,qid);if shared_fn.present {fn_ty=shared_fn.value;}}
+ let fn_root,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,false,err;}
+ let fn_node=self_.types.node(fn_root);
+ var arg_ty:u32=0;
+ if fn_node.tag==blot_check_types::Tag.function {
+  var wanted_param=fn_node.a;
+  let outer=self_.types.node(self_.types.head(wanted_param,0));
+  if outer.tag==blot_check_types::Tag.usage && outer.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {wanted_param=outer.a;}
+  let expected_head=self_.types.head(wanted_param,0);
+  if (expected_head>=blot_check_types::u8_type && expected_head<blot_check_types::never) || (expected_head==blot_check_types::u32_type && self_.isCharLiteralNode(arg_source)) {
+   let v,aerr=operatorArgument(self_,arg_source,self_.numericLiteralSyntax(arg_source),expected_head);if aerr!=blot_error::Error.none {return 0,false,aerr;}
+   arg_ty=v;
+  } else {
+   let v,aerr=ordinaryArgument(self_,arg_source,fn_node);if aerr!=blot_error::Error.none {return 0,false,aerr;}
+   arg_ty=v;
+  }
+ } else {
+  let v,aerr=self_.checkArgument(arg_source);if aerr!=blot_error::Error.none {return 0,false,aerr;}
+  arg_ty=v;
+ }
+ var given=arg_ty;
+ var takes=false;
+ {var marked=arg_source;while self_.tree.node(marked).tag==blot_parse_ast::tag_group {if self_.tree.node(marked).b==1 {takes=true;}marked=self_.tree.node(marked).a;}}
+ if fn_node.tag==blot_check_types::Tag.function {
+  let wanted,err=self_.types.resolve(fn_node.a,0);if err!=blot_error::Error.none {return 0,false,err;}
+  let wrapper=self_.types.node(wanted);
+  if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {takes=true;}
+  else if !takes {
+   let actual=self_.types.head(arg_ty,0);let actual_node=self_.types.node(actual);let actual_info=blot_check_storage_types::info(self_.types,actual);let wanted_info=blot_check_storage_types::info(self_.types,wanted);
+   if wrapper.tag==blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.variable {
+    let readable=blot_check_storage_types::readableElement(self_.types,actual);
+    if readable.present && (!actual_info.present || actual_info.value.kind!=blot_check_storage_types::view) {
+     let cerr=self_.constrain(readable.value,wrapper.a,id);if cerr!=blot_error::Error.none {return 0,false,cerr;}
+     given=wanted;
+    }
+   } else if wanted_info.present && wanted_info.value.kind==blot_check_storage_types::sized_array && actual!=wanted && actual_node.tag!=blot_check_types::Tag.variable {
+    let act_unwrapped=self_.types.head(blot_check_storage_types::unwrapShared(self_.types,actual),0);let act_uinfo=blot_check_storage_types::info(self_.types,act_unwrapped);
+    if act_uinfo.present && blot_check_storage_types::isSized(act_uinfo.value.kind) {
+     let wlen=blot_check_storage_types::lengthOf(self_.types,wanted);let alen=blot_check_storage_types::lengthOf(self_.types,act_unwrapped);
+     let e1=self_.constrain(alen.value,wlen.value,id);if e1!=blot_error::Error.none {return 0,false,e1;}
+     let e2=self_.constrain(act_uinfo.value.element,wanted_info.value.element,id);if e2!=blot_error::Error.none {return 0,false,e2;}
+     given=wanted;
+    }
+   } else if actual_info.present && actual_info.value.kind==blot_check_storage_types::shared && wrapper.tag!=blot_check_types::Tag.variable && (!wanted_info.present || wanted_info.value.kind!=blot_check_storage_types::shared) {
+    let cerr=self_.constrain(actual_info.value.element,wanted,id);if cerr!=blot_error::Error.none {return 0,false,cerr;}
+    given=wanted;
+   }
+  }
+ }
+ if takes {let wrapped,werr=self_.types.usage(arg_ty,blot_parse_ast::usagekind_own,0);if werr!=blot_error::Error.none {return 0,false,werr;}given=wrapped;}
+ let res,rerr=self_.types.fresh();if rerr!=blot_error::Error.none {return 0,false,rerr;}
+ let inv,ierr=self_.invocation(given,res);if ierr!=blot_error::Error.none {return 0,false,ierr;}
+ let cerr=self_.constrain(fn_ty,inv,id);if cerr!=blot_error::Error.none {return 0,false,cerr;}
+ let arg_res,arerr=self_.types.resolve(arg_ty,0);if arerr!=blot_error::Error.none {return 0,false,arerr;}
+ return res,arg_res==blot_check_types::never,blot_error::Error.none;
+}
 recursive fn binary(self_:Engine&,id:u32)->u32,blot_error::Error {
  let node=self_.tree.node(id);let operator=self_.pool.get(node.a);
  if operator=="and" || operator=="or" {let left,err=self_.expression(node.b);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(left,blot_check_types::boolean,node.b);if err!=blot_error::Error.none {return 0,err;}let right,err=self_.expression(node.c);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(right,blot_check_types::boolean,node.c);return blot_check_types::boolean,err;}
- if operator=="|>" {
-  let left,err=self_.checkArgument(node.b);if err!=blot_error::Error.none {return 0,err;}
-  let right_raw,err=self_.expression(node.c);if err!=blot_error::Error.none {return 0,err;}
-  let resolved,err=self_.types.resolve(right_raw,0);if err!=blot_error::Error.none {return 0,err;}
-  let opened,err=self_.types.openCovariant(resolved);if err!=blot_error::Error.none {return 0,err;}
-  var fn_ty=opened;
-  let qid,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,err;}
-  let qn=self_.types.node(qid);
-  if qn.tag==blot_check_types::Tag.usage && (qn.b==blot_parse_ast::usagekind_once || qn.b==blot_parse_ast::usagekind_many || qn.b==blot_parse_ast::usagekind_cleanup || qn.b==blot_parse_ast::usagekind_concurrent) {fn_ty=qn.a;}
-  else {let shared_fn=blot_check_storage_types::sharedInner(self_.types,qid);if shared_fn.present {fn_ty=shared_fn.value;}}
-  self_.expr_types[node.c]=fn_ty;
-  let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}
-  var given=left;
-  let fn_root,err=self_.types.resolve(fn_ty,0);if err!=blot_error::Error.none {return 0,err;}
-  let fn_node=self_.types.node(fn_root);
-  if fn_node.tag==blot_check_types::Tag.function {
-   let wanted,err=self_.types.resolve(fn_node.a,0);if err!=blot_error::Error.none {return 0,err;}
-   let wrapper=self_.types.node(wanted);
-   if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {
-    let wrapped,err=self_.types.usage(left,blot_parse_ast::usagekind_own,0);if err!=blot_error::Error.none {return 0,err;}
-    given=wrapped;
-   } else {
-    let actual=self_.types.head(left,0);let actual_node=self_.types.node(actual);let actual_info=blot_check_storage_types::info(self_.types,actual);
-    if wrapper.tag==blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.variable {
-     let readable=blot_check_storage_types::readableElement(self_.types,actual);
-     if readable.present && (!actual_info.present || actual_info.value.kind!=blot_check_storage_types::view) {
-      let err=self_.constrain(readable.value,wrapper.a,id);if err!=blot_error::Error.none {return 0,err;}
-      given=wanted;
-     }
-    }
+ var binding:u32=0;
+ var is_local=false;
+ let found_local=self_.lookup(node.a);
+ if found_local.present {binding=found_local.value;is_local=true;}
+ else {
+  let found_global,gerr=self_.globalBinding(node.a);if gerr!=blot_error::Error.none {return 0,gerr;}
+  if found_global.present {binding=found_global.value;}
+ }
+ if binding==0 {
+  let point=blot_parse_source_operators::origin(self_.tree,id);self_.diagnostics.push(Diagnostic{ code:Code.unknown_operator, span:blot_parse_ast::Span{point,point, ..}, node:id, symbol:node.a, .. });return self_.types.fresh();
+ }
+ if is_local {
+  if isWithLocked(binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}
+  let rejected,lherr=self_.checkLocalHandlerOrCompositeUse(binding,id);if lherr!=blot_error::Error.none {return 0,lherr;}
+  if rejected {return self_.types.fresh();}
+ } else {
+  let perr=self_.prepareGlobal(binding);if perr!=blot_error::Error.none {return 0,perr;}
+ }
+ let direct=self_.bindings[binding].capability_parameters.direct_op;
+ if direct==2 {
+  self_.projections[id]=pipe_binary_tag;
+  return self_.checkPipe(node.b,node.c,id);
+ }
+ if direct==3 {
+  self_.projections[id]=pipe_flipped_binary_tag;
+  return self_.checkPipe(node.c,node.b,id);
+ }
+ if direct==1 {
+  let scheme=self_.bindings[binding].scheme;
+  if scheme.obligations.len==1 {
+   let ob=self_.obligations[scheme.obligations.start];
+   if ob.kind==blot_check_types::ObligationKind.dispatch && ob.name!=0 {
+    self_.projections[id]=binary_dispatch_tag_base|ob.name;
+    return self_.checkDispatchBinary(node.b,node.c,ob.name,ob.operator,id);
    }
   }
-  let inv,err=self_.invocation(given,result);if err!=blot_error::Error.none {return 0,err;}
-  let err=self_.constrain(fn_ty,inv,id);if err!=blot_error::Error.none {return 0,err;}
-  return result,blot_error::Error.none;
  }
- let op_kind=symbolOperator(operator);
- if op_kind!=blot_check_types::Operator.none {
-  let expected=self_.expectedExpression(id);
-  let left_literal=self_.numericLiteralSyntax(node.b);
-  let right_literal=self_.numericLiteralSyntax(node.c);
-  var inferred_right:u32=0;
-  var left_expected=expected;
-  if left_literal && !right_literal {
-   let right,err=operatorArgument(self_,node.c,false,expected);if err!=blot_error::Error.none {return 0,err;}
-   inferred_right=right;
-   left_expected=self_.types.head(right,0);
-  }
-  let lv,lerr=operatorArgument(self_,node.b,left_literal,left_expected);
-  if lerr!=blot_error::Error.none {return 0,lerr;}
-  if self_.member_templates.len!=0 {
-   let mtext=operatorMethodName(op_kind);let msym,mknown=self_.pool.lookup(mtext);
-   if mknown {
-    let tb,trecv,tambig,terr=self_.findTraitMethodBinding(lv,msym,id);if terr!=blot_error::Error.none {return 0,terr;}
-    if tambig {
-     let _,rerr=rightOperatorArgument(self_,node.c,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
-     return self_.types.fresh();
-    }
-    if tb.present {
-     self_.resolved[id]=tb.value;let fn_ty,ferr=self_.instantiate(tb.value,id);if ferr!=blot_error::Error.none {return 0,ferr;}
-     self_.dispatch_signatures[id]=fn_ty;let after,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
-     let inv1,i1err=self_.invocation(trecv,after);if i1err!=blot_error::Error.none {return 0,i1err;}
-     let c1err=self_.constrain(fn_ty,inv1,id);if c1err!=blot_error::Error.none {return 0,c1err;}
-     let rv,rerr=rightOperatorArgument(self_,node.c,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
-     let res,reserr=self_.types.fresh();if reserr!=blot_error::Error.none {return 0,reserr;}
-     let inv2,i2err=self_.invocation(rv,res);if i2err!=blot_error::Error.none {return 0,i2err;}
-     let c2err=self_.constrain(after,inv2,id);return res,c2err;
-    }
-   }
-  }
-  let rv,rerr=rightOperatorArgument(self_,node.c,inferred_right,right_literal,lv);if rerr!=blot_error::Error.none {return 0,rerr;}
-  let dispatched,derr=self_.dispatch(lv,rv,0,op_kind,id,true);if derr!=blot_error::Error.none {return 0,derr;}
-  if dispatched.present {return dispatched.value,blot_error::Error.none;}
-  let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}
-  let signature,err=self_.invocationBinary(lv,rv,result);if err!=blot_error::Error.none {return 0,err;}
-  let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:lv, kind:blot_check_types::ObligationKind.dispatch, source:id, name:0, result:result, other:rv, signature:signature, operator:op_kind, .. }, owner:self_.current, direct:true, .. });
-  return result,err;
+ var op_ty:u32=0;
+ if is_local {
+  let ty,err=self_.instantiate(binding,id);if err!=blot_error::Error.none {return 0,err;}
+  op_ty=ty;
+ } else {
+  let ty,err=self_.preparedGlobalReference(binding,id);if err!=blot_error::Error.none {return 0,err;}
+  op_ty=ty;
  }
- let point=blot_parse_source_operators::origin(self_.tree,id);self_.diagnostics.push(Diagnostic{ code:Code.unknown_operator, span:blot_parse_ast::Span{point,point, ..}, node:id, symbol:node.a, .. });return self_.types.fresh();
+ self_.resolved[id]=binding;
+ self_.dispatch_signatures[id]=op_ty;
+ let after,left_never,lerr=self_.applyBinaryArg(op_ty,node.b,id);if lerr!=blot_error::Error.none {return 0,lerr;}
+ let res,right_never,rerr=self_.applyBinaryArg(after,node.c,id);if rerr!=blot_error::Error.none {return 0,rerr;}
+ if left_never || right_never {return blot_check_types::never,blot_error::Error.none;}
+ return res,blot_error::Error.none;
 }
 recursive fn operatorArgument(self_:Engine&,id:u32,literal:bool,expected:u32)->u32,blot_error::Error {
  if (expected>=blot_check_types::u8_type && expected<blot_check_types::never) || (expected==blot_check_types::u32_type && self_.isCharLiteralNode(id)) {

@@ -248,7 +248,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits"
   const first = dir + "/first.blot";
   const last = dir + "/last.blot";
   const operator =
-    "func combine a -> b => return @u32.sub a b\n";
+    "func (-) a -> b => return @u32.sub a b\nfunc combine a -> b => return @u32.sub a b\n";
   const original =
     "func left () => return do:\n  let first = 10\n  return first\n";
   const stamp = new Date("2024-01-02T03:04:05Z");
@@ -302,7 +302,10 @@ Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits"
     // The edited local preserves the symbol count but changes a spelling.
     await Deno.writeTextFile(first, original.replaceAll("first", "other"));
     await expect(6, 3);
-    await Deno.writeTextFile(prelude, operator.replace("@u32.sub", "@u32.add"));
+    await Deno.writeTextFile(
+      prelude,
+      operator.replace("combine a -> b => return @u32.sub", "combine a -> b => return @u32.add"),
+    );
     await expect(8, 0);
     if (Deno.build.os !== "windows") {
       await Deno.rename(last, dir + "/three.blot");

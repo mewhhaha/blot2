@@ -50,6 +50,7 @@ io main (): U32 =>
 ```
 
 - Application is curried and left-associative: `add 1 2` means `(add 1) 2`.
+- Custom operators are ordinary functions named in parentheses (`func (++) a -> b => ...`, `import { (++) } from "./ops"`, `fold (+) 0 xs`) with lexical precedence (`|>`/`<|` 5, `or` 20, `and` 25, `= ! < >` 30, `|` 40, `^` 45, `&` 50, `<< >>` 55, `+ - ~ ?` 60, `* / %` 70, `**` 75). Standard operators live in `std/prelude.blot` using `@type.call` and `@pipe`.
 - Tuples use parens: `let (x, y) = pair`.
 - Indented `do:` blocks yield via `break value`.
 - Pattern matching must be exhaustive:

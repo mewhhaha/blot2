@@ -19,6 +19,25 @@ const le = func left => return func right => return @type.call "le" left right
 const gt = func left => return func right => return @type.call "gt" left right
 const ge = func left => return func right => return @type.call "ge" left right
 
+func (+) left -> right => return @type.call "add" left right
+func (-) left -> right => return @type.call "sub" left right
+func (*) left -> right => return @type.call "mul" left right
+func (/) left -> right => return @type.call "div" left right
+func (%) left -> right => return @type.call "rem" left right
+func (&) left -> right => return @type.call "bit_and" left right
+func (|) left -> right => return @type.call "bit_or" left right
+func (^) left -> right => return @type.call "bit_xor" left right
+func (<<) value -> count => return @type.call "shl" value count
+func (>>) value -> count => return @type.call "shr" value count
+func (==) left -> right => return @type.call "eq" left right
+func (!=) left -> right => return @type.call "ne" left right
+func (<) left -> right => return @type.call "lt" left right
+func (<=) left -> right => return @type.call "le" left right
+func (>) left -> right => return @type.call "gt" left right
+func (>=) left -> right => return @type.call "ge" left right
+func (|>) value -> function => return @pipe value function
+func (<|) function -> value => return @pipe value function
+
 type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
 type Iteration [state, result] is data = $Continue state | $Done result

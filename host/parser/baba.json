@@ -190,18 +190,6 @@
         }
       },
       {
-        "rule": "symbolic_fixity",
-        "boundary": {
-          "kind": "root"
-        }
-      },
-      {
-        "rule": "named_fixity",
-        "boundary": {
-          "kind": "root"
-        }
-      },
-      {
         "rule": "qualified_name",
         "boundary": {
           "kind": "root"
@@ -316,9 +304,11 @@
         }
       },
       {
-        "rule": "named_operator",
+        "rule": "operator_name",
         "boundary": {
-          "kind": "root"
+          "kind": "paired",
+          "open": "(",
+          "close": ")"
         }
       },
       {

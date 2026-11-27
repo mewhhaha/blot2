@@ -176,23 +176,22 @@ const alias = 1
 //    ^ variable
 //    ^ !keyword.storage.type
 
-infixl 60 (+) = add
-// <- keyword.directive
-//     ^ constant.numeric.integer
-//         ^ operator
-//              ^ variable
+func (+) left -> right => @type.call "add" left right
+// <- keyword.function
+//   ^ punctuation.bracket
+//    ^ operator
+//     ^ punctuation.bracket
+//       ^ variable.parameter
+//               ^ variable.parameter
 
-infixr 22 (<|>) = either
-// <- keyword.directive
-//          ^ operator
+func (<|>) left -> right => either left right
+// <- keyword.function
+//    ^ operator
 
-infix 30 (==) = eq
-// <- keyword.directive
-//         ^ operator
-
-prefix 90 (!) = not
-// <- keyword.directive
-//         ^ operator
+const (==) = eq
+// <- keyword.storage.type
+//     ^ operator
+//           ^ variable
 
 const add = func left => return func right => return (@type.of left).add left right
 //                                                    ^ function.builtin
@@ -275,8 +274,8 @@ do try:
 //      ^ !operator
 //        ^ variable
 
-infixr 0 ($) = apply
-//        ^ operator
+const (|>) = func value -> f => @pipe value f
+//     ^ operator
 
 break identity $ value
 //             ^ operator

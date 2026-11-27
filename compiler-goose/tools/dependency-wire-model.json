@@ -2067,6 +2067,11 @@
           "owned_results",
           "bool",
           "owned_results"
+        ],
+        [
+          "direct_op",
+          "u8",
+          "direct_op"
         ]
       ],
       "unwired": []

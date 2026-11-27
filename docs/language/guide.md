@@ -493,24 +493,32 @@ io conditional () => return do:
 
 ## Operators and compile-time associated dispatch
 
-Default precedence, weakest first: `$` (0), `|>` (5), `or` (20), `and` (25),
-comparisons `== != < <= > >=` (30), bitwise `|` (40), `^` (45), `&` (50), shifts
-`<< >>` (55), `+ -` (60), `* / %` (70), then application. `$`, `and`, and `or`
-associate right; comparisons are non-associative; the others associate left. The
-default `f $ g x` is application syntax for `f (g x)`, with identical
-evaluation, demand and scoped-callback checks. It works without the prelude,
-including callbacks such as `apply $ func value => return value`. An explicit
-fixity declaration for `$` overrides this default with an ordinary operator
-call. Backticks call ordinary functions infix. Declare custom fixities before
-other declarations: `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
-`infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
+Precedence and associativity are determined lexically by each operator's spelling (no `infix` declarations are needed):
 
-Arithmetic/comparison operators call generic prelude functions. `add` uses
-`@type.call "add" left right`. The left operand's type supplies `add`; its signature determines which right
-operand it accepts. Use an explicit qualified call for other operand orders.
-A compatible left implementation wins even if its result conflicts with an
-annotation. Associated functions belong to the nominal type's defining module;
-`@type.call` accepts other literal member names too.
+- `$` (0, right) — application syntax (`f $ g x` means `f (g x)`), built into the language and available without the prelude
+- `|>`… (5, left), `<|`… (5, right) — pipes
+- `$`… (10, right) — multi-character `$`-prefixed operators (`$>`, `$$`)
+- `or` (20, right), `and` (25, right) — short-circuit boolean words, built into the language
+- `==`, `!=`, `<`, `<=`, `>`, `>=` (30, non-associative) — comparisons; other `=`, `!`, `<`, `>`-prefixed operators (`<>`, `<+>`, `<*>`, `===`, `==>`) (30, left)
+- `|`… (40, left), `^`… (45, left), `&`… (50, left), shifts `<<`, `>>`, `<<<`, `>>>` (55, left)
+- `+`, `-`, `~`, `?`-prefixed (60, left) — e.g. `+`, `-`, `++`, `~>`, `??`
+- `*`, `/`, `%`-prefixed (70, left) — e.g. `*`, `/`, `%`, `/=`
+- `**`… (75, right) — exponentiation and power-like operators
+
+Custom and standard symbolic operators are ordinary functions or bindings named in parentheses:
+
+```blot
+func (++) (a: Text) -> (b: Text): Text => a.concat b
+const (><) = func left -> right => left * 10 + right
+import { (++) } from "./ops"
+let sum = fold (+) 0 xs
+```
+
+Parenthesized operator names work in `func`, `const`, `let`, `import`/`export`, first-class value references (`(+)`), and module-qualified lookups (`ops.(++)`).
+
+The standard operators (`+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `|>`, `<|`) are ordinary Blot definitions in `std/prelude.blot`, implemented with `@type.call` and `@pipe`. For example, `func (+) left -> right => @type.call "add" left right` and `func (|>) value -> function => @pipe value function`. User-defined operators written the same way get the same compile-time associated/trait dispatch and zero-overhead lowering.
+
+With `@type.call "member" left right`, the left operand's type supplies `member` (either via a trait implementation or an associated function in the type's defining module); its signature determines which right operand it accepts. Use an explicit qualified call for other operand orders. A compatible left implementation wins even if its result conflicts with an annotation. `@type.call` accepts any literal member name.
 
 Receiver syntax selects a member from the receiver's type:
 `tail.contains(witness)` means the type's `contains` function applied to `tail`,

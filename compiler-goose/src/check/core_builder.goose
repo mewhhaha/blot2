@@ -117,22 +117,6 @@ fn resizeVisitEpochs(self_:Builder&,length:i64)->Error {let old=self_.scratch.vi
 fn allocateEmpty(self_:Builder&,destination:u32[:]& ,count:i64)->Error {assert(destination.len==0);if count<0 {return blot_error::Error.core_limit;}let buffer=word_runs.alloc_slice(count);for &value in buffer {value=0;}destination=buffer;return blot_error::Error.none;}
 
 fn binaryOp(text:const u8[:])->blot_support::Option<blot_check_core::Op> {
-if text=="+" {return blot_support::some(blot_check_core::Op.add);}
-if text=="-" {return blot_support::some(blot_check_core::Op.sub);}
-if text=="*" {return blot_support::some(blot_check_core::Op.mul);}
-if text=="/" {return blot_support::some(blot_check_core::Op.div);}
-if text=="%" {return blot_support::some(blot_check_core::Op.rem);}
-if text=="==" {return blot_support::some(blot_check_core::Op.equal);}
-if text=="!=" {return blot_support::some(blot_check_core::Op.not_equal);}
-if text=="<" {return blot_support::some(blot_check_core::Op.less);}
-if text=="<=" {return blot_support::some(blot_check_core::Op.less_equal);}
-if text==">" {return blot_support::some(blot_check_core::Op.greater);}
-if text==">=" {return blot_support::some(blot_check_core::Op.greater_equal);}
-if text=="&" {return blot_support::some(blot_check_core::Op.bit_and);}
-if text=="|" {return blot_support::some(blot_check_core::Op.bit_or);}
-if text=="^" {return blot_support::some(blot_check_core::Op.bit_xor);}
-if text=="<<" {return blot_support::some(blot_check_core::Op.shift_left);}
-if text==">>" {return blot_support::some(blot_check_core::Op.shift_right);}
 if text=="and" {return blot_support::some(blot_check_core::Op.and_);}
 if text=="or" {return blot_support::some(blot_check_core::Op.or_);}
 return blot_support::none<blot_check_core::Op>();}
@@ -166,7 +150,11 @@ if text=="@u32.mul" {return blot_support::some(Intrinsic{blot_check_core::Op.mul
 if text=="@u32.div" {return blot_support::some(Intrinsic{blot_check_core::Op.div,2, ..});}
 if text=="@u32.rem" {return blot_support::some(Intrinsic{blot_check_core::Op.rem,2, ..});}
 if text=="@u32.eq" {return blot_support::some(Intrinsic{blot_check_core::Op.equal,2, ..});}
+if text=="@u32.ne" {return blot_support::some(Intrinsic{blot_check_core::Op.not_equal,2, ..});}
 if text=="@u32.lt" {return blot_support::some(Intrinsic{blot_check_core::Op.less,2, ..});}
+if text=="@u32.le" {return blot_support::some(Intrinsic{blot_check_core::Op.less_equal,2, ..});}
+if text=="@u32.gt" {return blot_support::some(Intrinsic{blot_check_core::Op.greater,2, ..});}
+if text=="@u32.ge" {return blot_support::some(Intrinsic{blot_check_core::Op.greater_equal,2, ..});}
 if text=="@u32.bit_and" {return blot_support::some(Intrinsic{blot_check_core::Op.bit_and,2, ..});}
 if text=="@u32.bit_or" {return blot_support::some(Intrinsic{blot_check_core::Op.bit_or,2, ..});}
 if text=="@u32.bit_xor" {return blot_support::some(Intrinsic{blot_check_core::Op.bit_xor,2, ..});}
@@ -535,7 +523,54 @@ recursive fn expressionSyntax(self_:Builder&,source:u32,syntax:blot_parse_ast::N
  blot_parse_ast::tag_product=>{return self_.productExpression(source,ty,blot_check_core::Tag.product,depth+1);},blot_parse_ast::tag_array=>{return self_.productExpression(source,ty,blot_check_core::Tag.array,depth+1);},blot_parse_ast::tag_index_access=>{let owner,error=self_.expression(syntax.a,depth+1);if error!=blot_error::Error.none {return 0,error;}let index,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}let values,error=self_.save([owner,index]);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.array_op,ty:ty,a:values.start,b:values.len,c:blot_backend_collection_ops::opCode(blot_backend_collection_ops::Op.get), ..});},blot_parse_ast::tag_record=>{return self_.recordExpression(source,ty,depth+1);},
  blot_parse_ast::tag_type_witness=>{var catalog:u32=0;if source<self_.source.checked.constructor_resolved.len {catalog=self_.source.checked.constructor_resolved[source];}if catalog==0 {let error=self_.diagnostic(blot_check_core::Code.unresolved_binding,source);return 0,error;}let payload,error=self_.expression(syntax.a,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.construct,ty:ty,a:catalog,b:payload, ..});},blot_parse_ast::tag_lambda=>{return self_.closureExpression(source,ty,depth+1);},blot_parse_ast::tag_case_expr=>{return self_.caseExpression(source,ty,depth+1);},
  blot_parse_ast::tag_constructor_ref=>{var catalog:u32=0;if source<self_.source.checked.constructor_resolved.len {catalog=self_.source.checked.constructor_resolved[source];}if catalog==0 {let error=self_.diagnostic(blot_check_core::Code.unresolved_binding,source);return 0,error;}if self_.source.checked.constructors[catalog].payload!=0 {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.constructor_function,ty:ty,a:catalog, ..});}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.construct,ty:ty,a:catalog, ..});},blot_parse_ast::tag_apply=>{return self_.application(source,depth+1);},
- blot_parse_ast::tag_binary=>{let left,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}let right,error=self_.expression(syntax.c,depth+1);if error!=blot_error::Error.none {return 0,error;}let spelling=self_.source.names.get(syntax.a);let binding=self_.source.checked.resolved[source];if binding!=0 {let op=binaryOp(spelling);if op.present && isScalarPair(self_,left,right) && !isMemberTemplate(self_,binding) {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.scalar,op:op.value,ty:ty,a:left,b:right,c:1, ..});}return self_.namedCall(source,binding,[left,right],ty);}if spelling=="|>" {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:ty,a:right,b:left, ..});}let op=binaryOp(spelling);if !op.present {let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return 0,error;}var tag=blot_check_core::Tag.scalar;if op.value==blot_check_core::Op.and_ || op.value==blot_check_core::Op.or_ {tag=blot_check_core::Tag.logical;}return self_.make(source,blot_check_core::Node{tag:tag,op:op.value,ty:ty,a:left,b:right,c:1, ..});},
+ blot_parse_ast::tag_binary=>{
+  let left,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}
+  let right,error=self_.expression(syntax.c,depth+1);if error!=blot_error::Error.none {return 0,error;}
+  let spelling=self_.source.names.get(syntax.a);
+  let logical_op=binaryOp(spelling);
+  if logical_op.present {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.logical,op:logical_op.value,ty:ty,a:left,b:right,c:1, ..});}
+  var proj:u32=0;if source<self_.source.checked.projections.len {proj=self_.source.checked.projections[source];}
+  if proj==blot_check_check::pipe_binary_tag {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:ty,a:right,b:left, ..});}
+  if proj==blot_check_check::pipe_flipped_binary_tag {return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:ty,a:left,b:right, ..});}
+  let binding=self_.source.checked.resolved[source];
+  if proj!=0xffffffff && (proj & 0xc0000000)==blot_check_check::binary_dispatch_tag_base {
+   let member_sym=proj & 0x3fffffff;
+   let sferr=self_.saveFieldName(member_sym);if sferr!=blot_error::Error.none {return 0,sferr;}
+   let mop=memberOp(self_.source.names.get(member_sym));
+   if binding!=0 {
+    if mop!=blot_check_core::Op.none && isScalarPair(self_,left,right) && !isMemberTemplate(self_,binding) {
+     return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.scalar,op:mop,ty:ty,a:left,b:right,c:1, ..});
+    }
+    return self_.namedCall(source,binding,[left,right],ty);
+   }
+   return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.associated,op:mop,ty:ty,a:left,b:right,c:member_sym, ..});
+  }
+  if binding!=0 {
+   let kind=self_.source.checked.bindings[binding].kind;
+   let returned,rerr=self_.callableType(ty);if rerr!=blot_error::Error.none {return 0,rerr;}
+   let arity=self_.directArity(binding);
+   if (kind==blot_reuse_principal_interface::Kind.global || kind==blot_reuse_principal_interface::Kind.external) && (!arity.present || arity.value==2) && returned.tag!=blot_check_types::Tag.function {
+    return self_.namedCall(source,binding,[left,right],ty);
+   }
+   var callee_type=ty;
+   if self_.scratch.signature_sources.len!=0 && self_.scratch.signature_sources[source]!=0 {
+    let ct,cterr=self_.projectType(self_.scratch.signature_sources[source],0);if cterr!=blot_error::Error.none {return 0,cterr;}
+    callee_type=ct;
+   } else {
+    let f2,e2=self_.addType(blot_check_types::Node{tag:blot_check_types::Tag.function,a:self_.tables.nodes[right].ty,b:ty, ..});if e2!=blot_error::Error.none {return 0,e2;}
+    let f1,e1=self_.addType(blot_check_types::Node{tag:blot_check_types::Tag.function,a:self_.tables.nodes[left].ty,b:f2, ..});if e1!=blot_error::Error.none {return 0,e1;}
+    callee_type=f1;
+   }
+   let initial,ierr=self_.referenceNode(source,binding,callee_type);if ierr!=blot_error::Error.none {return 0,ierr;}
+   let sig1,s1err=self_.callableType(self_.tables.nodes[initial].ty);if s1err!=blot_error::Error.none {return 0,s1err;}
+   if sig1.tag!=blot_check_types::Tag.function {let derr=self_.diagnostic(blot_check_core::Code.invalid_call,source);return 0,derr;}
+   let mid_val,merr=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:sig1.b,a:initial,b:left, ..});if merr!=blot_error::Error.none {return 0,merr;}
+   let sig2,s2err=self_.callableType(self_.tables.nodes[mid_val].ty);if s2err!=blot_error::Error.none {return 0,s2err;}
+   if sig2.tag!=blot_check_types::Tag.function {let derr=self_.diagnostic(blot_check_core::Code.invalid_call,source);return 0,derr;}
+   return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:sig2.b,a:mid_val,b:right, ..});
+  }
+  let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return 0,error;
+ },
  blot_parse_ast::tag_unary=>{let spelling=self_.source.names.get(syntax.a);if spelling=="-" || spelling=="~" {let operand,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.scalar,op:if spelling=="-" {blot_check_core::Op.neg} else {blot_check_core::Op.bit_not},ty:ty,a:operand, ..});}if spelling=="not" {let operand,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.scalar,op:blot_check_core::Op.not_,ty:ty,a:operand, ..});}let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return 0,error;},
  blot_parse_ast::tag_if_expr=>{let condition,error=self_.expression(syntax.a,depth+1);if error!=blot_error::Error.none {return 0,error;}let yes,error=self_.expression(syntax.b,depth+1);if error!=blot_error::Error.none {return 0,error;}let no,error=self_.expression(syntax.c,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.if_value,ty:ty,a:condition,b:yes,c:no, ..});},
  blot_parse_ast::tag_block=>{if syntax.c!=0 {let provider=self_.source.checked.provider_block_ids[source];if provider!=0 {return self_.providerBlock(source,self_.source.checked.provider_blocks[provider-1],depth+1);}let error=self_.diagnostic(blot_check_core::Code.unresolved_binding,source);return 0,error;}let id,error=self_.reserve(source);if error!=blot_error::Error.none {return 0,error;}let previous=self_.scratch.return_target;self_.scratch.return_target=id;let children,error=self_.statements(source,depth+1);self_.scratch.return_target=previous;if error!=blot_error::Error.none {return 0,error;}self_.tables.nodes[id]=blot_check_core::Node{tag:blot_check_core::Tag.block_,ty:ty,a:children.start,b:children.len, ..};return id,blot_error::Error.none;},
@@ -806,9 +841,10 @@ recursive fn applicationSpecial(self_:Builder&,source:u32,callee:u32,syntax:blot
   let value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.flat_op,ty:result,a:arg,b:self_.tables.nodes[arg].ty,c:op_code, ..});
   return blot_support::some(value),error;
  }
- var arity:i64=0;if name=="@effect.provider" || name=="@type.same" || name=="@type.result" {arity=2;}else if name=="@effect.state" || name=="@type.call" {arity=3;}else if name=="@panic" {arity=1;}else {return blot_support::none<u32>(),blot_error::Error.none;}if backwards.len!=arity {let error=self_.diagnostic(blot_check_core::Code.invalid_call,source);return blot_support::some(0 as u32),error;}
+ var arity:i64=0;if name=="@effect.provider" || name=="@type.same" || name=="@type.result" || name=="@pipe" {arity=2;}else if name=="@effect.state" || name=="@type.call" {arity=3;}else if name=="@panic" {arity=1;}else {return blot_support::none<u32>(),blot_error::Error.none;}if backwards.len!=arity {let error=self_.diagnostic(blot_check_core::Code.invalid_call,source);return blot_support::some(0 as u32),error;}
+ if name=="@pipe" {let val_node,verr=self_.expression(backwards[1].value,depth+1);if verr!=blot_error::Error.none {return blot_support::none<u32>(),verr;}let fn_node,ferr=self_.expression(backwards[0].value,depth+1);if ferr!=blot_error::Error.none {return blot_support::none<u32>(),ferr;}let app_node,aerr=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.apply,ty:result,a:fn_node,b:val_node, ..});return blot_support::some(app_node),aerr;}
  if name=="@panic" {let literal=self_.source.tree.node(self_.unwrap(backwards[0].value));if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return blot_support::some(0 as u32),error;}let message=self_.source.names.get(literal.a);if message.len>0xffffffff-self_.tables.name_bytes.len {return blot_support::none<u32>(),blot_error::Error.core_limit;}let start=self_.tables.name_bytes.len as u32;self_.tables.name_bytes.append(message);let value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.panic,ty:result,a:start,b:message.len as u32, ..});return blot_support::some(value),error;}
- if name=="@type.result" || name=="@type.call" {let member=self_.source.tree.node(self_.unwrap(backwards[arity-1].value));if member.tag!=blot_parse_ast::tag_string || member.b!=0 {let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return blot_support::some(0 as u32),error;}let left,error=self_.expression(backwards[arity-2].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}let binding=self_.source.checked.resolved[source];if name=="@type.result" {var value:u32=0;var error=blot_error::Error.none;if binding!=0 {value,error=self_.namedCall(source,binding,[left],result);}else {value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.result_associated,ty:result,a:left,b:member.a, ..});}return blot_support::some(value),error;}let right,error=self_.expression(backwards[0].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}let mop=memberOp(self_.source.names.get(member.a));var value:u32=0;var error=blot_error::Error.none;if binding!=0 && !(mop!=blot_check_core::Op.none && isScalarPair(self_,left,right) && !isMemberTemplate(self_,binding)) {value,error=self_.namedCall(source,binding,[left,right],result);}else {value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.associated,op:mop,ty:result,a:left,b:right,c:member.a, ..});}return blot_support::some(value),error;}
+ if name=="@type.result" || name=="@type.call" {let member=self_.source.tree.node(self_.unwrap(backwards[arity-1].value));if member.tag!=blot_parse_ast::tag_string || member.b!=0 {let error=self_.diagnostic(blot_check_core::Code.unsupported,source);return blot_support::some(0 as u32),error;}let sferr=self_.saveFieldName(member.a);if sferr!=blot_error::Error.none {return blot_support::none<u32>(),sferr;}let left,error=self_.expression(backwards[arity-2].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}let binding=self_.source.checked.resolved[source];if name=="@type.result" {var value:u32=0;var error=blot_error::Error.none;if binding!=0 {value,error=self_.namedCall(source,binding,[left],result);}else {value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.result_associated,ty:result,a:left,b:member.a, ..});}return blot_support::some(value),error;}let right,error=self_.expression(backwards[0].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}let mop=memberOp(self_.source.names.get(member.a));var value:u32=0;var error=blot_error::Error.none;if binding!=0 && !(mop!=blot_check_core::Op.none && isScalarPair(self_,left,right) && !isMemberTemplate(self_,binding)) {value,error=self_.namedCall(source,binding,[left,right],result);}else {value,error=self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.associated,op:mop,ty:result,a:left,b:right,c:member.a, ..});}return blot_support::some(value),error;}
  let left,error=self_.expression(backwards[arity-1].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}let right,error=self_.expression(backwards[arity-2].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}var third:u32=0;var tag=blot_check_core::Tag.effect_provider;if name=="@effect.state" {tag=blot_check_core::Tag.state_provider;let value,error=self_.expression(backwards[0].value,depth+1);if error!=blot_error::Error.none {return blot_support::none<u32>(),error;}third=value;}else if name=="@type.same" {tag=blot_check_core::Tag.type_same;}let value,error=self_.make(source,blot_check_core::Node{tag:tag,ty:result,a:left,b:right,c:third, ..});return blot_support::some(value),error;
 }
 

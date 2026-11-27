@@ -152,6 +152,15 @@ fn member_identifier(p: Parser&,source: const u8[:],tokens: const Token[:]) -> S
  if !member_tag(t.tag) { return fail(p,source,tokens,c_expected_token); }
  advance(p,source,tokens); return intern(p,source,tokens,text(p,source,t));
 }
+fn operator_name_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_star||tag==t_caret||tag==t_pipe; }
+fn operator_name_ahead(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool { return at(p,source,tokens,t_l_paren)&&operator_name_tag(peek(p,tokens,1))&&peek(p,tokens,2)==t_r_paren; }
+fn operator_name(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbol {
+ expect(p,source,tokens,t_l_paren);
+ let op=advance(p,source,tokens);
+ let sym=intern(p,source,tokens,text(p,source,op));
+ expect(p,source,tokens,t_r_paren);
+ return sym;
+}
 fn member_qualified(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbol {
  let first=current(p,source,tokens); let name=member_identifier(p,source,tokens);
  if p.failure!=blot_error::Error.none||!at(p,source,tokens,t_dot)||current(p,source,tokens).start!=first.end||!member_tag(peek(p,tokens,1)) { return name; }
@@ -278,7 +287,7 @@ recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token
  }
  if at(p,source,tokens,t_kw_func) {let declaration_id=function_declaration(p,source,tokens,attrs,start,modifier,flags);attributes.deinit();return declaration_id;}
  var runtime: u32=0; if eat(p,source,tokens,t_kw_const) {} else if eat(p,source,tokens,t_kw_let) { runtime=1; } else { let __cleanup_result_11_0: Id = fail(p,source,tokens,c_expected_token); attributes.deinit(); return __cleanup_result_11_0; }
- let name_point=current(p,source,tokens).start; let name=qualified(p,source,tokens); var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); }
+ let name_point=current(p,source,tokens).start; var name: Symbol=0; if operator_name_ahead(p,source,tokens) { name=operator_name(p,source,tokens); } else { name=qualified(p,source,tokens); } var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); }
  let constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_equal); let body=expression(p,source,tokens);
  let value=add(p,source,tokens,a_value_decl,name,body,extra(p,source,tokens,[annotation,modifier,runtime,constraints.predicates.start,constraints.predicates.len,attrs.start,attrs.len,flags,constraints.node]),start);
  if p.failure!=blot_error::Error.none { let __cleanup_result_12_0: Id = 0; attributes.deinit(); return __cleanup_result_12_0; }
@@ -290,7 +299,7 @@ fn import_decl(p: Parser&,source: const u8[:],tokens: const Token[:],forwarding:
  if !forwarding&&eat(p,source,tokens,t_star) { expect(p,source,tokens,t_kw_as); let t=current(p,source,tokens); name_space=lower_identifier(p,source,tokens); namespace_span=Span {t.start,t.end}; }
  else {
   expect(p,source,tokens,t_l_brace);
-  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) { let point=current(p,source,tokens).start; let name=identifier(p,source,tokens); var alias=name; if eat(p,source,tokens,t_kw_as) { alias=identifier(p,source,tokens); } bindings.push(add(p,source,tokens,a_import_binding,name,alias,0,point)); if !eat(p,source,tokens,t_comma) { break; } }
+  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) { let point=current(p,source,tokens).start; var name: Symbol=0; if operator_name_ahead(p,source,tokens) { name=operator_name(p,source,tokens); } else { name=identifier(p,source,tokens); } var alias=name; if eat(p,source,tokens,t_kw_as) { if operator_name_ahead(p,source,tokens) { alias=operator_name(p,source,tokens); } else { alias=identifier(p,source,tokens); } } bindings.push(add(p,source,tokens,a_import_binding,name,alias,0,point)); if !eat(p,source,tokens,t_comma) { break; } }
   expect(p,source,tokens,t_r_brace);
  }
  if !eat(p,source,tokens,t_kw_from) { if !word(p,source,tokens,"from") { let __cleanup_result_14_0: Id = fail(p,source,tokens,c_expected_token); bindings.deinit(); return __cleanup_result_14_0; } advance(p,source,tokens); }
@@ -775,7 +784,7 @@ recursive fn test_declaration(p: Parser&,source: const u8[:],tokens: const Token
 }
 recursive fn function_declaration_body(p:Parser&,source:const u8[:],tokens:const Token[:],attributes:List,start:u32,function_start:u32,modifier:Symbol,flags:u32)->Id {
  let name_token=current(p,source,tokens);if name_token.tag==t_kw_true||name_token.tag==t_kw_false {return identifier_syntax_at(p,name_token);}
- let name_point=name_token.start;let name=qualified(p,source,tokens);if p.failure!=blot_error::Error.none {return 0;}
+ let name_point=name_token.start;var name: Symbol=0;if operator_name_ahead(p,source,tokens) {name=operator_name(p,source,tokens);} else {name=qualified(p,source,tokens);}if p.failure!=blot_error::Error.none {return 0;}
  if name_token.tag==t_type_identifier&&tokens[p.index-1].start==name_token.start {return identifier_syntax_at(p,name_token);}
  var constraints=Where {};if !enter(p,source,tokens) {return 0;}let body=lambda_tail(p,source,tokens,function_start,true,constraints);p.depth--;if p.failure!=blot_error::Error.none {return 0;}
  let declaration_id=add(p,source,tokens,a_value_decl,name,body,extra(p,source,tokens,[0 as u32,modifier,0,constraints.predicates.start,constraints.predicates.len,attributes.start,attributes.len,flags|2,constraints.node]),start);if p.failure!=blot_error::Error.none {return 0;}
@@ -854,32 +863,39 @@ recursive fn lambda_body(p: Parser&,source: const u8[:],tokens: const Token[:]) 
 }
 recursive fn do_block(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=expect(p,source,tokens,t_kw_do).start; var resolver: Id=0; if !at(p,source,tokens,t_colon) { resolver=application(p,source,tokens,false); } expect(p,source,tokens,t_colon); let block_=suite(p,source,tokens); if p.failure!=blot_error::Error.none { return 0; } p.tree.nodes.items[block_].c=resolver; p.tree.spans.items[block_].start=start; return block_; }
 recursive fn if_expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=expect(p,source,tokens,t_kw_if).start; let condition=infix(p,source,tokens); expect(p,source,tokens,t_kw_then); let consequence=expression(p,source,tokens); expect(p,source,tokens,t_kw_else); let fallback=expression(p,source,tokens); return add(p,source,tokens,a_if_expr,condition,consequence,fallback,start); }
-fn builtin_fixity(spelling: const u8[:]) -> u32, u32, bool {
- if spelling=="|>" { return 5,0,true; }
+fn lexical_fixity(spelling: const u8[:]) -> u32, u32, bool {
+ if spelling.len==0 { return 0,0,false; }
  if spelling=="or" { return 20,1,true; }
  if spelling=="and" { return 25,1,true; }
+ if spelling.len>=2&&spelling[0]=='|'&&spelling[1]=='>' { return 5,0,true; }
+ if spelling.len>=2&&spelling[0]=='<'&&spelling[1]=='|' { return 5,1,true; }
+ if spelling[0]=='$' { return 10,1,true; }
+ if spelling=="<<"||spelling==">>"||spelling=="<<<"||spelling==">>>" { return 55,0,true; }
  if spelling=="=="||spelling=="!="||spelling=="<"||spelling=="<="||spelling==">"||spelling==">=" { return 30,2,true; }
- if spelling=="|" { return 40,0,true; }
- if spelling=="^" { return 45,0,true; }
- if spelling=="&" { return 50,0,true; }
- if spelling=="<<"||spelling==">>" { return 55,0,true; }
- if spelling=="+"||spelling=="-" { return 60,0,true; }
- if spelling=="*"||spelling=="/"||spelling=="%" { return 70,0,true; }
- return 0,0,false;
+ if spelling.len>=2&&spelling[0]=='*'&&spelling[1]=='*' { return 75,1,true; }
+ match spelling[0] {
+  '=', '!', '<', '>' => { return 30,0,true; },
+  '|' => { return 40,0,true; },
+  '^' => { return 45,0,true; },
+  '&' => { return 50,0,true; },
+  '+', '-', '~', '?' => { return 60,0,true; },
+  '*', '/', '%' => { return 70,0,true; },
+  _ => { return 0,0,false; },
+ }
 }
 fn read_operator(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Operator {
  let t=advance(p,source,tokens); let span=Span {t.start,t.end}; let spelling=text(p,source,t);
  let symbol=intern(p,source,tokens,spelling);
  if spelling=="$" { return Operator {symbol,0,1,span,true,true}; }
- let precedence,association,known=builtin_fixity(spelling);
+ let precedence,association,known=lexical_fixity(spelling);
  return Operator {symbol,precedence,association,span,known,false};
 }
 fn stop_infix_for_not(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
  let tag=current(p,source,tokens).tag;
  if tag==t_kw_and||tag==t_kw_or||tag==t_dollar { return true; }
- if tag==t_symbol {
+ if tag==t_symbol||tag==t_star||tag==t_caret||tag==t_pipe {
   let spelling=text(p,source,current(p,source,tokens));
-  let prec,_,known=builtin_fixity(spelling);
+  let prec,_,known=lexical_fixity(spelling);
   if known&&prec<27 { return true; }
  }
  return false;
@@ -956,7 +972,11 @@ recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],a
  while p.failure==blot_error::Error.none {
   if at(p,source,tokens,t_dot) {
    let dot=advance(p,source,tokens);
-   if eat(p,source,tokens,t_l_paren) {
+   if operator_name_ahead(p,source,tokens) {
+    let point=current(p,source,tokens).start; let member=operator_name(p,source,tokens);
+    value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { break; }
+    p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point});
+   } else if eat(p,source,tokens,t_l_paren) {
     let field_var=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
     value=add(p,source,tokens,a_comptime_project,value,field_var,0,start); if p.failure!=blot_error::Error.none { break; }
    } else {
@@ -967,7 +987,11 @@ recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],a
    while p.failure==blot_error::Error.none {
     if at(p,source,tokens,t_dot)&&current(p,source,tokens).start==p.tree.span(value).end {
      let d2=advance(p,source,tokens);
-     if eat(p,source,tokens,t_l_paren) {
+     if operator_name_ahead(p,source,tokens) {
+      let pt2=current(p,source,tokens).start; let m2=operator_name(p,source,tokens);
+      value=add(p,source,tokens,a_field_access,value,m2,0,start); if p.failure!=blot_error::Error.none { break; }
+      p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {d2.start,d2.end},member:m2,member_point:pt2});
+     } else if eat(p,source,tokens,t_l_paren) {
       let fv2=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
       value=add(p,source,tokens,a_comptime_project,value,fv2,0,start); if p.failure!=blot_error::Error.none { break; }
      } else {
@@ -1001,7 +1025,9 @@ recursive fn postfix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
  while p.failure==blot_error::Error.none {
   if at(p,source,tokens,t_dot)&&current(p,source,tokens).start==p.tree.span(value).end {
    let dot=advance(p,source,tokens);
-   if eat(p,source,tokens,t_l_paren) {
+   if operator_name_ahead(p,source,tokens) {
+    let point=current(p,source,tokens).start; let member=operator_name(p,source,tokens); value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point});
+   } else if eat(p,source,tokens,t_l_paren) {
     let field_var=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
     value=add(p,source,tokens,a_comptime_project,value,field_var,0,start); if p.failure!=blot_error::Error.none { return 0; }
    } else {
@@ -1088,6 +1114,11 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
   values.deinit(); { p.depth--; } return id;
  }
  if t.tag==t_l_paren {
+  if operator_name_ahead(p,source,tokens) {
+   let op_sym=operator_name(p,source,tokens);
+   let op_id: Id = add(p,source,tokens,a_name,op_sym,0,0,start);
+   p.depth--; return op_id;
+  }
   advance(p,source,tokens); var values=ScratchIdBuffer {};  var tuple=false;
   while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_paren) { values.push(expression(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } tuple=true; }
   expect(p,source,tokens,t_r_paren); if values.len==0 { let __cleanup_result_59_0: Id = add(p,source,tokens,a_unit,0,0,0,start); { p.depth--; } let __cleanup_result_53_0: Id = __cleanup_result_59_0; values.deinit(); return __cleanup_result_53_0; } if !tuple&&values.len==1 { let __cleanup_result_60_0: Id = add(p,source,tokens,a_group,values.items[0],0,0,start); { p.depth--; } let __cleanup_result_54_0: Id = __cleanup_result_60_0; values.deinit(); return __cleanup_result_54_0; } let __cleanup_result_61_0: Id = list_node(p,source,tokens,a_product,values.items,start); { p.depth--; } let __cleanup_result_55_0: Id = __cleanup_result_61_0; values.deinit(); return __cleanup_result_55_0;
@@ -1392,7 +1423,10 @@ recursive fn local_function_declaration(p:Parser&,source:const u8[:],tokens:cons
  if p.tree.node(declaration_id).tag!=a_value_decl||!p.tree.value_decl(declaration_id).function_declaration {return fail(p,source,tokens,c_expected_token);}return declaration_id;
 }
 fn named_function_ahead(p:Parser&,source:const u8[:],tokens:const Token[:])->bool {
- if !at(p,source,tokens,t_kw_func)||peek(p,tokens,1)!=t_identifier {return false;}return peek(p,tokens,2)==t_identifier||peek(p,tokens,2)==t_l_paren;
+ if !at(p,source,tokens,t_kw_func) {return false;}
+ if peek(p,tokens,1)==t_l_paren&&operator_name_tag(peek(p,tokens,2))&&peek(p,tokens,3)==t_r_paren {return true;}
+ if peek(p,tokens,1)!=t_identifier {return false;}
+ return peek(p,tokens,2)==t_identifier||peek(p,tokens,2)==t_l_paren;
 }
 fn has_use_binding(p: Parser&,tokens: const Token[:]) -> bool {
  if peek(p,tokens,1)==t_left_arrow { return true; } if peek(p,tokens,1)!=t_colon { return false; }
@@ -1576,6 +1610,7 @@ recursive fn pattern(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
  if eat(p,source,tokens,t_char_literal) { let res: Id = char_literal_node(p,source,tokens,t,a_pattern_integer); p.depth--; return res; }
  if eat(p,source,tokens,t_hash) { let name=constructor_pattern_name(p,source,tokens); var payload: Id=0; if at(p,source,tokens,t_l_brace) { payload=constructor_fields(p,source,tokens); } else if pattern_tag(current(p,source,tokens).tag) { payload=pattern(p,source,tokens); } let __cleanup_result_73_0: Id = add(p,source,tokens,a_pattern_constructor,name,payload,0,start); { p.depth--; } return __cleanup_result_73_0; }
  if at(p,source,tokens,t_l_brace) { let __cleanup_result_74_0: Id = constructor_fields(p,source,tokens); { p.depth--; } return __cleanup_result_74_0; }
+ if operator_name_ahead(p,source,tokens) { let op_pat: Id = add(p,source,tokens,a_pattern_name,operator_name(p,source,tokens),0,0,start); p.depth--; return op_pat; }
  if eat(p,source,tokens,t_l_paren) { var values=ScratchIdBuffer {};  var tuple=false; while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_paren) { values.push(pattern(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } tuple=true; } expect(p,source,tokens,t_r_paren); if !tuple&&values.len==1 { let __cleanup_result_75_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_71_0: Id = __cleanup_result_75_0; values.deinit(); return __cleanup_result_71_0; } let __cleanup_result_76_0: Id = list_node(p,source,tokens,a_pattern_product,values.items,start); { p.depth--; } let __cleanup_result_72_0: Id = __cleanup_result_76_0; values.deinit(); return __cleanup_result_72_0;  values.deinit(); }
  let __cleanup_result_77_0: Id = fail(p,source,tokens,c_expected_pattern); { p.depth--; } return __cleanup_result_77_0;
  { p.depth--; } }

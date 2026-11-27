@@ -1217,14 +1217,14 @@ io main (): U32 =>
     summary:
       "This construct uses an unsupported backend form, invalid custom operator/proof declaration, or a retired task/request syntax.",
     why:
-      "Blot vNext removes legacy language tasks and unsupported forms in favor of `#kernel`, `#process`, `spark`, and standard curried functions and operators.",
+      "Blot vNext removes legacy `infix`/`infixl`/`infixr` declarations and language tasks; custom operators use parenthesized names (`func (++) ...`) with lexical precedence.",
     before:
-      `// Using a retired task/request construct or invalid operator header`,
+      `// Using a retired task/request construct or legacy infix declaration`,
     after:
-      `// Rewrite using standard Blot vNext functions, effects, #kernel, or #process`,
+      `// Define custom operators as ordinary functions: func (++) a -> b => ...`,
     checklist: [
       "Replace retired task/request syntax with `#kernel` / `#process` or explicit algebraic effects.",
-      "Check custom operator precedence, associativity, and header order (or use standard prefix/infix operators).",
+      "Define custom operators with `func (op) a -> b => ...` or `const (op) = ...` (precedence is lexical; no `infix` header is needed).",
       "Simplify unsupported forms into standard Blot vNext expressions (`blot guide --cheatsheet`).",
     ],
   },
