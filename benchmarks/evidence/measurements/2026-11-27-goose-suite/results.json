@@ -11,29 +11,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 59.788,
-              "wall_ms": 60.126,
-              "median_ms": 63.576,
+              "ms": 56.848,
+              "wall_ms": 57.163,
+              "median_ms": 60.668,
               "all_ms": [
-                59.788,
-                63.576,
-                65.524
+                56.848,
+                60.668,
+                62.371
               ],
               "all_wall_ms": [
-                60.126,
-                64.003,
-                66.206
+                57.163,
+                61.094,
+                63.14
               ],
-              "peak_bytes": 68091904,
+              "peak_bytes": 68096000,
               "peak_mb": 64.94,
-              "compile_ms": 21.18,
+              "compile_ms": 23.12,
               "stdout": [
                 "16000000",
                 "63945983872"
               ],
-              "blotc_ms": 14.23,
-              "aot_ms": 6.95,
-              "wasm_bytes": 5840
+              "blotc_ms": 15.47,
+              "aot_ms": 7.65,
+              "wasm_bytes": 5707
             },
             "goose grow-only array": {
               "kind": "goose",
@@ -150,31 +150,31 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 45.751,
-              "wall_ms": 46.113,
-              "median_ms": 47.19,
+              "ms": 42.732,
+              "wall_ms": 43.098,
+              "median_ms": 44.106,
               "all_ms": [
-                45.751,
-                47.19,
-                47.499
+                42.732,
+                44.106,
+                44.842
               ],
               "all_wall_ms": [
-                46.113,
-                47.644,
-                47.793
+                43.098,
+                44.355,
+                45.218
               ],
-              "peak_bytes": 133046272,
-              "peak_mb": 126.88,
-              "compile_ms": 23.6,
+              "peak_bytes": 133058560,
+              "peak_mb": 126.89,
+              "compile_ms": 22.38,
               "stdout": [
                 "16000000",
                 "250000",
                 "7999220817282",
                 "12000142"
               ],
-              "blotc_ms": 15.36,
-              "aot_ms": 8.24,
-              "wasm_bytes": 7328
+              "blotc_ms": 14.89,
+              "aot_ms": 7.49,
+              "wasm_bytes": 7020
             },
             "goose array, typed references": {
               "kind": "goose",
@@ -299,29 +299,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 78.262,
-              "wall_ms": 78.67,
-              "median_ms": 78.579,
+              "ms": 73.772,
+              "wall_ms": 74.433,
+              "median_ms": 76.119,
               "all_ms": [
-                78.262,
-                78.579,
-                79.834
+                73.772,
+                76.119,
+                76.503
               ],
               "all_wall_ms": [
-                78.67,
-                79.057,
-                81.166
+                74.433,
+                76.725,
+                78.431
               ],
-              "peak_bytes": 45494272,
-              "peak_mb": 43.39,
-              "compile_ms": 24.62,
+              "peak_bytes": 45469696,
+              "peak_mb": 43.36,
+              "compile_ms": 24.54,
               "stdout": [
                 "2000000",
                 "1843958476"
               ],
-              "blotc_ms": 16.66,
-              "aot_ms": 7.96,
-              "wasm_bytes": 6974
+              "blotc_ms": 17.38,
+              "aot_ms": 7.16,
+              "wasm_bytes": 6772
             },
             "goose inline strings, owned": {
               "kind": "goose",
@@ -463,29 +463,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 112.737,
-              "wall_ms": 113.211,
-              "median_ms": 115.962,
+              "ms": 107.768,
+              "wall_ms": 108.487,
+              "median_ms": 108.998,
               "all_ms": [
-                112.737,
-                115.962,
-                120.338
+                107.768,
+                108.998,
+                111.113
               ],
               "all_wall_ms": [
-                113.211,
-                117.381,
-                123.014
+                108.487,
+                109.656,
+                112.074
               ],
-              "peak_bytes": 77578240,
-              "peak_mb": 73.98,
-              "compile_ms": 26.33,
+              "peak_bytes": 77590528,
+              "peak_mb": 74.0,
+              "compile_ms": 23.31,
               "stdout": [
                 "4000000",
                 "701055136604"
               ],
-              "blotc_ms": 19.25,
-              "aot_ms": 7.07,
-              "wasm_bytes": 7615
+              "blotc_ms": 15.61,
+              "aot_ms": 7.7,
+              "wasm_bytes": 7356
             },
             "goose variable enum": {
               "kind": "goose",
@@ -602,29 +602,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 54.662,
-              "wall_ms": 55.906,
-              "median_ms": 55.55,
+              "ms": 31.556,
+              "wall_ms": 31.835,
+              "median_ms": 34.102,
               "all_ms": [
-                54.662,
-                55.55,
-                56.028
+                31.556,
+                34.102,
+                34.769
               ],
               "all_wall_ms": [
-                55.906,
-                56.022,
-                56.345
+                31.835,
+                34.431,
+                35.931
               ],
-              "peak_bytes": 29270016,
+              "peak_bytes": 29265920,
               "peak_mb": 27.91,
-              "compile_ms": 23.5,
+              "compile_ms": 25.12,
               "stdout": [
                 "2097151",
                 "8377899684"
               ],
-              "blotc_ms": 15.93,
-              "aot_ms": 7.57,
-              "wasm_bytes": 6420
+              "blotc_ms": 17.36,
+              "aot_ms": 7.77,
+              "wasm_bytes": 6986
             },
             "goose pool + typed relative refs": {
               "kind": "goose",
@@ -766,29 +766,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 11.469,
-              "wall_ms": 11.53,
-              "median_ms": 11.958,
+              "ms": 10.778,
+              "wall_ms": 10.859,
+              "median_ms": 10.803,
               "all_ms": [
-                11.469,
-                11.958,
-                13.132
+                10.778,
+                10.803,
+                12.078
               ],
               "all_wall_ms": [
-                11.53,
-                12.478,
-                13.308
+                10.859,
+                10.902,
+                12.207
               ],
               "peak_bytes": 8454144,
               "peak_mb": 8.06,
-              "compile_ms": 23.78,
+              "compile_ms": 24.65,
               "stdout": [
                 "294997",
                 "950682"
               ],
-              "blotc_ms": 15.76,
-              "aot_ms": 8.02,
-              "wasm_bytes": 6978
+              "blotc_ms": 17.3,
+              "aot_ms": 7.35,
+              "wasm_bytes": 6880
             },
             "goose case functions + relative refs": {
               "kind": "goose",
@@ -930,29 +930,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 85.177,
-              "wall_ms": 85.85,
-              "median_ms": 86.469,
+              "ms": 86.586,
+              "wall_ms": 87.176,
+              "median_ms": 87.983,
               "all_ms": [
-                85.177,
-                86.469,
-                87.705
+                86.586,
+                87.983,
+                88.189
               ],
               "all_wall_ms": [
-                85.85,
-                87.168,
-                89.194
+                87.176,
+                88.7,
+                88.81
               ],
-              "peak_bytes": 59977728,
-              "peak_mb": 57.2,
-              "compile_ms": 24.55,
+              "peak_bytes": 60063744,
+              "peak_mb": 57.28,
+              "compile_ms": 24.98,
               "stdout": [
                 "4500000",
                 "12991077"
               ],
-              "blotc_ms": 15.75,
-              "aot_ms": 8.8,
-              "wasm_bytes": 8641
+              "blotc_ms": 15.79,
+              "aot_ms": 9.18,
+              "wasm_bytes": 8515
             },
             "goose CSR two-pass": {
               "kind": "goose",
@@ -1094,30 +1094,30 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 215.491,
-              "wall_ms": 217.191,
-              "median_ms": 298.278,
+              "ms": 199.393,
+              "wall_ms": 200.724,
+              "median_ms": 202.741,
               "all_ms": [
-                215.491,
-                298.278,
-                316.692
+                199.393,
+                202.741,
+                210.594
               ],
               "all_wall_ms": [
-                217.191,
-                300.889,
-                325.507
+                200.724,
+                203.981,
+                212.163
               ],
-              "peak_bytes": 83431424,
-              "peak_mb": 79.57,
-              "compile_ms": 26.11,
+              "peak_bytes": 83427328,
+              "peak_mb": 79.56,
+              "compile_ms": 24.88,
               "stdout": [
                 "4000000",
                 "287555",
                 "472050912"
               ],
-              "blotc_ms": 16.21,
-              "aot_ms": 9.9,
-              "wasm_bytes": 9622
+              "blotc_ms": 15.42,
+              "aot_ms": 9.46,
+              "wasm_bytes": 9181
             },
             "goose slices + open addressing": {
               "kind": "goose",
@@ -1264,29 +1264,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 140.527,
-              "wall_ms": 141.579,
-              "median_ms": 140.581,
+              "ms": 141.767,
+              "wall_ms": 143.418,
+              "median_ms": 142.986,
               "all_ms": [
-                140.527,
-                140.581,
-                141.523
+                141.767,
+                142.986,
+                149.3
               ],
               "all_wall_ms": [
-                141.579,
-                141.708,
-                142.636
+                143.418,
+                144.064,
+                151.098
               ],
-              "peak_bytes": 28049408,
-              "peak_mb": 26.75,
-              "compile_ms": 27.73,
+              "peak_bytes": 27926528,
+              "peak_mb": 26.63,
+              "compile_ms": 28.91,
               "stdout": [
                 "1000000",
                 "19381529234"
               ],
-              "blotc_ms": 17.63,
-              "aot_ms": 10.1,
-              "wasm_bytes": 10477
+              "blotc_ms": 19.94,
+              "aot_ms": 8.97,
+              "wasm_bytes": 10351
             },
             "goose AoS, per component": {
               "kind": "goose",
@@ -1403,22 +1403,22 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 606.788,
-              "wall_ms": 610.421,
-              "median_ms": 621.643,
+              "ms": 562.278,
+              "wall_ms": 571.333,
+              "median_ms": 587.58,
               "all_ms": [
-                606.788,
-                621.643,
-                634.504
+                562.278,
+                587.58,
+                608.575
               ],
               "all_wall_ms": [
-                610.421,
-                625.523,
-                639.492
+                571.333,
+                593.083,
+                614.587
               ],
-              "peak_bytes": 114475008,
-              "peak_mb": 109.17,
-              "compile_ms": 26.98,
+              "peak_bytes": 114528256,
+              "peak_mb": 109.22,
+              "compile_ms": 28.69,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1426,9 +1426,9 @@
                 "0",
                 "547350405826"
               ],
-              "blotc_ms": 15.88,
-              "aot_ms": 11.09,
-              "wasm_bytes": 12692
+              "blotc_ms": 17.66,
+              "aot_ms": 11.03,
+              "wasm_bytes": 12150
             },
             "goose pool + refs, inline text": {
               "kind": "goose",
@@ -1585,22 +1585,22 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 228.054,
-              "wall_ms": 230.516,
-              "median_ms": 240.75,
+              "ms": 190.579,
+              "wall_ms": 191.976,
+              "median_ms": 232.427,
               "all_ms": [
-                228.054,
-                240.75,
-                261.63
+                190.579,
+                232.427,
+                289.744
               ],
               "all_wall_ms": [
-                230.516,
-                242.582,
-                263.524
+                191.976,
+                234.219,
+                293.659
               ],
               "peak_bytes": 40808448,
               "peak_mb": 38.92,
-              "compile_ms": 27.49,
+              "compile_ms": 26.06,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1609,9 +1609,9 @@
                 "1009107182135619685",
                 "501925078"
               ],
-              "blotc_ms": 17.35,
-              "aot_ms": 10.14,
-              "wasm_bytes": 11990
+              "blotc_ms": 16.3,
+              "aot_ms": 9.76,
+              "wasm_bytes": 11352
             },
             "goose reusable pool + pool-relative refs": {
               "kind": "goose",
@@ -1773,29 +1773,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 102.295,
-              "wall_ms": 102.929,
-              "median_ms": 103.196,
+              "ms": 66.419,
+              "wall_ms": 67.52,
+              "median_ms": 67.186,
               "all_ms": [
-                102.295,
-                103.196,
-                103.528
+                66.419,
+                67.186,
+                69.795
               ],
               "all_wall_ms": [
-                102.929,
-                103.866,
-                104.393
+                67.52,
+                67.966,
+                72.844
               ],
-              "peak_bytes": 60309504,
-              "peak_mb": 57.52,
-              "compile_ms": 24.89,
+              "peak_bytes": 60305408,
+              "peak_mb": 57.51,
+              "compile_ms": 28.58,
               "stdout": [
                 "254401",
                 "16563864"
               ],
-              "blotc_ms": 15.84,
-              "aot_ms": 9.05,
-              "wasm_bytes": 10301
+              "blotc_ms": 19.13,
+              "aot_ms": 9.45,
+              "wasm_bytes": 9908
             },
             "goose pool + inline child refs": {
               "kind": "goose",
@@ -1937,22 +1937,22 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 247.941,
-              "wall_ms": 249.477,
-              "median_ms": 253.187,
+              "ms": 179.029,
+              "wall_ms": 179.773,
+              "median_ms": 181.893,
               "all_ms": [
-                247.941,
-                253.187,
-                266.121
+                179.029,
+                181.893,
+                183.277
               ],
               "all_wall_ms": [
-                249.477,
-                256.68,
-                276.619
+                179.773,
+                182.729,
+                184.712
               ],
-              "peak_bytes": 4100096,
+              "peak_bytes": 4096000,
               "peak_mb": 3.91,
-              "compile_ms": 33.27,
+              "compile_ms": 30.76,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -1963,9 +1963,9 @@
                 "16093",
                 "17094074625383217522"
               ],
-              "blotc_ms": 18.05,
-              "aot_ms": 15.23,
-              "wasm_bytes": 21060
+              "blotc_ms": 17.23,
+              "aot_ms": 13.53,
+              "wasm_bytes": 17483
             },
             "goose local pool + return from": {
               "kind": "goose",
@@ -2137,22 +2137,22 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 194.451,
-              "wall_ms": 196.875,
-              "median_ms": 225.267,
+              "ms": 65.819,
+              "wall_ms": 66.191,
+              "median_ms": 66.215,
               "all_ms": [
-                194.451,
-                225.267,
-                333.594
+                65.819,
+                66.215,
+                66.999
               ],
               "all_wall_ms": [
-                196.875,
-                231.589,
-                447.979
+                66.191,
+                67.056,
+                68.008
               ],
               "peak_bytes": 11698176,
               "peak_mb": 11.16,
-              "compile_ms": 27.68,
+              "compile_ms": 26.23,
               "stdout": [
                 "524287",
                 "131072",
@@ -2178,9 +2178,9 @@
                 "4194272",
                 "262143"
               ],
-              "blotc_ms": 19.33,
-              "aot_ms": 8.35,
-              "wasm_bytes": 8040
+              "blotc_ms": 17.4,
+              "aot_ms": 8.83,
+              "wasm_bytes": 8088
             },
             "goose local pool per tree": {
               "kind": "goose",
@@ -2427,30 +2427,30 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 226.424,
-              "wall_ms": 227.137,
-              "median_ms": 229.151,
+              "ms": 183.208,
+              "wall_ms": 184.132,
+              "median_ms": 183.706,
               "all_ms": [
-                226.424,
-                229.151,
-                265.893
+                183.208,
+                183.706,
+                184.491
               ],
               "all_wall_ms": [
-                227.137,
-                230.631,
-                269.153
+                184.132,
+                184.839,
+                185.621
               ],
-              "peak_bytes": 4100096,
+              "peak_bytes": 4096000,
               "peak_mb": 3.91,
-              "compile_ms": 28.97,
+              "compile_ms": 27.28,
               "stdout": [
                 "400000",
                 "91800236",
                 "8685297199210497210"
               ],
-              "blotc_ms": 16.38,
-              "aot_ms": 12.59,
-              "wasm_bytes": 14642
+              "blotc_ms": 16.22,
+              "aot_ms": 11.06,
+              "wasm_bytes": 11087
             },
             "goose inline DTO": {
               "kind": "goose",
@@ -2623,29 +2623,29 @@
               "kind": "blot",
               "tier": null,
               "ok": true,
-              "ms": 32.384,
-              "wall_ms": 32.7,
-              "median_ms": 33.887,
+              "ms": 29.533,
+              "wall_ms": 29.871,
+              "median_ms": 30.587,
               "all_ms": [
-                32.384,
-                33.887,
-                47.607
+                29.533,
+                30.587,
+                31.111
               ],
               "all_wall_ms": [
-                32.7,
-                34.165,
-                47.983
+                29.871,
+                31.037,
+                31.905
               ],
-              "peak_bytes": 12517376,
-              "peak_mb": 11.94,
-              "compile_ms": 32.74,
+              "peak_bytes": 12484608,
+              "peak_mb": 11.91,
+              "compile_ms": 25.95,
               "stdout": [
                 "2048",
                 "502239988"
               ],
-              "blotc_ms": 23.63,
-              "aot_ms": 9.12,
-              "wasm_bytes": 8561
+              "blotc_ms": 17.05,
+              "aot_ms": 8.9,
+              "wasm_bytes": 8371
             },
             "goose flat indexing": {
               "kind": "goose",
@@ -2778,7 +2778,7 @@
     }
   },
   "meta": {
-    "generated_at": "2026-11-27T04:23:00.968513+00:00",
+    "generated_at": "2026-11-27T10:35:26.425922+00:00",
     "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
     "os": "Linux 7.3.5-2-cachyos (x86_64)",
     "clang": "clang version 23.1.5",

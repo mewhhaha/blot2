@@ -97,7 +97,7 @@
   <rect x="490" y="322" width="442" height="198" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="504.0" y="344.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a">records<tspan dx="8" font-size="10.6" font-weight="500" fill="#64748b">N = 4,000,000</tspan></text>
   <rect x="738.6" y="329.0" width="183.4" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="830.3" y="343.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">Blot 2.66× vs idiomatic C++</text>
+  <text x="830.3" y="343.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">Blot 2.65× vs idiomatic C++</text>
   <text x="504.0" y="359.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.8" font-weight="400" fill="#64748b" text-anchor="start">Build a log of N variant records, aggregate 4 times.</text>
   <text x="504.0" y="388.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">Goose</text>
   <rect x="604.0" y="374.0" width="248.0" height="17.0" rx="3.5" fill="#f1f5f9"/>
@@ -200,8 +200,8 @@
   <text x="388.3" y="881.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#0f172a" text-anchor="start">57.1 MiB</text>
   <text x="42.0" y="904.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="700" fill="#0f766e" text-anchor="start">Blot</text>
   <rect x="142.0" y="892.0" width="248.0" height="15.5" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="892.0" width="240.5" height="15.5" rx="3.5" fill="#0f766e"/>
-  <text x="388.5" y="904.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="700" fill="#0f766e" text-anchor="start">57.2 MiB</text>
+  <rect x="142.0" y="892.0" width="240.9" height="15.5" rx="3.5" fill="#0f766e"/>
+  <text x="388.9" y="904.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="700" fill="#0f766e" text-anchor="start">57.3 MiB</text>
   <text x="42.0" y="928.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">Goose</text>
   <rect x="142.0" y="915.5" width="248.0" height="15.5" rx="3.5" fill="#f1f5f9"/>
   <rect x="142.0" y="915.5" width="248.0" height="15.5" rx="3.5" fill="#2563eb"/>
