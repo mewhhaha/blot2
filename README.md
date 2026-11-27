@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="docs/artwork/README.md"><img src="./favicon.svg" width="112" height="112" alt="View the Squid hairstyle gallery"></a>
+  <a href="docs/artwork/README.md"><img src="./favicon.svg" width="112" height="112" alt="Squid with orange bangs and black eye shadow on a mint ink splat. View the hairstyle gallery."></a>
 </p>
 
 <h1 align="center">Squid</h1>
