@@ -29,6 +29,7 @@ import .function_calls;
 import .function_data;
 import .function_control;
 import .function_storage;
+import .function_packed;
 import .function_effects;
 import .function_entry;
 import .function_staging;
@@ -2652,7 +2653,7 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
     if body {
         if body.is_function { return partial(g, f, blot_direct_emit::InstanceKind.partial, target, ty, Vals {}, id); }
         match tagOf(g, ty) {
-            array => { return pool(g, f, target, ty, id); },
+            array, packed => { return pool(g, f, target, ty, id); },
             _ => {},
         }
         // Inline non-exported scalar or nullary-constructor constants directly
@@ -2774,7 +2775,7 @@ recursive fn layoutFree(g: Generator&, ty: Ty, depth: i64) -> bool {
     let n = g.types.node(ty);
     match n.tag {
         never => { return false; },
-        function, array, ref, view, link, cell => { return true; },
+        function, array, packed, ref, view, link, cell => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if !layoutFree(g, g.types.words[n.a + at], depth + 1) { return false; } }
             return true;

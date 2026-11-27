@@ -7,6 +7,16 @@ const packed: Array U32 = #[1, 2, 3]
 //                        ^ punctuation.special
 //                         ^ punctuation.bracket
 
+const seq_packed: %[U32] = %[1, 2, 3]
+//                ^ punctuation.special
+//                 ^ punctuation.bracket
+//                  ^^^ type
+//                         ^ punctuation.special
+//                          ^ punctuation.bracket
+
+const rem_ok = 10 % 3
+//                ^ operator
+
 const filtered = [value | value <- values, value > 1]
 //                      ^ operator
 //                              ^^ operator

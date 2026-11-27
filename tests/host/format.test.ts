@@ -621,3 +621,36 @@ Deno.test("formatter is strictly idempotent across the 80-char data declaration 
     "type T is data =\n  | $First { a: U32, b: U32, c: U32 }\n  | $VAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
   );
 });
+
+Deno.test("formatter preserves packed array %[...] / %[T] syntax without conflicting with modulo %", async () => {
+  const source = `type Event is data = $Tick | $Val U32
+func take (xs:own %[Event])->(ro:*%[U32]):%[U32]=>
+  let empty:%[U32]=%[]
+  let nums=%[1,2,3]
+  let mapped=%[x*2 | x<-nums, x>1]
+  let spread=%[0,...nums,4]
+  let rem=10%3
+  let op=(%) 10 3
+  return spread
+io main ():U32=>
+  let p=%[$Tick,$Val 7]
+  let q=take p (freeze %[1,2])
+  return q.length
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(
+    formatted.includes(
+      "func take (xs: own %[Event]) -> (ro: *%[U32]): %[U32] =>",
+    ),
+    true,
+  );
+  equal(formatted.includes("let empty: %[U32] = %[]"), true);
+  equal(formatted.includes("let nums = %[1, 2, 3]"), true);
+  equal(formatted.includes("let mapped = %[x * 2 | x <- nums, x > 1]"), true);
+  equal(formatted.includes("let spread = %[0, ...nums, 4]"), true);
+  equal(formatted.includes("let rem = 10 % 3"), true);
+  equal(formatted.includes("let op = (%) 10 3"), true);
+  equal(formatted.includes("let p = %[$Tick, $Val 7]"), true);
+  equal(formatted.includes("let q = take p (freeze %[1, 2])"), true);
+});

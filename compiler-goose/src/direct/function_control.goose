@@ -3146,6 +3146,9 @@ recursive fn isIrrefutableSubpat(m: const Module&, pat_id: u32, depth: i64 = 0) 
 }
 
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let split_val, did_split, split_err = tryEmitSplitSumMatch(g, f, id);
+    if split_err != blot_direct_types::Error.none { return split_val, split_err; }
+    if did_split { return split_val, blot_direct_types::Error.none; }
     // Lazy variant payload fast path: when matching an unboxed multi-constructor
     // nominal directly from a `Tag.array` element read (`pos[i]`, `pool.at id`),
     // load ONLY the 4-byte tag before branching and load payload words only inside
@@ -10614,6 +10617,9 @@ recursive fn emitLoopCore(
     input_locals: u32 = 0,
 ) -> Error {
     let m .= g.units[f.unit - 1];
+    if has_source && tagOf(g, source.ty) == blot_direct_types::Tag.packed {
+        return emitPackedLoopCore(g, f, id, info, iteration, outgoing, slots, index, end_loc, source);
+    }
     let carries = m.loopCarries(id);
     var range = range_in;
     if has_index { range.end_local = end_loc; }
@@ -10998,18 +11004,18 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if selective_resize {
             for ri in 0..resized_len {
                 let rv, rok = bindGet(g, f, resized_bindings[ri]);
-                if rok && tagOf(g, rv.ty) == blot_direct_types::Tag.array {
+                if rok && (tagOf(g, rv.ty) == blot_direct_types::Tag.array || tagOf(g, rv.ty) == blot_direct_types::Tag.packed) {
                     invalidateCheckedOwner(g, f, rv);
                 }
             }
             for carry, ci in carries {
                 if bindingResizedInLoop(m, id, carry.iteration, resized_bindings, resized_len) {
                     let iv = g.s.vals[iteration.start + ci];
-                    if tagOf(g, iv.ty) == blot_direct_types::Tag.array {
+                    if tagOf(g, iv.ty) == blot_direct_types::Tag.array || tagOf(g, iv.ty) == blot_direct_types::Tag.packed {
                         invalidateCheckedOwner(g, f, iv);
                     }
                     let inv, inok = bindGet(g, f, carry.incoming);
-                    if inok && tagOf(g, inv.ty) == blot_direct_types::Tag.array {
+                    if inok && (tagOf(g, inv.ty) == blot_direct_types::Tag.array || tagOf(g, inv.ty) == blot_direct_types::Tag.packed) {
                         invalidateCheckedOwner(g, f, inv);
                     }
                 }
@@ -11729,7 +11735,7 @@ recursive fn collectFlatPlainOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, 
     if rec { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, view, ref, link => {
+        array, packed, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
             if herr != blot_direct_types::Error.none { return false, herr; }
             if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
@@ -11779,7 +11785,7 @@ recursive fn collectRegPlainOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u
     if boxed { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, view, ref, link => {
+        array, packed, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
             if herr != blot_direct_types::Error.none { return false, herr; }
             if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
@@ -11936,7 +11942,7 @@ recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
     if boxed { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, view, ref, link => {
+        array, packed, view, ref, link => {
             let element_holds, error = g.contentsHoldMemory(n.a);
             if error != blot_direct_types::Error.none { return false, error; }
             if element_holds { return false, blot_direct_types::Error.none; }

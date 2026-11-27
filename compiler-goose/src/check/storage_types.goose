@@ -11,6 +11,7 @@ let view: Kind = 23;
 let link: Kind = 24;
 let shared: Kind = 25;
 let sized_array: Kind = 26;
+let packed: Kind = 27;
 let length_literal_base: u32 = 0x10000000;
 let length_literal_limit: u32 = 0x80000000;
 
@@ -50,6 +51,7 @@ fn named(spelling: const u8[:]) -> blot_support::Option<Kind> {
     if text == "Link" { return blot_support::Option<Kind> { true, link , ..}; }
     if text == "Shared" { return blot_support::Option<Kind> { true, shared , ..}; }
     if text == "SizedArray" { return blot_support::Option<Kind> { true, sized_array , ..}; }
+    if text == "Packed" { return blot_support::Option<Kind> { true, packed , ..}; }
     return blot_support::Option<Kind> { false, 0 , ..};
 }
 fn name(kind: Kind) -> const u8[:] {
@@ -59,11 +61,12 @@ fn name(kind: Kind) -> const u8[:] {
         24 => { return "Link"; },
         25 => { return "Shared"; },
         26 => { return "SizedArray"; },
+        27 => { return "Packed"; },
         _ => { assert(false); return ""; },
     }
 }
 fn identity(unit: u32, declaration: u32) -> blot_support::Option<Kind> {
-    if unit == 0xffffffff && declaration >= ref && declaration <= sized_array {
+    if unit == 0xffffffff && declaration >= ref && declaration <= packed {
         return blot_support::Option<Kind> { true, declaration , ..};
     }
     return blot_support::Option<Kind> { false, 0 , ..};
@@ -132,6 +135,31 @@ fn readableElement(store, id: blot_check_types::Id) -> blot_support::Option<blot
 }
 
 
+fn packedElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let value = info(store, id);
+    if value.present && value.value.kind == packed {
+        return blot_support::Option<blot_check_types::Id> { true, value.value.element , ..};
+    }
+    if value.present && value.value.kind == shared {
+        let inner = info(store, value.value.element);
+        if inner.present && inner.value.kind == packed {
+            return blot_support::Option<blot_check_types::Id> { true, inner.value.element , ..};
+        }
+    }
+    return blot_support::Option<blot_check_types::Id> { false, 0 , ..};
+}
+fn isPacked(store, id: blot_check_types::Id) -> bool { return packedElement(store, id).present; }
+fn isOwnedPacked(store, id: blot_check_types::Id) -> bool {
+    let value = info(store, id);
+    return value.present && value.value.kind == packed;
+}
+fn iterableElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let element = readableElement(store, id);
+    if element.present { return element; }
+    return packedElement(store, id);
+}
+
+
 // A collection obligation carries its access mode in the existing signature
 // slot. The marker survives scheme instantiation and project transport.
 let iteration: u32 = 0;       // Absent signature.
@@ -140,5 +168,6 @@ let indexed_write: u32 = 2;   // Built-in Bool type ID.
 
 fn collectionElement(store, id: blot_check_types::Id, mode: u32) -> blot_support::Option<blot_check_types::Id> {
     if mode == indexed_write { return arrayElement(store, id); }
-    return readableElement(store, id);
+    if mode == indexed_read { return readableElement(store, id); }
+    return iterableElement(store, id);
 }

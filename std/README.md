@@ -360,6 +360,23 @@ updated owner. Views and shared handles (`*#[T]`) are read-only; use `copy`
 when an independent mutable snapshot is needed. See
 [collection and ownership contracts](../docs/language/guide.md#lists-arrays-and-libraries).
 
+### Packed sequential arrays (`%[T]` / `Packed T`)
+
+`%[1, 2]` constructs a packed non-indexable sequential array of type `%[U32]`
+(`Packed U32`). Because `%[T]` disallows random indexing, slicing, and element
+links, the compiler lowers sum types to split-stream storage (dense `U8` tag
+stream + per-variant contiguous payload streams with fused `for`+`case`
+dispatch), multi-field records and tuples to Structure-of-Arrays (SoA) columns
+with touched-column projection, and scalars to flat sequential cursors.
+
+The prelude exposes `Packed.length`, `Packed.is_empty`, `Packed.with_capacity`,
+`Packed.reserve`, `Packed.push`, `Packed.pop`, `Packed.extend`,
+`Packed.extend_array`, `Packed.extend_view`, `Packed.copy`, `Packed.concat`,
+`Packed.to_array`, and `Packed.from_array`, alongside `Array.to_packed`,
+`Array.from_packed`, and `Array.extend_packed`. `%[T]` also supports `for`
+iteration, comprehensions (`%[x * 2 | x <- xs]`), spreads (`%[a, ...xs, b]`),
+`freeze` (`*%[T]`), `fork` rollback, and module `const` values.
+
 ### Rolling reductions, summaries, and SIMD
 
 [rolling.blot](rolling.blot) provides complete overlapping reductions.

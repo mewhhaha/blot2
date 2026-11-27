@@ -91,6 +91,7 @@
 (escape_sequence) @constant.character.escape
 
 (constructor_marker) @punctuation.special
+(packed_marker) @punctuation.special
 (staging_marker) @keyword.directive
 (constructor_reference qualifier: (_) @namespace)
 (constructor_reference name: (type_identifier) @constructor)

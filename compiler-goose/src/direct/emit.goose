@@ -664,6 +664,7 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
         boolean => { return NominalIdentity { 0, blot_check_types::boolean }, true; },
         unit => { return NominalIdentity { 0, blot_check_types::unit }, true; },
         array => { return NominalIdentity { 0, 0xffffffff }, true; },
+        packed => { return NominalIdentity { 0xffffffff, blot_check_storage_types::packed }, true; },
         function => { return NominalIdentity { 0, 0xfffffffc }, true; },
         // Storage capabilities are compiler-owned nominal identities.
         ref => { return NominalIdentity { 0xffffffff, blot_check_storage_types::ref }, true; },
@@ -829,7 +830,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
-        function, provider, array, ref, view, link, cell => { result = true; },
+        function, provider, array, packed, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -881,7 +882,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
-        function, provider, array, ref, view, link, cell => { result = true; },
+        function, provider, array, packed, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -1550,7 +1551,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let n = g.types.node(receiver);
             if goal.kind == blot_check_types::ObligationKind.collection {
                 match n.tag {
-                    array, view => { g.types.match_(m, goal.result, n.a, env); },
+                    array, packed, view => { g.types.match_(m, goal.result, n.a, env); },
                     _ => {},
                 }
                 if at < 64 { done |= ((1 as u64) << (at as u64)); }
@@ -1704,7 +1705,7 @@ recursive fn packTyGrow(types: const blot_direct_types::Types&, ty: Ty, out: u8[
     out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
-        array, ref, view, link, provider, cell => {
+        array, packed, ref, view, link, provider, cell => {
             packTyGrow(types, n.a, out);
         },
         function => {
@@ -1755,7 +1756,7 @@ recursive fn packTy(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..<
     out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
-        array, ref, view, link, provider, cell => {
+        array, packed, ref, view, link, provider, cell => {
             packTy(types, n.a, out);
         },
         function => {
@@ -1833,7 +1834,7 @@ recursive fn unpackTy(
         if err != blot_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
-    if code == 9 || code == 12 || code == 13 || code == 14 || code == 15 || code == 17 {
+    if code == 9 || code == 12 || code == 13 || code == 14 || code == 15 || code == 17 || code == 23 {
         let a = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
         if !ok { return 0; }
         var tag = blot_direct_types::Tag.array;
@@ -1842,6 +1843,7 @@ recursive fn unpackTy(
         else if code == 14 { tag = blot_direct_types::Tag.link; }
         else if code == 15 { tag = blot_direct_types::Tag.provider; }
         else if code == 17 { tag = blot_direct_types::Tag.cell; }
+        else if code == 23 { tag = blot_direct_types::Tag.packed; }
         let res, err = types.intern(tag, [a]);
         if err != blot_direct_types::Error.none { ok = false; return 0; }
         return res;

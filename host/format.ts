@@ -151,20 +151,61 @@ export async function formatSource(source: string): Promise<string> {
         }
       }
       const lexed = frontend.lex(current);
-      const lines = current.replace(/\r\n|\r/g, "\n").split("\n");
-      const output: string[] = [];
-      let cursor = 0;
-      let line = 0;
-      let text = "";
-      let previous: { text: string; start: number; end: number } | undefined;
+      const rawTokens: {
+        text: string;
+        start: number;
+        end: number;
+        comment: boolean;
+      }[] = [];
       for (let index = 0; index < lexed.tokenTape.length; index++) {
         const token = lexed.tokenTape.token(index)!;
         if (
           token.type === "eof" ||
           (token.type === "named" && token.kind === "WHITESPACE")
         ) continue;
+        rawTokens.push({
+          text: token.text,
+          start: token.span.start,
+          end: token.span.end,
+          comment: token.type === "named" && token.kind === "COMMENT",
+        });
+      }
+      // Split trailing `%` off combined symbol tokens before adjacent `[` (e.g. `*%[T]`, `=%[1]`).
+      const tokens: typeof rawTokens = [];
+      for (let index = 0; index < rawTokens.length; index++) {
+        const token = rawTokens[index];
+        const next = rawTokens[index + 1];
+        if (
+          !token.comment && token.text.length > 1 && token.text.endsWith("%") &&
+          next?.text === "[" && next.start === token.end
+        ) {
+          tokens.push(
+            {
+              text: token.text.slice(0, -1),
+              start: token.start,
+              end: token.end - 1,
+              comment: false,
+            },
+            {
+              text: "%",
+              start: token.end - 1,
+              end: token.end,
+              comment: false,
+            },
+          );
+        } else {
+          tokens.push(token);
+        }
+      }
+      const lines = current.replace(/\r\n|\r/g, "\n").split("\n");
+      const output: string[] = [];
+      let cursor = 0;
+      let line = 0;
+      let text = "";
+      let previous: { text: string; start: number; end: number } | undefined;
+      for (const token of tokens) {
         const breaks =
-          (current.slice(cursor, token.span.start).match(/\r\n|\r|\n/g) ?? [])
+          (current.slice(cursor, token.start).match(/\r\n|\r|\n/g) ?? [])
             .length;
         if (breaks) {
           if (text.trim()) output.push(text.trimEnd());
@@ -177,15 +218,15 @@ export async function formatSource(source: string): Promise<string> {
         }
         if (!text) text = /^[ ]*/.exec(lines[line] ?? "")![0];
         const value = token.text;
-        const comment = token.type === "named" && token.kind === "COMMENT";
+        const comment = token.comment;
         let space = previous !== undefined;
         if (previous) {
-          const adjacent = previous.end === token.span.start;
+          const adjacent = previous.end === token.start;
           if (comment) {
             text = text.trimEnd() + "  ";
             space = false;
           } else if ([")", "]", ",", ";"].includes(value)) space = false;
-          else if (value === ":" && !witness.has(token.span.start)) {
+          else if (value === ":" && !witness.has(token.start)) {
             space = false;
           } else if (["(", "["].includes(previous.text)) space = false;
           else if (["(", "["].includes(value)) {
@@ -211,17 +252,17 @@ export async function formatSource(source: string): Promise<string> {
             (previous.text === "$" && adjacent && /^[A-Za-z_]/.test(value))
           ) space = false;
           else if (tightAfter.has(previous.start)) space = false;
-          else if (tightBefore.has(token.span.start)) space = false;
+          else if (tightBefore.has(token.start)) space = false;
           else if (value === "}" && previous.text === "{") space = false;
         }
         if (space) text += " ";
         text += value;
         previous = {
           text: value,
-          start: token.span.start,
-          end: token.span.end,
+          start: token.start,
+          end: token.end,
         };
-        cursor = token.span.end;
+        cursor = token.end;
       }
       if (text.trim()) output.push(text.trimEnd());
       return output.join("\n").trimEnd() + "\n";

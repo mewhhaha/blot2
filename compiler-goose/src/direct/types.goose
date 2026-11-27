@@ -35,7 +35,7 @@ type U64Map = blot_direct_map::U64Map;
 // failure is not an error value here.
 enum Error { none, unsupported, diverged }
 
-enum Tag { unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never, tuple, record, nominal, function, array, ref, view, link, provider, state_provider, cell }
+enum Tag { unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never, tuple, record, nominal, function, array, packed, ref, view, link, provider, state_provider, cell }
 fn tagCode(tag: Tag) -> u32 {
     match tag {
         unit => { return 0; }, boolean => { return 1; }, u32_ => { return 2; }, f32_ => { return 3; }, never => { return 4; },
@@ -45,6 +45,7 @@ fn tagCode(tag: Tag) -> u32 {
         i64_ => { return 21; },
         f64_ => { return 22; },
         tuple => { return 5; }, record => { return 6; }, nominal => { return 7; }, function => { return 8; }, array => { return 9; },
+        packed => { return 23; },
         ref => { return 12; },
         view => { return 13; }, link => { return 14; }, provider => { return 15; }, state_provider => { return 16; }, cell => { return 17; },
     }
@@ -59,6 +60,7 @@ fn tagName(tag: Tag) -> Text {
         i64_ => { return "i64"; },
         f64_ => { return "f64"; },
         tuple => { return "tuple"; }, record => { return "record"; }, nominal => { return "nominal"; }, function => { return "function"; }, array => { return "array"; },
+        packed => { return "packed"; },
         ref => { return "ref"; },
         view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, cell => { return "cell"; },
     }
@@ -394,7 +396,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var arity: i64 = -1;
     match tag {
         function => { arity = 2; },
-        array, ref, view, link, provider, cell => { arity = 1; },
+        array, packed, ref, view, link, provider, cell => { arity = 1; },
         state_provider => { arity = 3; },
         _ => {},
     }
@@ -417,7 +419,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         record => { value = Node { tag, start, (payload.len / 2) as u32 }; },
         nominal => { value = Node { tag, start, (payload.len - 2) as u32 }; },
         function => { value = Node { tag, first, payload[payload.len - 1] }; },
-        array, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
+        array, packed, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
     }
     var cdepth: u8 = 0;
     match tag {
@@ -429,7 +431,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
             if d1 > md { md = d1; }
             if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
         },
-        array, ref, view, link, provider, cell => {
+        array, packed, ref, view, link, provider, cell => {
             let md = self_.concrete_depth[payload[0]];
             if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
         },
@@ -480,7 +482,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         u64_, i64_ => { init_flat = Slot { true, 6, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 1; },
         f64_ => { init_flat = Slot { true, 7, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 1; },
         f32_ => { init_flat = Slot { true, 1, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; init_falign = 4; init_plain = 2; init_bbytes = 4; init_hmem = 1; },
-        function, provider, array => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 2; },
+        function, provider, array, packed => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 2; },
         ref, link => { init_flat = Slot { true, 2, 3 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 12; init_falign = 4; init_plain = 2; init_bbytes = 12; init_hmem = 2; },
         view => { init_flat = Slot { true, 2, 4 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 16; init_falign = 4; init_plain = 2; init_bbytes = 16; init_hmem = 2; },
         _ => {},
@@ -741,6 +743,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     var tag = Tag.link;
                     if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
                     else if kind.value == blot_check_storage_types::view { tag = Tag.view; }
+                    else if kind.value == blot_check_storage_types::packed { tag = Tag.packed; }
                     let made, error = intern(self_, tag, [element]);
                     if error != Error.none { return 0, error; }
                     result = made;
@@ -1109,7 +1112,7 @@ recursive fn tyHoldsMemory(self_: Types&, ty: Ty) -> bool, Error {
     var res = false;
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
-        function, provider, array, ref, view, link, cell => { res = true; },
+        function, provider, array, packed, ref, view, link, cell => { res = true; },
         state_provider => {
             let h, err = tyHoldsMemory(self_, self_.words[n.a + 2]);
             if err != Error.none { return false, err; }
@@ -1648,7 +1651,7 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
         },
         // Owner handles: (slot, generation); views add (start, length),
         // element references and links add an index.
-        array => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
+        array, packed => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
         view => { for at in 0..4 { self_.pushScratchLayout(i32w); } },
         ref, link => { for at in 0..3 { self_.pushScratchLayout(i32w); } },
         cell => { self_.pushScratchLayout(i32w); },
@@ -1661,7 +1664,7 @@ fn pushSlot(self_: Types&, slot: Slot) {
 
 fn isContainer(tag: Tag) -> bool {
     match tag {
-        array, ref, view, link => { return true; },
+        array, packed, ref, view, link => { return true; },
         _ => { return false; },
     }
 }

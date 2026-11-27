@@ -25,6 +25,7 @@ Quick, version-matched reference for humans and coding agents. Run `deno task bl
 - Byte-string literals (`b"hello\r\n\x00"`) have type `#[U8]` (see `std/bytes`).
 - Negative arguments need parens: `F32.abs (-2.0)`.
 - Arrays: `#[T]` (equivalent to `Array T`), fixed-length `#[N; T]`, borrowed read-only view `&[T]`, frozen shared handle `*T` (via `freeze x`). Pre-size with `Array.with_capacity`, `Array.reserve`, bulk append with `Array.extend` / `Array.extend_view`.
+- Packed sequential arrays: `%[T]` (`Packed T`, constructed with `%[1, 2]`, `%[x * 2 | x <- xs]`, `%[a, ...xs]`) — non-indexable dense sequential storage (split-stream sums with fused `for`+`case`, SoA record/tuple columns, flat scalar cursors). Supports `.length`, `.is_empty`, `.push`, `.pop`, `.reserve`, `.extend`, `.copy`, `freeze` (`*%[T]`), `.to_array`, and `Array.to_packed`.
 - Text: `Text` is a prelude alias for `#[U32]` Unicode scalar values; string literals (`"hi"`, `"é🙂"`) have type `Text` (see `std/text`).
 - Standard modules: `std/prelude`, `std/text`, `std/bytes`, `std/map` (open-addressed hash map `Map K V`), `std/simd` (`F32x4`, `I32x4`, `F64x2`, `U64x2`, `U8x16`, `I16x8`).
 - Wide 64×64->128 multiply: `U64.mul_wide a b` returns `(lo, hi)` as `(U64, U64)`.

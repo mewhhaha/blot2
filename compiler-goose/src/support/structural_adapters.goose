@@ -44,6 +44,7 @@ import direct.emit;
 import direct.function;
 import direct.function_control;
 import direct.function_kernels;
+import direct.function_packed;
 import direct.function_persist;
 import direct.function_spark;
 import direct.function_staging;
@@ -1059,6 +1060,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Mutable
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::MutableOwner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::PackedF32x4)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::PackedF32x4,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::PackedPlan)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::PackedPlan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::PersistRoot)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::PersistRoot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::ScratchCut)->bool {return equalFields(left,right);}

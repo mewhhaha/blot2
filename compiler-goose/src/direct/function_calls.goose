@@ -57,7 +57,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     match shape.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_ => { return true; },
         function, provider, state_provider, cell, never => { return false; },
-        array, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
+        array, packed, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
             for child in g.types.words[shape.a..shape.a + shape.b] {
                 if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
@@ -1226,6 +1226,25 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             }
             return blot_direct_types::Error.none;
         },
+        packed => {
+            let c_slot = local32(g, f);
+            let c_gen = local32(g, f);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+            lset(g, c_slot);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
+            lset(g, c_gen);
+            let p_slot, p_gen, perr = emitPackedPersist(g, f, c_slot, c_gen, ty, id, depth);
+            if perr != blot_direct_types::Error.none { return perr; }
+            lget(g, base);
+            lget(g, p_slot);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+            lget(g, base);
+            lget(g, p_gen);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
+            return blot_direct_types::Error.none;
+        },
         ref, link, view => {
             let c_slot = local32(g, f);
             let c_gen = local32(g, f);
@@ -1421,25 +1440,34 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     callf(g, g.s.instances[value_instance].function);
     let value, error = pop(g, f, key.ty, 0);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    lget(g, w(g, value, 0));
-    lget(g, w(g, value, 1));
-    let element, error = elementOf(g, f, key.ty, 0);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    let step, error = stride(g, f, element, 0);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    i32Const(g, step);
-    // All module const pools are deeply immutable: always emit mode = 2 (static_pool_flag | live_flag).
-    i32Const(g, 2);
-    callf(g, persist);
-    let p_slot = local32(g, f);
-    let p_gen = local32(g, f);
-    lset(g, p_gen);
-    lset(g, p_slot);
-    let elem_holds, eherr = g.contentsHoldMemory(element);
-    if eherr != blot_direct_types::Error.none { return neverVal(), eherr; }
-    if elem_holds {
-        let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, 0, 0);
+    var p_slot: u32 = 0;
+    var p_gen: u32 = 0;
+    if tagOf(g, key.ty) == blot_direct_types::Tag.packed {
+        let ps, pg, perr = emitPackedPersist(g, f, w(g, value, 0), w(g, value, 1), key.ty, 0, 0);
         if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        p_slot = ps;
+        p_gen = pg;
+    } else {
+        lget(g, w(g, value, 0));
+        lget(g, w(g, value, 1));
+        let element, error = elementOf(g, f, key.ty, 0);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let step, error = stride(g, f, element, 0);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        i32Const(g, step);
+        // All module const pools are deeply immutable: always emit mode = 2 (static_pool_flag | live_flag).
+        i32Const(g, 2);
+        callf(g, persist);
+        p_slot = local32(g, f);
+        p_gen = local32(g, f);
+        lset(g, p_gen);
+        lset(g, p_slot);
+        let elem_holds, eherr = g.contentsHoldMemory(element);
+        if eherr != blot_direct_types::Error.none { return neverVal(), eherr; }
+        if elem_holds {
+            let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, 0, 0);
+            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        }
     }
     lget(g, p_slot);
     gset(g, slot_global);

@@ -319,6 +319,39 @@ func Array.copy (values: #[a]): #[a] => @storage.copy values
 func Array.view (values: #[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
 func View.view (values: &[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
 
+// Packed sequential arrays (`%[T]`): dense, non-indexable iteration storage.
+func Packed.length (values: %[a]): U32 => @storage.length values
+func Packed.is_empty (values: %[a]): Bool => Packed.length values == 0
+func Packed.with_capacity (capacity: U32): %[a] => @storage.with_capacity capacity
+func Packed.reserve (values: own %[a]) -> (additional: U32): %[a] =>
+  return @storage.reserve values additional
+func Packed.push (values: own %[a]) -> (value: a): %[a] =>
+  return @storage.push values value
+func Packed.pop (values: own %[a]): (%[a], a) =>
+  let value = @storage.pop values
+  return (values, value)
+func Packed.extend (values: own %[a]) -> (more: %[a]): %[a] =>
+  return @storage.extend values more
+func Packed.extend_array (values: own %[a]) -> (more: #[a]): %[a] =>
+  return @storage.extend values more
+func Packed.extend_view (values: own %[a]) -> (more: &[a]): %[a] =>
+  return @storage.extend values more
+func Packed.copy (values: %[a]): %[a] => @storage.copy values
+func Packed.concat (left: %[a]) -> (right: %[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (U32.add (Packed.length left) (Packed.length right))
+  out := @storage.extend out left
+  return @storage.extend out right
+func Packed.to_array (values: %[a]): #[a] =>
+  let out: #[a] = @storage.with_capacity (Packed.length values)
+  return @storage.extend out values
+func Packed.from_array (values: #[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (Array.length values)
+  return @storage.extend out values
+func Array.to_packed (values: #[a]): %[a] => Packed.from_array values
+func Array.from_packed (values: %[a]): #[a] => Packed.to_array values
+func Array.extend_packed (values: own #[a]) -> (more: %[a]): #[a] =>
+  return @storage.extend values more
+
 func U8.from value : U8 => value.to_u8
 const U8.add = @u8.add
 const U8.sub = @u8.sub

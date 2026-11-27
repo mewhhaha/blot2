@@ -624,11 +624,33 @@ io answer (value: F32) => return case twice ($Box value) of
 
 ## Arrays and libraries
 
-Arrays are the single homogeneous collection type. `#[]`, `#[1, 2]`, and
-`#[#[1], #[2]]` construct owned `#[T]` (`Array T`) values. Fixed-length arrays
-use `#[N; T]` (or `#[n; T]` to tie equal lengths across parameters), read-only
+Arrays are the primary indexable collection type, complemented by packed
+sequential arrays (`%[T]`) for dense iteration-only storage. `#[]`, `#[1, 2]`,
+and `#[#[1], #[2]]` construct owned `#[T]` (`Array T`) values; `%[]` and
+`%[1, 2]` construct owned `%[T]` (`Packed T`) values. Fixed-length arrays use
+`#[N; T]` (or `#[n; T]` to tie equal lengths across parameters), read-only
 borrowed slices use `&[T]` (`View T`), and frozen shared handles use `*T` (via
 `freeze value`).
+
+Packed arrays (`%[T]` / `Packed T`) cannot be randomly indexed (`p[i]`),
+sliced (`&p[start..end]`), or linked (`^p[i]`), which allows the direct Wasm
+backend to pick dense sequential layouts automatically:
+- **Split-stream sums:** multi-variant data types store a dense 1-byte tag
+  stream plus one contiguous payload stream per non-empty variant (no wide-tag
+  padding for empty variants, and `for ev in ps: case ev of ...` fuses to direct
+  tag dispatch that skips unused payload streams).
+- **Structure of Arrays (SoA):** multi-field records and tuples store one
+  contiguous column per field, so `for p in ps:` only loads the columns the loop
+  body actually reads.
+- **Flat cursors:** scalars and other single-stream elements walk a contiguous
+  buffer by cursor.
+
+`%[T]` supports comprehensions (`%[x * 2 | x <- xs]`), spreads
+(`%[a, ...xs, b]`), `for` loops, `freeze` (`*%[T]`), `fork` rollback, module
+`const` values, and prelude methods (`Packed.length`, `is_empty`,
+`with_capacity`, `reserve`, `push`, `pop`, `extend`, `extend_array`,
+`extend_view`, `copy`, `concat`, `to_array`, `from_array`, plus
+`Array.to_packed`, `Array.from_packed`, `Array.extend_packed`).
 
 Arrays have contiguous checked row storage. An owned `#[T]` supports in-place
 element updates (`values[index] := replacement`), growth and truncation

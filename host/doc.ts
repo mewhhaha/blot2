@@ -410,12 +410,14 @@ export class TypeVarRenamer {
 
   rename(raw: string): string {
     let s = raw;
-    // Convert `Array ...` to idiomatic Blot `#[...]`
+    // Convert `Array ...` to idiomatic Blot `#[...]` and `Packed ...` to `%[...]`
     let prev = "";
     while (prev !== s) {
       prev = s;
       s = s.replace(/\bArray\s+\(([^()]+)\)/g, "#[$1]");
-      s = s.replace(/\bArray\s+([*#&?A-Za-z0-9_.]+)/g, "#[$1]");
+      s = s.replace(/\bArray\s+([*#%?&A-Za-z0-9_.]+)/g, "#[$1]");
+      s = s.replace(/\bPacked\s+\(([^()]+)\)/g, "%[$1]");
+      s = s.replace(/\bPacked\s+([*#%?&A-Za-z0-9_.]+)/g, "%[$1]");
     }
     // Clean polymorphic open effect row tail `| ?e` -> `| e`
     s = s.replace(/\|\s*\?e\b/g, "| e");

@@ -64,6 +64,15 @@ export function parserSource(
       prepared.tokens[index + 1]?.span.start === token.span.end &&
       /^[A-Za-z_]/.test(prepared.tokens[index + 1]?.text ?? "")
     ) replace(token.span.start, token.span.end, "#");
+    // Normalize the packed array sigil (`%[`) for the shared CST grammar without
+    // changing spans or the original text used by formatting and diagnostics.
+    // Splitting a trailing `%` off a combined symbol token also handles `*%[T]`,
+    // `=%[1, 2]`, and `=>%[1, 2]`.
+    if (
+      token.text.endsWith("%") &&
+      prepared.tokens[index + 1]?.text === "[" &&
+      prepared.tokens[index + 1]?.span.start === token.span.end
+    ) replace(token.span.end - 1, token.span.end, "#");
     if (token.type === "named" && token.kind === "INTEGER") {
       replace(
         token.span.start,

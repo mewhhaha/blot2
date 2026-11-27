@@ -653,6 +653,13 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,"Array"),0,0,start);
   let __cleanup_result_arr_0: Id = add(p,source,tokens,a_type_apply,head,elem,0,start); { p.depth--; } return __cleanup_result_arr_0;
  }
+ if packed_bracket_at(p,source,tokens,0) {
+  advance(p,source,tokens); advance(p,source,tokens);
+  let elem=type_expression(p,source,tokens);
+  expect(p,source,tokens,t_r_bracket);
+  let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,"@storage.Packed"),0,0,start);
+  let __cleanup_result_packed_0: Id = add(p,source,tokens,a_type_apply,head,elem,0,start); { p.depth--; } return __cleanup_result_packed_0;
+ }
  if at(p,source,tokens,t_caret)||(at(p,source,tokens,t_symbol)&&text(p,source,current(p,source,tokens))=="&") {
   let link=advance(p,source,tokens).tag==t_caret; let view=!link&&eat(p,source,tokens,t_l_bracket); var storage_name: const u8[:]="@storage.Ref";
   if link { storage_name="@storage.Link"; } else if view { storage_name="@storage.View"; }
@@ -910,7 +917,7 @@ recursive fn infix_work(p: Parser&,source: const u8[:],tokens: const Token[:],st
  let start=current(p,source,tokens).start; var head: Id=0;
  if at(p,source,tokens,t_kw_not) { head=not_operand(p,source,tokens); } else { head=prefix(p,source,tokens); }
  var operands=ScratchIdBuffer {};  var operators=ScratchOperatorBuffer {};  var unknown=false;
- while p.failure==blot_error::Error.none&&operator_tag(current(p,source,tokens).tag) {
+ while p.failure==blot_error::Error.none&&operator_tag(current(p,source,tokens).tag)&&!packed_bracket_at(p,source,tokens,0) {
   if stop_below_not&&stop_infix_for_not(p,source,tokens) { break; }
   let op=read_operator(p,source,tokens); unknown=unknown||!op.known; operators.push(op); var rhs: Id=0;
   if at(p,source,tokens,t_kw_func)||at(p,source,tokens,t_kw_do)||at(p,source,tokens,t_kw_if)||at(p,source,tokens,t_kw_case) { rhs=expression(p,source,tokens); }
@@ -959,12 +966,12 @@ recursive fn prefix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id
   if node.tag!=a_name&&node.tag!=a_field_access { return fail(p,source,tokens,c_expected_expression); }
   return collection_intrinsic(p,source,tokens,"@storage.ref",[operand],t.start);
  }
- if t.tag==t_symbol||t.tag==t_star||t.tag==t_caret { advance(p,source,tokens); let op=intern(p,source,tokens,text(p,source,t)); let arg=application(p,source,tokens,true); return add(p,source,tokens,a_unary,op,arg,0,t.start); }
+ if (t.tag==t_symbol||t.tag==t_star||t.tag==t_caret)&&!packed_bracket_at(p,source,tokens,0) { advance(p,source,tokens); let op=intern(p,source,tokens,text(p,source,t)); let arg=application(p,source,tokens,true); return add(p,source,tokens,a_unary,op,arg,0,t.start); }
  return application(p,source,tokens,true);
 }
 recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],allow_witness: bool) -> Id {
  let start=current(p,source,tokens).start; var value: Id=0;
- if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&atom_tag(peek(p,tokens,1)) {
+ if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&(atom_tag(peek(p,tokens,1))||packed_bracket_at(p,source,tokens,1)) {
   // `(own x)` on its own, as an argument in parentheses.
   advance(p,source,tokens); let given=postfix(p,source,tokens); if p.failure!=blot_error::Error.none { return 0; }
   value=add(p,source,tokens,a_group,given,1,0,start); p.tree.spans.items[value].end=p.tree.span(given).end;
@@ -1007,11 +1014,11 @@ recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],a
    }
    continue;
   }
-  if !atom_tag(current(p,source,tokens).tag)||(!allow_witness&&at(p,source,tokens,t_colon)) { break; }
+  if (!atom_tag(current(p,source,tokens).tag)&&!packed_bracket_at(p,source,tokens,0))||(!allow_witness&&at(p,source,tokens,t_colon)) { break; }
   if at(p,source,tokens,t_colon)&&peek(p,tokens,1)==t_newline { break; }
   // `f (own x)` or `f own x`: the argument is given away. A group node
   // with b = 1 carries it; every other group has b = 0.
-  if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&atom_tag(peek(p,tokens,1)) {
+  if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&(atom_tag(peek(p,tokens,1))||packed_bracket_at(p,source,tokens,1)) {
    let point=current(p,source,tokens).start; advance(p,source,tokens); let given=postfix(p,source,tokens); if p.failure!=blot_error::Error.none { break; }
    let marked=add(p,source,tokens,a_group,given,1,0,point); p.tree.spans.items[marked].end=p.tree.span(given).end;
    value=add(p,source,tokens,a_apply,value,marked,0,start); continue;
@@ -1104,6 +1111,11 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
   if at(p,source,tokens,t_l_bracket) { let __cleanup_result_53_0: Id = collection(p,source,tokens,start); { p.depth--; } return __cleanup_result_53_0; } if at(p,source,tokens,t_l_brace) { let __cleanup_result_54_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_54_0; }
   let name=qualified(p,source,tokens); if at(p,source,tokens,t_l_brace) { let __cleanup_result_55_0: Id = record(p,source,tokens,name,start); { p.depth--; } return __cleanup_result_55_0; } let __cleanup_result_56_0: Id = add(p,source,tokens,a_constructor_ref,name,0,0,start); { p.depth--; } return __cleanup_result_56_0;
  }
+ if packed_bracket_at(p,source,tokens,0) {
+  advance(p,source,tokens);
+  let __cleanup_result_packed_expr_0: Id = collection(p,source,tokens,start,true);
+  { p.depth--; } return __cleanup_result_packed_expr_0;
+ }
  if t.tag==t_l_brace { let __cleanup_result_57_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_57_0; }
  if t.tag==t_l_bracket {
   advance(p,source,tokens); var values=ScratchIdBuffer {};
@@ -1136,7 +1148,7 @@ recursive fn collection_element(p: Parser&,source: const u8[:],tokens: const Tok
  }
  let value=expression(p,source,tokens); p.expression_end=previous; return value;
 }
-fn collection_literal(p: Parser&,source: const u8[:],tokens: const Token[:],values: const Id[:],start: u32) -> Id { let range=list(p,source,tokens,values); return add(p,source,tokens,a_array,range.start,range.len,0,start); }
+fn collection_literal(p: Parser&,source: const u8[:],tokens: const Token[:],values: const Id[:],start: u32,is_packed: bool=false) -> Id { let range=list(p,source,tokens,values); var flag: u32=0; if is_packed { flag=2; } return add(p,source,tokens,a_array,range.start,range.len,flag,start); }
 fn collection_intrinsic(p: Parser&,source: const u8[:],tokens: const Token[:],name: const u8[:],args: const Id[:],start: u32) -> Id { var result=add(p,source,tokens,a_intrinsic,intern(p,source,tokens,name),0,0,start); for arg in args { result=add(p,source,tokens,a_apply,result,arg,0,start); } return result; }
 fn collection_name(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Symbol { let spelling=str("$collection.",p.collection_names); p.collection_names++; return intern(p,source,tokens,spelling); }
 fn collection_binding(p: Parser&,source: const u8[:],tokens: const Token[:],name: Symbol,value: Id,start: u32) -> Id { let pat=add(p,source,tokens,a_pattern_name,name,0,0,start); return add(p,source,tokens,a_let_stmt,pat,value,extra(p,source,tokens,[0 as u32,0,0,0,0]),start); }
@@ -1157,18 +1169,34 @@ fn collection_loop(p: Parser&,source: const u8[:],tokens: const Token[:],pat: Id
   statements.deinit(); }
  var explicit_flag: u32=0; if explicit { explicit_flag=1; } return add(p,source,tokens,a_for_stmt,pat,value,extra(p,source,tokens,[end,body,explicit_flag,expansion]),start);
 }
-recursive fn collection(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
+recursive fn collection(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32,is_packed: bool=false) -> Id {
  expect(p,source,tokens,t_l_bracket); var values=ScratchIdBuffer {};  var spread: i64=-1;
  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_bracket) {
   if eat(p,source,tokens,t_ellipsis) { if spread>=0 { let __cleanup_result_56_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_56_0; } spread=values.len; }
   values.push(collection_element(p,source,tokens));
-  if eat(p,source,tokens,t_pipe) { if spread>=0 { let __cleanup_result_57_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_57_0; } if values.len==1&&at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_left_arrow { let __cleanup_result_58_0: Id = comprehension(p,source,tokens,values.items[0],start); values.deinit(); return __cleanup_result_58_0; } spread=values.len; values.push(expression(p,source,tokens)); break; }
+  if eat(p,source,tokens,t_pipe) { if spread>=0 { let __cleanup_result_57_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_57_0; } if values.len==1&&at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_left_arrow { let __cleanup_result_58_0: Id = comprehension(p,source,tokens,values.items[0],start,is_packed); values.deinit(); return __cleanup_result_58_0; } spread=values.len; values.push(expression(p,source,tokens)); break; }
   if !eat(p,source,tokens,t_comma) { break; }
  }
  expect(p,source,tokens,t_r_bracket); if p.failure!=blot_error::Error.none { let __cleanup_result_59_0: Id = 0; values.deinit(); return __cleanup_result_59_0; }
- if spread<0 { let __cleanup_result_60_0: Id = collection_literal(p,source,tokens,values.items,start); values.deinit(); return __cleanup_result_60_0; }
+ if spread<0 { let __cleanup_result_60_0: Id = collection_literal(p,source,tokens,values.items,start,is_packed); values.deinit(); return __cleanup_result_60_0; }
  var statements=ScratchIdBuffer {};  var refs=ScratchIdBuffer {};
  for value in values.items { let name=collection_name(p,source,tokens,start); statements.push(add(p,source,tokens,a_iterator_bind,name,value,0,start)); refs.push(add(p,source,tokens,a_name,name,0,0,start)); }
+ if is_packed {
+  let acc=collection_name(p,source,tokens,start);
+  let empty=collection_literal(p,source,tokens,[],start,true);
+  statements.push(collection_binding(p,source,tokens,acc,empty,start));
+  for ref_val, idx in refs.items {
+   let target=add(p,source,tokens,a_name,acc,0,0,start);
+   let receiver=add(p,source,tokens,a_name,acc,0,0,start);
+   var step: Id=0;
+   if idx==spread { step=collection_intrinsic(p,source,tokens,"@storage.extend",[receiver,ref_val],start); }
+   else { step=collection_intrinsic(p,source,tokens,"@storage.push",[receiver,ref_val],start); }
+   statements.push(add(p,source,tokens,a_rebind_stmt,target,step,0,start));
+  }
+  let final=add(p,source,tokens,a_name,acc,0,0,start);
+  statements.push(add(p,source,tokens,a_return_stmt,final,0,0,start));
+  let __cleanup_result_packed_spread_0: Id = list_node(p,source,tokens,a_block,statements.items,start); refs.deinit(); statements.deinit(); values.deinit(); return __cleanup_result_packed_spread_0;
+ }
  var result=refs.items[spread]; var index=spread;
  while index!=0 { index--; result=collection_intrinsic(p,source,tokens,"@array.prepend",[result,refs.items[index]],start); }
  for value in refs.items[spread+1..] { result=collection_intrinsic(p,source,tokens,"@array.append",[result,value],start); }
@@ -1336,7 +1364,7 @@ recursive fn spark_expression(p: Parser&,source: const u8[:],tokens: const Token
  advance(p,source,tokens);
  return add(p,source,tokens,a_spark_expr,body,pat,extra(p,source,tokens,[src_first,src_end]),start);
 }
-recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:],result: Id,start: u32) -> Id {
+recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:],result: Id,start: u32,is_packed: bool=false) -> Id {
  var qualifiers=ScratchQualifierBuffer {};
  while p.failure==blot_error::Error.none {
   let point=current(p,source,tokens).start; var kind: u32=1; var name: Symbol=0;
@@ -1345,8 +1373,11 @@ recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:]
   let value=expression(p,source,tokens); qualifiers.push(Qualifier {kind,name,value,point});
   if !eat(p,source,tokens,t_comma) { break; } if at(p,source,tokens,t_r_bracket) { let __cleanup_result_62_0: Id = fail(p,source,tokens,c_expected_expression); qualifiers.deinit(); return __cleanup_result_62_0; }
  }
- expect(p,source,tokens,t_r_bracket); let accumulator=collection_name(p,source,tokens,start); let empty=collection_literal(p,source,tokens,[],start); let initial=collection_binding(p,source,tokens,accumulator,empty,start);
- let target=add(p,source,tokens,a_name,accumulator,0,0,start); let receiver=add(p,source,tokens,a_name,accumulator,0,0,start); let appended=collection_intrinsic(p,source,tokens,"@array.append",[receiver,result],start);
+ expect(p,source,tokens,t_r_bracket); let accumulator=collection_name(p,source,tokens,start); let empty=collection_literal(p,source,tokens,[],start,is_packed); let initial=collection_binding(p,source,tokens,accumulator,empty,start);
+ let target=add(p,source,tokens,a_name,accumulator,0,0,start); let receiver=add(p,source,tokens,a_name,accumulator,0,0,start);
+ var append_name: const u8[:]="@array.append";
+ if is_packed { append_name="@storage.push"; }
+ let appended=collection_intrinsic(p,source,tokens,append_name,[receiver,result],start);
  let rebind=add(p,source,tokens,a_rebind_stmt,target,appended,0,start); var body=list_node(p,source,tokens,a_block,[rebind],start); var index=qualifiers.len;
  while index!=0&&p.failure==blot_error::Error.none {
   index--; let q=qualifiers.items[index]; var statement: Id=0;
@@ -1638,6 +1669,11 @@ recursive fn case_expression(p: Parser&,source: const u8[:],tokens: const Token[
 fn operator_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_dollar||tag==t_star||tag==t_caret||tag==t_pipe||tag==t_kw_and||tag==t_kw_or; }
 fn atom_tag(tag: Tag) -> bool { return tag==t_integer||tag==t_char_literal||tag==t_float||tag==t_string||tag==t_byte_string||tag==t_intrinsic||tag==t_identifier||tag==t_type_identifier||tag==t_selector||tag==t_hash||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_colon||tag==t_kw_true||tag==t_kw_false||tag==t_kw_spark; }
 fn type_atom_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_type_identifier||tag==t_intrinsic||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_caret||tag==t_symbol; }
+fn packed_bracket_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i64) -> bool {
+ let idx=p.index+offset; if idx+1>=tokens.len { return false; }
+ let t=tokens[idx]; let next=tokens[idx+1];
+ return t.tag==t_symbol&&next.tag==t_l_bracket&&t.end==next.start&&text(p,source,t)=="%";
+}
 fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i64) -> bool {
  let idx=p.index+offset; if idx>=tokens.len { return false; }
  let tag=tokens[idx].tag;

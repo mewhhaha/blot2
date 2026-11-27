@@ -322,6 +322,21 @@ change by a net -6 bytes (`direct/closures.blot` 6270->6263 B,
 `missing_associated` with `{"operation": "+", "member": "add"}`); and prelude
 work counters increase uniformly by `+18` body elaborations/lowerings.
 
+Packed Sequential Arrays `%[...]` / `%[T]` (`Packed T`) (27 November 2026)
+added packed non-indexable sequential arrays across parsing (`%[` adjacency with
+lexer symbol-run split for `*%[T]` / `=%[1]`), typechecking (`storage_types::packed`),
+Core/uniqueness validation (including direct `:=` `@storage.{push,reserve,extend}`
+move semantics), wire schema (`0x2d`), type display (`%[T]`), direct Wasm lowering
+(`direct/function_packed.goose`: split-stream sums with dense U8 tags and fused
+`for`+`case` dispatch, SoA records/tuples with touched-column projection and
+destructuring, flat sequential cursors, `freeze`, `fork`, module `const`, and
+nested containers), `Packed.*` / `Array.{to_packed,from_packed,extend_packed}`
+prelude helpers in `std/prelude.blot`, Baba/formatter support, and Tree-sitter
+highlighting. Re-recorded `expected.json`: all 109 fixtures keep 100% identical
+exit codes, diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
+`wasm_diffs=0`); only prelude work counters updated (`+16` prelude body
+elaborations/lowerings).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

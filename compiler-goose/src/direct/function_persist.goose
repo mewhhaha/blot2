@@ -215,6 +215,21 @@ recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64,
         array => {
             return collectPersistTys(g, n.a, out, depth + 1, false);
         },
+        packed => {
+            let dummy_f = newFn(g, 1, 0);
+            let plan, perr = computePackedPlan(g, dummy_f, n.a, 0);
+            if perr != blot_direct_types::Error.none { return perr; }
+            if plan.mode == PACKED_FLAT {
+                return collectPersistTys(g, n.a, out, depth + 1, false);
+            }
+            for s in 0..plan.stream_count {
+                let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
+                if ierr != blot_direct_types::Error.none { return ierr; }
+                let err = collectPersistTys(g, sub_arr, out, depth + 1, true);
+                if err != blot_direct_types::Error.none { return err; }
+            }
+            return blot_direct_types::Error.none;
+        },
         tuple => {
             for at in 0..(n.b as i64) {
                 let err = collectPersistTys(g, g.types.words[n.a + at], out, depth + 1, false);
@@ -901,6 +916,146 @@ fn emitStageRoot(
                     close(g, f); // empty_o_if
                     close(g, f); // seen_t_if
                     close(g, f); // p_if
+                },
+                packed => {
+                    let elem_ty = tn.a;
+                    let plan, perr = computePackedPlan(g, f, elem_ty, 0);
+                    if perr != blot_direct_types::Error.none { return perr; }
+                    let is_multi = plan.mode != PACKED_FLAT;
+                    let elem_step = if is_multi { 0 as u32 } else {
+                        let st, serr = stride(g, f, elem_ty, 0);
+                        if serr != blot_direct_types::Error.none { return serr; }
+                        st
+                    };
+                    let header_bytes = (plan.stream_count as u32) * 8;
+                    let elem_cidx = if is_multi { -1 as i64 } else { findCollectedTy(tys[..], elem_ty) };
+                    lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, o_slot);
+                    lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4); lset(g, o_gen);
+                    lget(g, o_slot); lget(g, o_gen); callf(g, rt.check); ltee(g, o_entry);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, o_base);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, o_len);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity); lset(g, o_cap);
+
+                    lget(g, o_slot); i32Const(g, rt.layout.persistent_split); op(g, OP_i32_ge_u);
+                    let p_if = open(g, f, OP_if_);
+                    lget(g, o_cap); i32Const(g, blot_direct_runtime::static_pool_flag); op(g, OP_i32_and); op(g, OP_i32_eqz);
+                    let non_static_if = open(g, f, OP_if_);
+                    lget(g, old_owners_map); lget(g, o_slot); lget(g, o_gen); i32Const(g, 0); callf(g, rt.hmap_get);
+                    lset(g, m_found); op(g, OP_drop);
+                    lget(g, m_found); op(g, OP_i32_eqz); trap(g, f);
+                    lget(g, ret_owners_map); lget(g, o_slot); lget(g, o_gen); i32Const(g, 0); callf(g, rt.hmap_get);
+                    lset(g, m_found); op(g, OP_drop);
+                    lget(g, m_found); op(g, OP_i32_eqz);
+                    let first_ret_if = open(g, f, OP_if_);
+                    lget(g, ret_owners_map); lget(g, o_slot); lget(g, o_gen); i32Const(g, 0); i32Const(g, 1); callf(g, rt.hmap_put);
+                    emitPushFixup(g, ret_owners_slot, o_slot, o_gen, dst_tmp);
+                    if is_multi {
+                        for s in 0..plan.stream_count {
+                            let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
+                            if ierr != blot_direct_types::Error.none { return ierr; }
+                            let scidx = findCollectedTy(tys[..], sub_arr);
+                            if scidx >= 0 {
+                                let perr2 = emitPushFlatChild(g, f, work_slot, o_base, (s as u32) * 8, sub_arr, tys[..], tmp_a, tmp_b, dst_tmp);
+                                if perr2 != blot_direct_types::Error.none { return perr2; }
+                            }
+                        }
+                    } else if elem_cidx >= 0 {
+                        i32Const(g, 0); lset(g, elem_i);
+                        let eb = open(g, f, OP_block);
+                        let el = open(g, f, OP_loop);
+                        lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb);
+                        lget(g, o_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
+                        let perr2 = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
+                        if perr2 != blot_direct_types::Error.none { return perr2; }
+                        lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
+                        br(g, f, OP_br, el);
+                        close(g, f); close(g, f);
+                    }
+                    close(g, f); close(g, f);
+                    op(g, OP_else_);
+                    lget(g, temp_owner_map); lget(g, o_slot); i32Const(g, 0); i32Const(g, 0); callf(g, rt.hmap_get);
+                    lset(g, m_found); lset(g, m_val);
+                    lget(g, m_found);
+                    let seen_t_if = open(g, f, OP_if_);
+                    lget(g, m_val); i32Const(g, 1); op(g, OP_i32_sub); lset(g, steal_idx);
+                    emitPushFixup(g, owner_fix_slot, w_a, steal_idx, dst_tmp);
+                    op(g, OP_else_);
+                    emitLoadTempEntry(g, steal_slot, dst_tmp);
+                    lget(g, dst_tmp); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, steal_idx);
+                    lget(g, temp_owner_map); lget(g, o_slot); i32Const(g, 0); i32Const(g, 0);
+                    lget(g, steal_idx); i32Const(g, 1); op(g, OP_i32_add); callf(g, rt.hmap_put);
+                    emitPushFixup(g, owner_fix_slot, w_a, steal_idx, dst_tmp);
+                    if is_multi {
+                        // Multi-stream header ALWAYS has `header_bytes` (even when logical o_len == 0!).
+                        i32Const(g, header_bytes); lget(g, o_len); callf(g, rt.open_heap);
+                        lset(g, dst_cap); lset(g, dst_base); op(g, OP_drop); lset(g, pin_slot);
+                        lget(g, dst_base); lget(g, o_base); i32Const(g, header_bytes); memoryCopyOp(g);
+                        lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
+                        lget(g, dst_tmp); i32Const(g, 2); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+                        lget(g, dst_tmp); lget(g, pin_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+                        lget(g, dst_tmp); lget(g, dst_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
+                        lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
+                        lget(g, dst_tmp); lget(g, dst_cap); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                        for s in 0..plan.stream_count {
+                            let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
+                            if ierr != blot_direct_types::Error.none { return ierr; }
+                            let scidx = findCollectedTy(tys[..], sub_arr);
+                            if scidx >= 0 {
+                                let perr2 = emitPushFlatChild(g, f, work_slot, dst_base, (s as u32) * 8, sub_arr, tys[..], tmp_a, tmp_b, dst_tmp);
+                                if perr2 != blot_direct_types::Error.none { return perr2; }
+                            }
+                        }
+                    } else {
+                        lget(g, o_len); op(g, OP_i32_eqz);
+                        let empty_o_if = open(g, f, OP_if_);
+                        lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+                        lget(g, dst_tmp); lget(g, o_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                        op(g, OP_else_);
+                        lget(g, o_cap); i32Const(g, blot_direct_runtime::heap_flag); op(g, OP_i32_and);
+                        let heap_o_if = open(g, f, OP_if_);
+                        lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
+                        lget(g, dst_tmp); i32Const(g, 1); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+                        lget(g, dst_tmp); lget(g, o_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+                        lget(g, dst_tmp); lget(g, o_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
+                        lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
+                        lget(g, dst_tmp); lget(g, o_cap); i32Const(g, blot_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                        lget(g, o_base); lset(g, dst_base);
+                        op(g, OP_else_);
+                        let copy_bytes = emitScaledBytes(g, f, o_len, elem_step);
+                        lget(g, copy_bytes); lget(g, o_len); callf(g, rt.open_heap);
+                        lset(g, dst_cap); lset(g, dst_base); op(g, OP_drop); lset(g, pin_slot);
+                        lget(g, dst_base); lget(g, o_base); lget(g, copy_bytes); memoryCopyOp(g);
+                        lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
+                        lget(g, dst_tmp); i32Const(g, 2); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+                        lget(g, dst_tmp); lget(g, pin_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+                        lget(g, dst_tmp); lget(g, dst_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
+                        lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
+                        lget(g, dst_tmp); lget(g, dst_cap); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                        lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                        close(g, f);
+                        if elem_cidx >= 0 {
+                            i32Const(g, 0); lset(g, elem_i);
+                            let eb2 = open(g, f, OP_block);
+                            let el2 = open(g, f, OP_loop);
+                            lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb2);
+                            lget(g, dst_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
+                            let perr2 = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
+                            if perr2 != blot_direct_types::Error.none { return perr2; }
+                            lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
+                            br(g, f, OP_br, el2);
+                            close(g, f); close(g, f);
+                        }
+                        close(g, f);
+                    }
+                    close(g, f);
+                    close(g, f);
                 },
                 tuple => {
                     for at in 0..(tn.b as i64) {

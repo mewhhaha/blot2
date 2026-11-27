@@ -1310,6 +1310,9 @@ fn tryProjectBoxedArrayElement(g: Generator&, f: Fn&, id: u32) -> Val, bool, Err
     return loaded, true, lerr;
 }
 recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let soa_val, did_soa, soa_err = tryProjectSoaLoopField(g, f, id);
+    if soa_err != blot_direct_types::Error.none { return soa_val, soa_err; }
+    if did_soa { return soa_val, blot_direct_types::Error.none; }
     let direct_val, did_direct, direct_err = tryProjectBoxedArrayElement(g, f, id);
     if direct_err != blot_direct_types::Error.none { return direct_val, direct_err; }
     if did_direct { return direct_val, blot_direct_types::Error.none; }
