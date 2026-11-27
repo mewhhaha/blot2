@@ -212,7 +212,7 @@ recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64,
     out.push(ty);
     let n = g.types.node(ty);
     match n.tag {
-        array => {
+        array, seq => {
             return collectPersistTys(g, n.a, out, depth + 1, false);
         },
         packed => {
@@ -916,6 +916,17 @@ fn emitStageRoot(
                     close(g, f); // empty_o_if
                     close(g, f); // seen_t_if
                     close(g, f); // p_if
+                },
+                seq => {
+                    lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, o_slot);
+                    lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4); lset(g, o_gen);
+                    lget(g, o_slot); i32Const(g, rt.layout.persistent_split); op(g, OP_i32_lt_u);
+                    let temp_seq = open(g, f, OP_if_);
+                    let p_slot, p_gen, perr = emitSeqPersist(g, f, o_slot, o_gen, t, 0, 0);
+                    if perr != blot_direct_types::Error.none { return perr; }
+                    lget(g, w_a); lget(g, p_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+                    lget(g, w_a); lget(g, p_gen); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+                    close(g, f);
                 },
                 packed => {
                     let elem_ty = tn.a;

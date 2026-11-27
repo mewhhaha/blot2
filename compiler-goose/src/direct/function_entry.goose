@@ -3180,6 +3180,7 @@ fn resetEntry(g: Generator&) {
     }
     i32Const(g, 1);
     callf(g, rt.release);
+    emitSeqReleaseCall(g);
     i32Const(g, 0);
     callf(g, rt.rewind_stack);
     i32Const(g, 0);
@@ -3191,6 +3192,7 @@ fn releaseEntry(g: Generator&) {
     let rt = g.runtime_();
     i32Const(g, 1);
     callf(g, rt.release);
+    emitSeqReleaseCall(g);
     i32Const(g, 0);
     callf(g, rt.rewind_stack);
 }

@@ -46,6 +46,7 @@ import direct.function_control;
 import direct.function_kernels;
 import direct.function_packed;
 import direct.function_persist;
+import direct.function_seq;
 import direct.function_spark;
 import direct.function_staging;
 import direct.map;
@@ -1066,6 +1067,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Persist
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::PersistRoot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::ScratchCut)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::ScratchCut,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::SeqPlan)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::SeqPlan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::SparkAffineLocal)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::SparkAffineLocal,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::SparkAffineStream)->bool {return equalFields(left,right);}

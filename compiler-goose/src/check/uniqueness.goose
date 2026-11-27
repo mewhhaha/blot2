@@ -1379,7 +1379,7 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
         if kind == blot_check_storage_types::shared {
             return false;
         }
-        if kind == blot_check_storage_types::sized_array || kind == blot_check_storage_types::packed {
+        if kind == blot_check_storage_types::sized_array || kind == blot_check_storage_types::packed || kind == blot_check_storage_types::seq {
             if want == 0 { return true; }
             for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
             return false;
@@ -1481,7 +1481,7 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
             let sk = blot_check_storage_types::identity(n.a, n.b);
             if sk.present {
                 if sk.value == blot_check_storage_types::shared { return false; }
-                if sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::packed {
+                if sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::packed || sk.value == blot_check_storage_types::seq {
                     let inner = element(self_, m, ty);
                     if !inner.present { return true; }
                     var elem = inner.value;
@@ -1544,7 +1544,7 @@ recursive fn copyResultFact(self_: Analyzer&, m: const Module&, ty: u32, depth: 
             if blot_check_storage_types::isLengthLiteral(n.a, n.b) { return deep; }
             let sk = blot_check_storage_types::identity(n.a, n.b);
             if sk.present {
-                if sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::packed {
+                if sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::packed || sk.value == blot_check_storage_types::seq {
                     return freshContainer(self_, m, ty, false);
                 }
                 return none;
@@ -3619,8 +3619,8 @@ fn memberCopy(self_: Analyzer&, m: const Module&, id: u32) -> Fact, bool {
     let n = m.node(id);
     let spelling = m.fieldSpelling(m.projection(n.b).field);
     if !spelling.present || spelling.value != "copy" { return none, false; }
-    let in_copy = blot_check_storage_types::arrayElement(m.types, m.typeOf(n.a)).present || blot_check_storage_types::packedElement(m.types, m.typeOf(n.a)).present;
-    let out_copy = blot_check_storage_types::arrayElement(m.types, n.ty).present || blot_check_storage_types::packedElement(m.types, n.ty).present;
+    let in_copy = blot_check_storage_types::arrayElement(m.types, m.typeOf(n.a)).present || blot_check_storage_types::packedElement(m.types, m.typeOf(n.a)).present || blot_check_storage_types::seqElement(m.types, m.typeOf(n.a)).present;
+    let out_copy = blot_check_storage_types::arrayElement(m.types, n.ty).present || blot_check_storage_types::packedElement(m.types, n.ty).present || blot_check_storage_types::seqElement(m.types, n.ty).present;
     if !in_copy || !out_copy { return none, false; }
     return freshContainer(self_, m, n.ty, false), true;
 }
@@ -3965,7 +3965,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32, rebind: bool
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
             return Value { exits: exits, .. };
         }
-        if operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.pop {
+        if operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.pop || operation == blot_check_storage_ops::Op.pop_front || operation == blot_check_storage_ops::Op.remove {
             let container = visit(self_, m, children[0]);
             let place_base = self_.argument_places.len;
             if local(self_, container.origin) {
@@ -4001,8 +4001,8 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32, rebind: bool
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
             return Value { origin: container.origin, exits: exits, .. };
         }
-        if operation == blot_check_storage_ops::Op.push {
-            // Appends in place and returns the same storage; requires unique
+        if operation == blot_check_storage_ops::Op.push || operation == blot_check_storage_ops::Op.push_front || operation == blot_check_storage_ops::Op.insert {
+            // Mutates in place and returns the same storage; requires unique
             // ownership of the target container.
             let container = visit(self_, m, children[0]);
             let fresh = container.origin == 0 && unique(container.fact);
@@ -4013,11 +4013,18 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32, rebind: bool
                 if found && src.binding == container.origin { locked = src; }
                 self_.argument_places.push(locked);
             }
-            let value = visit(self_, m, children[1]);
-            let pushed = taken(self_, m, children[1], value);
+            var exits = container.exits;
+            var val_child = children[1];
+            if operation == blot_check_storage_ops::Op.insert {
+                let idx_val = visitEscaping(self_, m, children[1]);
+                exits = exits || idx_val.exits;
+                val_child = children[2];
+            }
+            let value = visit(self_, m, val_child);
+            let pushed = taken(self_, m, val_child, value);
             self_.argument_places.resize(place_base);
-            let exits = container.exits || value.exits;
-            let pushed_shared = elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0);
+            exits = exits || value.exits;
+            let pushed_shared = elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(val_child), 0);
             if fresh {
                 var fact = container.fact;
                 if pushed_shared && fact == deep { fact = shell; }
@@ -4030,7 +4037,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32, rebind: bool
                 return Value { exits: exits, .. };
             }
             if self_.in_fork != 0 && local(self_, base.binding) {
-                let vt = nodeTaint(self_, m, children[1], 0);
+                let vt = nodeTaint(self_, m, val_child, 0);
                 if vt != 0 { setForkTaint(self_, base.binding, maxU32(getForkTaint(self_, base.binding), vt)); }
             }
             // A local pushed at its last read or direct rebinding hands its storage on.
@@ -4043,6 +4050,56 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32, rebind: bool
             }
             if pushed_shared { sharedIntoPlace(self_, base); }
             return Value { origin: container.origin, exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.reverse || operation == blot_check_storage_ops::Op.slice {
+            let input_ty = m.typeOf(children[0]);
+            let container = visit(self_, m, children[0]);
+            var exits = container.exits;
+            for child in children[1..] { let v = visitEscaping(self_, m, child); exits = exits || v.exits; }
+            if !blot_check_storage_types::isShared(m.types, input_ty) && copyHasUncopiedInner(self_, m, n.ty, [], [], 0) { escape(self_, container); }
+            return Value { fact: freshContainer(self_, m, n.ty, false), exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.split {
+            let input_ty = m.typeOf(children[0]);
+            let container = visit(self_, m, children[0]);
+            let idx_val = visitEscaping(self_, m, children[1]);
+            let exits = container.exits || idx_val.exits;
+            let out_seq_ty = blot_check_storage_types::unwrapShared(m.types, input_ty);
+            if !blot_check_storage_types::isShared(m.types, input_ty) && copyHasUncopiedInner(self_, m, out_seq_ty, [], [], 0) { escape(self_, container); }
+            var fact: Fact = none;
+            if !elementHolds(self_, m, out_seq_ty) { fact = deep; }
+            return Value { fact: fact, exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.concat {
+            let ty0 = m.typeOf(children[0]);
+            let ty1 = m.typeOf(children[1]);
+            let c0 = visit(self_, m, children[0]);
+            let c1 = visit(self_, m, children[1]);
+            let exits = c0.exits || c1.exits;
+            let uncopied = copyHasUncopiedInner(self_, m, n.ty, [], [], 0);
+            if !blot_check_storage_types::isShared(m.types, ty0) && uncopied { escape(self_, c0); }
+            if !blot_check_storage_types::isShared(m.types, ty1) && uncopied { escape(self_, c1); }
+            return Value { fact: freshContainer(self_, m, n.ty, false), exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.repeat {
+            let cnt = visitEscaping(self_, m, children[0]);
+            let val = visit(self_, m, children[1]);
+            let exits = cnt.exits || val.exits;
+            if elementHolds(self_, m, n.ty) {
+                escape(self_, val);
+                return Value { fact: shell, exits: exits, .. };
+            }
+            return Value { fact: deep, exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.ramp {
+            let a = visitEscaping(self_, m, children[0]);
+            let b = visitEscaping(self_, m, children[1]);
+            let c = visitEscaping(self_, m, children[2]);
+            return Value { fact: deep, exits: a.exits || b.exits || c.exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.from_frozen {
+            let arr = visit(self_, m, children[0]);
+            return Value { fact: freshContainer(self_, m, n.ty, false), exits: arr.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.with_capacity {
             let cap = visitEscaping(self_, m, children[0]);
@@ -4822,12 +4879,33 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
         let children = m.children(id);
         if children.len == 0 { return 0; }
         let op, unknown = blot_check_storage_ops::opFromCode(n.c);
-        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.with_capacity { return 0; }
-        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.copy {
-            if (!blot_check_storage_types::arrayElement(m.types, n.ty).present && !blot_check_storage_types::packedElement(m.types, n.ty).present) || !elementHolds(self_, m, n.ty) { return 0; }
+        if unknown == blot_error::Error.none && (op == blot_check_storage_ops::Op.with_capacity || op == blot_check_storage_ops::Op.ramp) { return 0; }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.repeat {
+            if !elementHolds(self_, m, n.ty) { return 0; }
+            if children.len >= 2 { return nodeTaint(self_, m, children[1], depth + 1); }
+            return 0;
         }
-        if unknown == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || (op == blot_check_storage_ops::Op.extend && elementHolds(self_, m, n.ty))) && children.len >= 2 {
+        if unknown == blot_error::Error.none && (op == blot_check_storage_ops::Op.reverse || op == blot_check_storage_ops::Op.slice || op == blot_check_storage_ops::Op.from_frozen) {
+            if !elementHolds(self_, m, n.ty) { return 0; }
+            return nodeTaint(self_, m, children[0], depth + 1);
+        }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.split {
+            if !elementHolds(self_, m, m.typeOf(children[0])) { return 0; }
+            return nodeTaint(self_, m, children[0], depth + 1);
+        }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.concat {
+            if !elementHolds(self_, m, n.ty) { return 0; }
+            if children.len >= 2 { return maxU32(nodeTaint(self_, m, children[0], depth + 1), nodeTaint(self_, m, children[1], depth + 1)); }
+            return nodeTaint(self_, m, children[0], depth + 1);
+        }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.copy {
+            if (!blot_check_storage_types::arrayElement(m.types, n.ty).present && !blot_check_storage_types::packedElement(m.types, n.ty).present && !blot_check_storage_types::seqElement(m.types, n.ty).present) || !elementHolds(self_, m, n.ty) { return 0; }
+        }
+        if unknown == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || op == blot_check_storage_ops::Op.push_front || (op == blot_check_storage_ops::Op.extend && elementHolds(self_, m, n.ty))) && children.len >= 2 {
             return maxU32(nodeTaint(self_, m, children[0], depth + 1), nodeTaint(self_, m, children[1], depth + 1));
+        }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.insert && children.len >= 3 {
+            return maxU32(nodeTaint(self_, m, children[0], depth + 1), nodeTaint(self_, m, children[2], depth + 1));
         }
         return nodeTaint(self_, m, children[0], depth + 1);
     }

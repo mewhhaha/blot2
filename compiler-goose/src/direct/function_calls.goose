@@ -57,7 +57,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     match shape.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_ => { return true; },
         function, provider, state_provider, cell, never => { return false; },
-        array, packed, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
+        array, packed, seq, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
             for child in g.types.words[shape.a..shape.a + shape.b] {
                 if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
@@ -1245,6 +1245,25 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
             return blot_direct_types::Error.none;
         },
+        seq => {
+            let c_slot = local32(g, f);
+            let c_gen = local32(g, f);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+            lset(g, c_slot);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
+            lset(g, c_gen);
+            let p_slot, p_gen, perr = emitSeqPersist(g, f, c_slot, c_gen, ty, id, depth);
+            if perr != blot_direct_types::Error.none { return perr; }
+            lget(g, base);
+            lget(g, p_slot);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+            lget(g, base);
+            lget(g, p_gen);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
+            return blot_direct_types::Error.none;
+        },
         ref, link, view => {
             let c_slot = local32(g, f);
             let c_gen = local32(g, f);
@@ -1444,6 +1463,11 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     var p_gen: u32 = 0;
     if tagOf(g, key.ty) == blot_direct_types::Tag.packed {
         let ps, pg, perr = emitPackedPersist(g, f, w(g, value, 0), w(g, value, 1), key.ty, 0, 0);
+        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        p_slot = ps;
+        p_gen = pg;
+    } else if tagOf(g, key.ty) == blot_direct_types::Tag.seq {
+        let ps, pg, perr = emitSeqPersist(g, f, w(g, value, 0), w(g, value, 1), key.ty, 0, 0);
         if perr != blot_direct_types::Error.none { return neverVal(), perr; }
         p_slot = ps;
         p_gen = pg;

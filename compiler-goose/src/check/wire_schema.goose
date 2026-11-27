@@ -641,6 +641,7 @@ recursive fn encodeTypeId(
                 else if kind == blot_check_storage_types::ref { cache.out_buf.push(0x2a); }
                 else if kind == blot_check_storage_types::link { cache.out_buf.push(0x2b); }
                 else if kind == blot_check_storage_types::packed { cache.out_buf.push(0x2d); }
+                else if kind == blot_check_storage_types::seq { cache.out_buf.push(0x2e); }
                 else { return false; }
                 return encodeTypeId(units, cache, unit, elem, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1);
             }
@@ -1051,7 +1052,8 @@ recursive fn checkPersistentSafe(
                 let kind = sinfo.value.kind;
                 if kind == blot_check_storage_types::shared ||
                    kind == blot_check_storage_types::sized_array ||
-                   kind == blot_check_storage_types::packed {
+                   kind == blot_check_storage_types::packed ||
+                   kind == blot_check_storage_types::seq {
                     if blot_check_storage_types::isSized(kind) {
                         let len_opt = blot_check_storage_types::lengthOf(m.types, tid);
                         if !len_opt.present { return false; }

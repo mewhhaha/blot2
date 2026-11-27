@@ -377,6 +377,27 @@ The prelude exposes `Packed.length`, `Packed.is_empty`, `Packed.with_capacity`,
 iteration, comprehensions (`%[x * 2 | x <- xs]`), spreads (`%[a, ...xs, b]`),
 `freeze` (`*%[T]`), `fork` rollback, and module `const` values.
 
+### Reversible generative sequences (`~[T]` / `Seq T`)
+
+`~[1, 2]` constructs a reversible generative SIMD-RRB sequence of type `~[U32]`
+(`Seq U32`). Internally, `~[T]` combines 16-way `v128` SIMD prefix-routed tree
+nodes, a readable inline focus gap for `O(1)` cursor-local edits, and six tagged
+leaf flavors: flat buffers, split-stream packed sums, inline SoA packed records,
+zero-copy frozen `*#[T]` spans, `O(1)` `Seq.repeat`, and `O(1)` `Seq.ramp`.
+
+The prelude exposes `Seq.length`, `Seq.is_empty`, `Seq.get`, `Seq.with_capacity`,
+`Seq.reserve`, `Seq.push`, `Seq.pop`, `Seq.push_front`, `Seq.pop_front`,
+`Seq.insert`, `Seq.remove`, `Seq.reverse`, `Seq.split`, `Seq.concat`,
+`Seq.slice`, `Seq.reverse_range`, `Seq.repeat`, `Seq.ramp`,
+`Seq.from_frozen_array`, `Seq.copy`, `Seq.extend`, `Seq.extend_array`,
+`Seq.extend_packed`, `Seq.extend_view`, `Seq.to_array`, `Seq.from_array`,
+`Seq.to_packed`, and `Seq.from_packed`, alongside `Array.to_seq`,
+`Array.from_seq`, `Array.extend_seq`, `Packed.to_seq`, `Packed.from_seq`, and
+`Packed.extend_seq`. `~[T]` supports `s[i]`, `s[i] := v`, leaf-streaming `for`
+loops, comprehensions (`~[x * 2 | x <- xs]`), spreads (`~[a, ...xs, b]`), `O(1)`
+`freeze` (`*~[T]`), `O(1)` CoW `copy`, `O(1)` `fork` rollback, and module
+`const` values.
+
 ### Rolling reductions, summaries, and SIMD
 
 [rolling.blot](rolling.blot) provides complete overlapping reductions.

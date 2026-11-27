@@ -12,6 +12,7 @@ let link: Kind = 24;
 let shared: Kind = 25;
 let sized_array: Kind = 26;
 let packed: Kind = 27;
+let seq: Kind = 28;
 let length_literal_base: u32 = 0x10000000;
 let length_literal_limit: u32 = 0x80000000;
 
@@ -52,6 +53,7 @@ fn named(spelling: const u8[:]) -> blot_support::Option<Kind> {
     if text == "Shared" { return blot_support::Option<Kind> { true, shared , ..}; }
     if text == "SizedArray" { return blot_support::Option<Kind> { true, sized_array , ..}; }
     if text == "Packed" { return blot_support::Option<Kind> { true, packed , ..}; }
+    if text == "Seq" { return blot_support::Option<Kind> { true, seq , ..}; }
     return blot_support::Option<Kind> { false, 0 , ..};
 }
 fn name(kind: Kind) -> const u8[:] {
@@ -62,11 +64,12 @@ fn name(kind: Kind) -> const u8[:] {
         25 => { return "Shared"; },
         26 => { return "SizedArray"; },
         27 => { return "Packed"; },
+        28 => { return "Seq"; },
         _ => { assert(false); return ""; },
     }
 }
 fn identity(unit: u32, declaration: u32) -> blot_support::Option<Kind> {
-    if unit == 0xffffffff && declaration >= ref && declaration <= packed {
+    if unit == 0xffffffff && declaration >= ref && declaration <= seq {
         return blot_support::Option<Kind> { true, declaration , ..};
     }
     return blot_support::Option<Kind> { false, 0 , ..};
@@ -153,10 +156,47 @@ fn isOwnedPacked(store, id: blot_check_types::Id) -> bool {
     let value = info(store, id);
     return value.present && value.value.kind == packed;
 }
+fn seqElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let value = info(store, id);
+    if value.present && value.value.kind == seq {
+        return blot_support::Option<blot_check_types::Id> { true, value.value.element , ..};
+    }
+    if value.present && value.value.kind == shared {
+        let inner = info(store, value.value.element);
+        if inner.present && inner.value.kind == seq {
+            return blot_support::Option<blot_check_types::Id> { true, inner.value.element , ..};
+        }
+    }
+    return blot_support::Option<blot_check_types::Id> { false, 0 , ..};
+}
+fn isSeq(store, id: blot_check_types::Id) -> bool { return seqElement(store, id).present; }
+fn isOwnedSeq(store, id: blot_check_types::Id) -> bool {
+    let value = info(store, id);
+    return value.present && value.value.kind == seq;
+}
+fn ownedSeqElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let value = info(store, id);
+    if value.present && value.value.kind == seq {
+        return blot_support::Option<blot_check_types::Id> { true, value.value.element , ..};
+    }
+    return blot_support::Option<blot_check_types::Id> { false, 0 , ..};
+}
+fn indexReadableElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let element = readableElement(store, id);
+    if element.present { return element; }
+    return seqElement(store, id);
+}
+fn indexWritableElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
+    let element = arrayElement(store, id);
+    if element.present { return element; }
+    return ownedSeqElement(store, id);
+}
 fn iterableElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
     let element = readableElement(store, id);
     if element.present { return element; }
-    return packedElement(store, id);
+    let packed_elem = packedElement(store, id);
+    if packed_elem.present { return packed_elem; }
+    return seqElement(store, id);
 }
 
 
@@ -167,7 +207,7 @@ let indexed_read: u32 = 1;    // Built-in Unit type ID.
 let indexed_write: u32 = 2;   // Built-in Bool type ID.
 
 fn collectionElement(store, id: blot_check_types::Id, mode: u32) -> blot_support::Option<blot_check_types::Id> {
-    if mode == indexed_write { return arrayElement(store, id); }
-    if mode == indexed_read { return readableElement(store, id); }
+    if mode == indexed_write { return indexWritableElement(store, id); }
+    if mode == indexed_read { return indexReadableElement(store, id); }
     return iterableElement(store, id);
 }

@@ -624,13 +624,15 @@ io answer (value: F32) => return case twice ($Box value) of
 
 ## Arrays and libraries
 
-Arrays are the primary indexable collection type, complemented by packed
-sequential arrays (`%[T]`) for dense iteration-only storage. `#[]`, `#[1, 2]`,
-and `#[#[1], #[2]]` construct owned `#[T]` (`Array T`) values; `%[]` and
-`%[1, 2]` construct owned `%[T]` (`Packed T`) values. Fixed-length arrays use
-`#[N; T]` (or `#[n; T]` to tie equal lengths across parameters), read-only
-borrowed slices use `&[T]` (`View T`), and frozen shared handles use `*T` (via
-`freeze value`).
+Arrays are the primary contiguous indexable collection type, complemented by
+packed sequential arrays (`%[T]`) for dense iteration-only storage and
+reversible generative sequences (`~[T]`) for persistent split/concat/reverse and
+cursor-local edits. `#[]`, `#[1, 2]`, and `#[#[1], #[2]]` construct owned
+`#[T]` (`Array T`) values; `%[]` and `%[1, 2]` construct owned `%[T]`
+(`Packed T`) values; `~[]` and `~[1, 2]` construct owned `~[T]` (`Seq T`)
+values. Fixed-length arrays use `#[N; T]` (or `#[n; T]` to tie equal lengths
+across parameters), read-only borrowed slices use `&[T]` (`View T`), and frozen
+shared handles use `*T` (via `freeze value`).
 
 Packed arrays (`%[T]` / `Packed T`) cannot be randomly indexed (`p[i]`),
 sliced (`&p[start..end]`), or linked (`^p[i]`), which allows the direct Wasm
@@ -651,6 +653,18 @@ backend to pick dense sequential layouts automatically:
 `with_capacity`, `reserve`, `push`, `pop`, `extend`, `extend_array`,
 `extend_view`, `copy`, `concat`, `to_array`, `from_array`, plus
 `Array.to_packed`, `Array.from_packed`, `Array.extend_packed`).
+
+Sequences (`~[T]` / `Seq T`) are 16-way Wasm SIMD-routed RRB trees with a
+readable inline focus gap and specialized leaves (flat buffers, split-stream
+packed sums, inline SoA packed records, zero-copy frozen `*#[T]` spans, and
+`O(1)` `Seq.repeat` / `Seq.ramp` descriptors). They support indexing (`s[i]`),
+indexed mutation (`s[i] := v`), `push`/`pop`/`push_front`/`pop_front`,
+`insert`/`remove`, `O(1)` `reverse`, `O(1)` `freeze` (`*~[T]`) and `copy`
+structural sharing (CoW), `O(log_16 m)` `split`/`concat`/`slice`/`reverse_range`,
+leaf-streaming `for` loops, `O(1)` `fork` rollback, comprehensions
+(`~[x * 2 | x <- xs]`), spreads (`~[a, ...xs, b]`), and module `const` values.
+Like `%[T]`, `~[T]` rejects contiguous views (`&s[a..b]`), refs (`&s[i]`),
+links (`^s[i]`), and `truncate`.
 
 Arrays have contiguous checked row storage. An owned `#[T]` supports in-place
 element updates (`values[index] := replacement`), growth and truncation

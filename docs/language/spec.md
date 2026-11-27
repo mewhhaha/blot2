@@ -157,7 +157,7 @@ Escape   = '\"' | "\\" | "\n" | "\r" | "\t"
 ### 3.6 Significant Adjacency
 
 - `$` touches its constructor name (`$Some`).
-- `#[` and `%[` have no internal space.
+- `#[`, `%[`, and `~[` have no internal space.
 - `#` touches `run`, `for`, `if`, `else`, `fields`, `variants`; `@` touches its
   name or `[`.
 - `*` in type position touches its operand (`*#[U32]`, `*(U32 -> U32)`).
@@ -353,12 +353,14 @@ TypePrefix  = "*" TypePrefix | TypeAtom
 TypeAtom    = TypePath
             | ArrayType
             | PackedType
+            | SeqType
             | LowerName ("." LowerName)?
             | "(" Type ")"
             | "(" Type "," Type,+ ")"
             | RecordType
 ArrayType   = "#[" (LengthExpr ";")? Type "]"
 PackedType  = "%[" Type "]"
+SeqType     = "~[" Type "]"
 LengthExpr  = LowerName | Integer
 TypePath    = (LowerName ".")? UpperName ("." UpperName)*
 RecordType  = "{" FieldType,* "}"
@@ -377,9 +379,9 @@ EffectLabel = TypePath TypeArg?
 - No implicit numeric conversions; conversions are explicit member calls
   (`count.to_f32`).
 
-### 6.2 Intrinsic Array Symbols (`#[T]`, `#[n; T]`, `%[T]`)
+### 6.2 Intrinsic Collection Symbols (`#[T]`, `#[n; T]`, `%[T]`, `~[T]`)
 
-Blot uses three intrinsic array type symbols, with length mutations gated by
+Blot uses four intrinsic collection type symbols, with length mutations gated by
 unique ownership (`own`) rather than separate grow/resize types:
 
 | Symbol | Mode | Length / Bounds & Layout Guarantee |
@@ -387,6 +389,7 @@ unique ownership (`own`) rather than separate grow/resize types:
 | `#[T]` | Dynamic (`Array T`) | Contiguous indexable array; supports in-place element writes and `push` / `pop` / `truncate` / `reserve` / `extend` whenever uniquely owned (`own`), and read-only indexing/iteration when borrowed or frozen (`*#[T]`) |
 | `#[n; T]` | Fixed / length-linked | Statically fixed length (symbolic variable `n` or literal integer); shares length across fields or parameters, proves equal length at zero runtime cost, forbids length mutation, and eliminates redundant bounds checks |
 | `%[T]` | Packed sequential (`Packed T`) | Non-indexable sequential array optimized for dense storage and streaming `for` loops. Lowers to split-stream storage for sum types (dense `U8` tag stream + per-variant contiguous payload streams, with fused `for`+`case` dispatch), Structure-of-Arrays (SoA) columns for multi-field records and tuples (loading only touched columns), and contiguous flat cursors for scalars. Supports `push` / `pop` / `reserve` / `extend` / `length` / `copy` / `freeze` (`*%[T]`) / `to_array`, while rejecting indexing (`p[i]`), slicing (`&p[a..b]`), and element links (`^p[i]`). |
+| `~[T]` | Sequence (`Seq T`) | Reversible generative SIMD-RRB sequence (16-way `v128` prefix-routed tree with readable inline focus gap and tagged leaves: flat, split-stream packed sums, inline SoA packed records, zero-copy frozen `*#[T]` spans, `O(1)` `repeat`, and `O(1)` `ramp`). Supports `s[i]`, `s[i] := v`, `push`/`pop`/`push_front`/`pop_front`/`insert`/`remove`, `O(1)` `reverse`/`freeze` (`*~[T]`)/`copy` CoW, `O(log_16 m)` `split`/`concat`/`slice`/`reverse_range`, leaf-streaming `for` loops, and `O(1)` `fork` rollback, while rejecting contiguous views (`&s[a..b]`), refs (`&s[i]`), links (`^s[i]`), and `truncate`. |
 
 - **Read-only borrow coercion:** A borrowed (non-`own`) parameter of type `#[T]`
   accepts `#[T]`, `#[n; T]`, and `*#[T]`. Inside the callee the array cannot
@@ -508,6 +511,8 @@ Primary     = Integer | Float | String | "true" | "false" | "()"
             | "#[" Expression "|" Qualifier,+ "]"
             | "%[" Expression,* "]"
             | "%[" Expression "|" Qualifier,+ "]"
+            | "~[" Expression,* "]"
+            | "~[" Expression "|" Qualifier,+ "]"
             | SparkExpr
             | "#fields" TypeAtom | "#variants" TypeAtom
 SparkExpr   = "spark" "#[" CollectionExpr "|" Pattern "<-" (Range | Expression) "]"
@@ -519,10 +524,12 @@ Range       = Expression ".." Expression
 
 - Arguments evaluate eagerly left-to-right.
 - `#[1, 2, 3]` builds `#[T]` (or `#[n; T]` when a fixed-length type is expected);
-  `%[1, 2, 3]` builds packed sequential `%[T]` (`Packed T`). Empty `#[]` and
-  `%[]` require an expected type.
-- Comprehensions (`#[... | ...]`, `%[... | ...]`) and spreads (`#[a, ...xs]`,
-  `%[a, ...xs]`) accept arrays, packed arrays, ranges (`0..n`), and any iterable.
+  `%[1, 2, 3]` builds packed sequential `%[T]` (`Packed T`); `~[1, 2, 3]` builds
+  sequence `~[T]` (`Seq T`). Empty `#[]`, `%[]`, and `~[]` require an expected
+  type.
+- Comprehensions (`#[... | ...]`, `%[... | ...]`, `~[... | ...]`) and spreads
+  (`#[a, ...xs]`, `%[a, ...xs]`, `~[a, ...xs]`) accept arrays, packed arrays,
+  sequences, ranges (`0..n`), and any iterable.
 - `spark #[body | pat <- source]` is a synchronous, pure (`! {}`), ordered
   data-parallel map over a single unguarded irrefutable array or `U32` range
   generator. Its body cannot mutate any storage reachable from outer captures,
@@ -789,7 +796,7 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 | Retired | vNext Replacement |
 | --- | --- |
 | `GrowArray T`, `ResizeArray T`, `#[+T]`, `#[~T]`, `seal` | Unified dynamic `#[T]` (`Array T`, ownership-gated `push`/`pop`/`truncate`) and fixed `#[n; T]` |
-| `List T`, `[...]`, `[head \| tail]`, `std/list`, `std/iter`, `@cursor` | `#[T]` and `%[T]` (see Annex B for reserved `~[T]` prefix) |
+| `List T`, `[...]`, `[head \| tail]`, `std/list`, `std/iter`, `@cursor` | `#[T]`, `%[T]`, and `~[T]` |
 | `&T`, `&[T]`, `^T`, `Ref`, `View`, `Link` | Lexical read borrows, `#[T]`, `*T`, typed indices |
 | `=` mutable store, `lent` functions, `@storage.write` | `:=` on `own` values + `let (a, w) = ...; x := w` |
 | First-class escaping capturing closures | 2A templated downward closures, `A -> B` fn ptrs, `*(A -> B)` frozen closures |
@@ -817,6 +824,3 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 3. **Host ABI transition:** Expanding numeric widths (`U8..U64`, `I8..I64`,
    `F64`) and UTF-8 `Text` (`#[U8]`) coordinates with guest ABI 8 / save schema
    26 migration timing across `Pen`, `Ink`, and `Gdev`.
-4. **Reserved collection prefix (`~[...]`):** `~[...]` / `~[T]` is reserved for
-   a future list-like sequence structure. (`%[...]` / `%[T]` is implemented as
-   packed non-indexable sequential arrays; see Section 6.2.)

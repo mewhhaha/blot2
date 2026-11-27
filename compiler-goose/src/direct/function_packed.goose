@@ -1160,6 +1160,42 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
 
 // ---- Touched-column analysis for PACKED_SOA `for p in packed:` loops ----
 
+fn soaProjectFieldPos(
+    g: Generator&,
+    m: const Module&,
+    proj_id: u32,
+    inner_ty: Ty,
+    is_nominal: bool,
+) -> i64 {
+    let proj = m.projection(proj_id);
+    let variants = m.projectionVariants(proj_id);
+    var name_sym = proj.field;
+    if variants.len != 0 {
+        if !is_nominal || variants.len != 1 || proj.nominal.decl == 0 { return -1; }
+        var found = false;
+        for nom, ni in m.nominals {
+            if !sameNominal(nom.identity, proj.nominal) { continue; }
+            for ci in m.nominalConstructors(ni as u32) {
+                let ctor = m.constructors[ci];
+                if ctor.tag != variants[0].tag { continue; }
+                let payload = m.types.node(ctor.payload);
+                if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return -1; }
+                name_sym = m.types.recordField(payload, variants[0].field).name;
+                found = true;
+                break;
+            }
+            break;
+        }
+        if !found { return -1; }
+    }
+    let sp = m.fieldSpelling(name_sym);
+    if !sp.present { return -1; }
+    let fname = g.types.fieldName(sp.value);
+    let pos = g.types.findField(inner_ty, fname);
+    if pos < 0 || pos >= 16 { return -1; }
+    return pos;
+}
+
 // Checks whether every reference to `binding` inside `node_id` is a direct
 // field projection (no whole-value uses). Populates bitmask of accessed fields.
 recursive fn analyzeSoaBodyUses(
@@ -1183,31 +1219,38 @@ recursive fn analyzeSoaBodyUses(
         project => {
             if localRef(m, n.a) == binding {
                 if !plan.soa_is_record { return false; }
-                let proj = m.projection(n.b);
-                if m.projectionVariants(n.b).len != 0 { return false; }
-                let sp = m.fieldSpelling(proj.field);
-                if !sp.present { return false; }
-                let fname = g.types.fieldName(sp.value);
-                let pos = g.types.findField(plan.soa_inner_ty, fname);
-                if pos < 0 || pos >= 16 { return false; }
+                let pos = soaProjectFieldPos(g, m, n.b, plan.soa_inner_ty, plan.soa_is_nominal);
+                if pos < 0 { return false; }
                 used_fields |= (1 as u32) << (pos as u32);
                 return true;
             }
             return analyzeSoaBodyUses(g, m, n.a, binding, plan, used_fields, budget);
         },
-        constant, constructor_function, associated, primitive_function, operation_value, type_constructor, break_ => { return true; },
+        constant, constructor_function, primitive_function, operation_value, type_constructor => { return true; },
+        break_ => {
+            for ch in m.breakValues(node_id) {
+                if !analyzeSoaBodyUses(g, m, ch, binding, plan, used_fields, budget) { return false; }
+            }
+            return true;
+        },
         bind => { return analyzeSoaBodyUses(g, m, n.b, binding, plan, used_fields, budget); },
         pattern_bind => {
             return analyzeSoaBodyUses(g, m, n.b, binding, plan, used_fields, budget) &&
                    analyzeSoaBodyUses(g, m, n.c, binding, plan, used_fields, budget);
         },
-        suite, block_, product, record, array, array_op, storage, call => {
+        suite, block_, product, record, array, array_op, storage => {
             for ch in m.children(node_id) {
                 if !analyzeSoaBodyUses(g, m, ch, binding, plan, used_fields, budget) { return false; }
             }
             return true;
         },
-        scalar, logical, apply => {
+        call => {
+            for ch in m.call(node_id).arguments {
+                if !analyzeSoaBodyUses(g, m, ch, binding, plan, used_fields, budget) { return false; }
+            }
+            return true;
+        },
+        scalar, associated, logical, apply => {
             return analyzeSoaBodyUses(g, m, n.a, binding, plan, used_fields, budget) &&
                    analyzeSoaBodyUses(g, m, n.b, binding, plan, used_fields, budget);
         },
@@ -1217,7 +1260,7 @@ recursive fn analyzeSoaBodyUses(
                    analyzeSoaBodyUses(g, m, n.c, binding, plan, used_fields, budget);
         },
         construct => { return analyzeSoaBodyUses(g, m, n.b, binding, plan, used_fields, budget); },
-        return_ => { return analyzeSoaBodyUses(g, m, n.a, binding, plan, used_fields, budget); },
+        return_, result_associated => { return analyzeSoaBodyUses(g, m, n.a, binding, plan, used_fields, budget); },
         match_ => {
             for inp in m.matchInputs(node_id) {
                 if !analyzeSoaBodyUses(g, m, inp, binding, plan, used_fields, budget) { return false; }
@@ -1260,13 +1303,9 @@ fn tryProjectSoaLoopField(g: Generator&, f: const Fn&, id: u32) -> Val, bool, Er
     while d >= 0 {
         if soa_loop_binding[d] == b {
             if !soa_loop_is_record[d] { return neverVal(), false, blot_direct_types::Error.none; }
-            let proj = m.projection(n.b);
-            if m.projectionVariants(n.b).len != 0 { return neverVal(), false, blot_direct_types::Error.none; }
-            let sp = m.fieldSpelling(proj.field);
-            if !sp.present { return neverVal(), false, blot_direct_types::Error.none; }
-            let fname = g.types.fieldName(sp.value);
-            let pos = g.types.findField(soa_loop_inner_ty[d], fname);
-            if pos < 0 || pos >= 16 { return neverVal(), false, blot_direct_types::Error.none; }
+            let is_nom = tagOf(g, soa_loop_ty[d]) == blot_direct_types::Tag.nominal;
+            let pos = soaProjectFieldPos(g, m, n.b, soa_loop_inner_ty[d], is_nom);
+            if pos < 0 { return neverVal(), false, blot_direct_types::Error.none; }
             let slot = d * 16 + pos;
             if !soa_loop_field_loaded[slot] { return neverVal(), false, blot_direct_types::Error.none; }
             return Val { soa_loop_field_ty[slot], soa_loop_field_start[slot], soa_loop_field_len[slot] }, true, blot_direct_types::Error.none;

@@ -617,7 +617,7 @@ recursive fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: 
 }
 fn elementOf(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Ty, Error {
     match tagOf(g, ty) {
-        array, packed, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
+        array, packed, seq, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
         _ => {
             g.failOpen(g.units[f.unit - 1], id);
             g.put("storage operation on a ");
@@ -796,7 +796,7 @@ fn create(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, Error {
 // The address of element 0 of an owner handle.
 fn baseOf(g: Generator&, f: Fn&, handle: Val) -> u32 {
     let htag = tagOf(g, handle.ty);
-    if htag == blot_direct_types::Tag.array || htag == blot_direct_types::Tag.packed || htag == blot_direct_types::Tag.view {
+    if htag == blot_direct_types::Tag.array || htag == blot_direct_types::Tag.packed || htag == blot_direct_types::Tag.seq || htag == blot_direct_types::Tag.view {
         let base, _ = ensureCheckedArray(g, f, handle);
         return base;
     }
@@ -814,7 +814,7 @@ fn baseOf(g: Generator&, f: Fn&, handle: Val) -> u32 {
 fn lengthOf(g: Generator&, f: Fn&, container: Val, id: u32) -> u32, Error {
     let length_function = g.runtime_().length;
     if tagOf(g, container.ty) == blot_direct_types::Tag.view { return w(g, container, 3), blot_direct_types::Error.none; }
-    if tagOf(g, container.ty) == blot_direct_types::Tag.array || tagOf(g, container.ty) == blot_direct_types::Tag.packed {
+    if tagOf(g, container.ty) == blot_direct_types::Tag.array || tagOf(g, container.ty) == blot_direct_types::Tag.packed || tagOf(g, container.ty) == blot_direct_types::Tag.seq {
         let _, length = ensureCheckedArray(g, f, container);
         return length, blot_direct_types::Error.none;
     }
@@ -1053,6 +1053,9 @@ fn scalarLocal(g: Generator&, f: const Fn&, value: Val, id: u32) -> u32, Error {
     return w(g, value, 0), blot_direct_types::Error.none;
 }
 fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0, cache_elem: bool = true) -> Val, Error {
+    if tagOf(g, container.ty) == blot_direct_types::Tag.seq {
+        return emitSeqReadVal(g, f, container, index, id);
+    }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let step, error = stride(g, f, element, id);
@@ -1749,6 +1752,9 @@ recursive fn arrayLiteral(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 fn arrayFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Val, Error {
     if tagOf(g, ty) == blot_direct_types::Tag.packed {
         return emitPackedFromValues(g, f, ty, values, id);
+    }
+    if tagOf(g, ty) == blot_direct_types::Tag.seq {
+        return emitSeqFromValues(g, f, ty, values, id);
     }
     let count = constLocal(g, f, values.len);
     recordConstU32(f, count, values.len);
@@ -2533,6 +2539,9 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     if tagOf(g, container.ty) == blot_direct_types::Tag.packed {
         return emitPackedPushVal(g, f, container, value, id, selective);
     }
+    if tagOf(g, container.ty) == blot_direct_types::Tag.seq {
+        return emitSeqPushVal(g, f, container, value, id, selective);
+    }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let step, error = stride(g, f, element, id);
@@ -2818,6 +2827,9 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if tagOf(g, container.ty) == blot_direct_types::Tag.packed {
                 return emitPackedPopVal(g, f, container, ty, id, is_direct);
             }
+            if tagOf(g, container.ty) == blot_direct_types::Tag.seq {
+                return emitSeqPopVal(g, f, container, ty, id, is_direct);
+            }
             let address = local32(g, f);
             lget(g, w(g, container, 0));
             lget(g, w(g, container, 1));
@@ -2871,6 +2883,9 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
             if tagOf(g, ty) == blot_direct_types::Tag.packed {
                 return emitPackedWithCapacity(g, f, ty, cap, true, id);
+            }
+            if tagOf(g, ty) == blot_direct_types::Tag.seq {
+                return emitSeqEmpty(g, f, ty, id);
             }
             let element, eerr = elementOf(g, f, ty, id);
             if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
@@ -2952,6 +2967,9 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if tagOf(g, container.ty) == blot_direct_types::Tag.packed {
                 return emitPackedReserve(g, f, container, additional, id, is_direct);
             }
+            if tagOf(g, container.ty) == blot_direct_types::Tag.seq {
+                return container, blot_direct_types::Error.none;
+            }
             let element, eerr = elementOf(g, f, container.ty, id);
             if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
             let step, sterr = stride(g, f, element, id);
@@ -3022,6 +3040,9 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             let src, serr = expr(g, f, children[1]);
             if serr != blot_direct_types::Error.none { return src, serr; }
+            if tagOf(g, dst.ty) == blot_direct_types::Tag.seq || tagOf(g, src.ty) == blot_direct_types::Tag.seq {
+                return emitSeqExtend(g, f, dst, src, m.typeOf(children[1]), id, is_direct);
+            }
             if tagOf(g, dst.ty) == blot_direct_types::Tag.packed || tagOf(g, src.ty) == blot_direct_types::Tag.packed {
                 return emitPackedExtend(g, f, dst, src, m.typeOf(children[1]), id, is_direct);
             }
@@ -3253,6 +3274,105 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if written != blot_direct_types::Error.none { return neverVal(), written; }
             return result, blot_direct_types::Error.none;
         },
+        push_front => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let value, error = expr(g, f, children[1]);
+            if error != blot_direct_types::Error.none { return value, error; }
+            return emitSeqPushFrontVal(g, f, container, value, id, is_direct);
+        },
+        pop_front => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            return emitSeqPopFrontVal(g, f, container, ty, id, is_direct);
+        },
+        insert => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let pos, perr = expr(g, f, children[1]);
+            if perr != blot_direct_types::Error.none { return pos, perr; }
+            let index, ierr = scalarLocal(g, f, pos, id);
+            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            let value, verr = expr(g, f, children[2]);
+            if verr != blot_direct_types::Error.none { return value, verr; }
+            return emitSeqInsertVal(g, f, container, index, value, id, is_direct);
+        },
+        remove => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let pos, perr = expr(g, f, children[1]);
+            if perr != blot_direct_types::Error.none { return pos, perr; }
+            let index, ierr = scalarLocal(g, f, pos, id);
+            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            return emitSeqRemoveVal(g, f, container, index, ty, id, is_direct);
+        },
+        reverse => {
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            return emitSeqReverseVal(g, f, container, ty, id);
+        },
+        split => {
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let pos, perr = expr(g, f, children[1]);
+            if perr != blot_direct_types::Error.none { return pos, perr; }
+            let index, ierr = scalarLocal(g, f, pos, id);
+            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            return emitSeqSplitVal(g, f, container, index, ty, id);
+        },
+        concat => {
+            let left, lerr = expr(g, f, children[0]);
+            if lerr != blot_direct_types::Error.none { return left, lerr; }
+            let right, rerr = expr(g, f, children[1]);
+            if rerr != blot_direct_types::Error.none { return right, rerr; }
+            return emitSeqConcatVal(g, f, left, right, ty, id);
+        },
+        slice => {
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let s_val, serr = expr(g, f, children[1]);
+            if serr != blot_direct_types::Error.none { return s_val, serr; }
+            let start_i, sierr = scalarLocal(g, f, s_val, id);
+            if sierr != blot_direct_types::Error.none { return neverVal(), sierr; }
+            let e_val, eerr = expr(g, f, children[2]);
+            if eerr != blot_direct_types::Error.none { return e_val, eerr; }
+            let end_i, eierr = scalarLocal(g, f, e_val, id);
+            if eierr != blot_direct_types::Error.none { return neverVal(), eierr; }
+            return emitSeqSliceVal(g, f, container, start_i, end_i, ty, id);
+        },
+        repeat => {
+            let cnt_val, cerr = expr(g, f, children[0]);
+            if cerr != blot_direct_types::Error.none { return cnt_val, cerr; }
+            let count, cierr = scalarLocal(g, f, cnt_val, id);
+            if cierr != blot_direct_types::Error.none { return neverVal(), cierr; }
+            let val, verr = expr(g, f, children[1]);
+            if verr != blot_direct_types::Error.none { return val, verr; }
+            return emitSeqRepeatVal(g, f, count, val, ty, id);
+        },
+        ramp => {
+            let s_val, serr = expr(g, f, children[0]);
+            if serr != blot_direct_types::Error.none { return s_val, serr; }
+            let start_v, sierr = scalarLocal(g, f, s_val, id);
+            if sierr != blot_direct_types::Error.none { return neverVal(), sierr; }
+            let st_val, sterr = expr(g, f, children[1]);
+            if sterr != blot_direct_types::Error.none { return st_val, sterr; }
+            let step_v, stierr = scalarLocal(g, f, st_val, id);
+            if stierr != blot_direct_types::Error.none { return neverVal(), stierr; }
+            let c_val, cerr = expr(g, f, children[2]);
+            if cerr != blot_direct_types::Error.none { return c_val, cerr; }
+            let count_v, cierr = scalarLocal(g, f, c_val, id);
+            if cierr != blot_direct_types::Error.none { return neverVal(), cierr; }
+            return emitSeqRampVal(g, f, start_v, step_v, count_v, ty, id);
+        },
+        from_frozen => {
+            let arr, aerr = expr(g, f, children[0]);
+            if aerr != blot_direct_types::Error.none { return arr, aerr; }
+            return emitSeqFromFrozenVal(g, f, arr, ty, id);
+        },
         _ => { abort("storage operation without a direct lowering"); },
     }
 }
@@ -3260,7 +3380,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 recursive fn holdsContainerVisited(g: Generator&, ty: Ty, visited: Ty[64]&, visited_len: i64&) -> bool {
     let n = g.types.node(ty);
     match n.tag {
-        array, packed => { return true; },
+        array, packed, seq => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if holdsContainerVisited(g, g.types.words[n.a + at], visited, visited_len) { return true; } }
             return false;
@@ -3386,6 +3506,31 @@ recursive fn deepCopyValue(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, d
     let tag = tagOf(g, ty);
     if tag == blot_direct_types::Tag.packed {
         return emitPackedDeepCopy(g, f, value, ty, id, depth);
+    }
+    if tag == blot_direct_types::Tag.seq {
+        let elem_ty, error = elementOf(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if !holdsContainer(g, elem_ty, 0) {
+            return emitSeqCopyVal(g, f, value, ty, id);
+        }
+        let length, lerr = lengthOf(g, f, value, id);
+        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+        let out_h, oerr = emitSeqEmpty(g, f, ty, id);
+        if oerr != blot_direct_types::Error.none { return out_h, oerr; }
+        let idx = constLocal(g, f, 0);
+        let exit = open(g, f, OP_block);
+        let top = open(g, f, OP_loop);
+        lget(g, idx); lget(g, length); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
+        let ev, rerr = emitSeqReadVal(g, f, value, idx, id);
+        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        let cp, cerr = deepCopyValue(g, f, ev, elem_ty, id, depth + 1);
+        if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+        let _, perr = emitSeqPushVal(g, f, out_h, cp, id, true);
+        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
+        br(g, f, OP_br, top);
+        close(g, f); close(g, f);
+        return out_h, blot_direct_types::Error.none;
     }
     if tag == blot_direct_types::Tag.array {
         let elem_ty, error = elementOf(g, f, ty, id);

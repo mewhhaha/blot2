@@ -337,6 +337,25 @@ exit codes, diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
 `wasm_diffs=0`); only prelude work counters updated (`+16` prelude body
 elaborations/lowerings).
 
+Reversible Generative SIMD-RRB Sequences `~[...]` / `~[T]` (`Seq T`, Design H)
+(27 November 2026) added `~[T]` sequences across parsing (`~[` adjacency with
+lexer symbol-run split for `*~[T]` / `=~[1]` / `=>~[1]`), typechecking
+(`storage_types::seq` + 11 new `@storage.*` ops: `push_front`, `pop_front`,
+`insert`, `remove`, `reverse`, `split`, `concat`, `slice`, `repeat`, `ramp`,
+`from_frozen`), Core/uniqueness validation, wire schema (`0x2e`), type display
+(`~[T]`), direct Wasm lowering (`direct/function_seq.goose`: 16-way `v128` SIMD
+prefix-routed internal nodes with in-place epoch reuse, readable inline
+`FocusGap` with in-place reuse, 6 tagged leaf flavors including `LEAF_PACKED_SUM`
+and `LEAF_PACKED_SOA`, `O(1)` `reverse`/`freeze`/`copy`/`repeat`/`ramp`/
+`from_frozen`, `O(log_16 m)` `split`/`concat`/`slice`, leaf-streaming `for`
+loops, and `O(1)` `fork` rollback), plus the `analyzeSoaBodyUses` fix for
+`Tag.call`/`Tag.associated`/`Tag.result_associated` and 1-constructor nominals
+in `direct/function_packed.goose`, `Seq.*` / `{Array,Packed}.*` prelude helpers,
+host formatter/doc, and Tree-sitter highlighting. Re-recorded `expected.json`:
+all 109 fixtures keep 100% identical exit codes, diagnostics, and Wasm
+bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`, `wasm_diffs=0`); only prelude
+work counters updated (`+34` prelude body elaborations/lowerings).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

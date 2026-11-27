@@ -654,3 +654,34 @@ io main ():U32=>
   equal(formatted.includes("let p = %[$Tick, $Val 7]"), true);
   equal(formatted.includes("let q = take p (freeze %[1, 2])"), true);
 });
+
+Deno.test("formatter preserves sequence ~[...] / ~[T] syntax without conflicting with operator ~", async () => {
+  const source = `func (~) (a:U32)->(b:U32):U32=>a+b
+func take (xs:own ~[U32])->(ro:*~[U32]):~[U32]=>
+  let empty:~[U32]=~[]
+  let nums=~[1,2,3]
+  let mapped=~[x*2 | x<-nums, x>1]
+  let spread=~[0,...nums,4]
+  let sum=10~3
+  let op=(~) 10 3
+  return spread
+io main ():U32=>
+  let q=take ~[1,2] (freeze ~[3,4])
+  return q.length
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(
+    formatted.includes(
+      "func take (xs: own ~[U32]) -> (ro: *~[U32]): ~[U32] =>",
+    ),
+    true,
+  );
+  equal(formatted.includes("let empty: ~[U32] = ~[]"), true);
+  equal(formatted.includes("let nums = ~[1, 2, 3]"), true);
+  equal(formatted.includes("let mapped = ~[x * 2 | x <- nums, x > 1]"), true);
+  equal(formatted.includes("let spread = ~[0, ...nums, 4]"), true);
+  equal(formatted.includes("let sum = 10 ~ 3"), true);
+  equal(formatted.includes("let op = (~) 10 3"), true);
+  equal(formatted.includes("let q = take ~[1, 2] (freeze ~[3, 4])"), true);
+});

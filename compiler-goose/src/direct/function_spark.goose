@@ -84,6 +84,7 @@ let SIMD_i16x8_min_u: u32 = 151;
 let SIMD_i16x8_max_u: u32 = 153;
 let SIMD_i32x4_neg: u32 = 161;
 let SIMD_i32x4_all_true: u32 = 163;
+let SIMD_i32x4_bitmask: u32 = 164;
 let SIMD_i32x4_extend_low_i16x8_u: u32 = 169;
 let SIMD_i32x4_shl: u32 = 171;
 let SIMD_i32x4_shr_s: u32 = 172;

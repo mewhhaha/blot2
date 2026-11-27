@@ -388,10 +388,10 @@ fn scan(source: const u8[:],result: Result&) {
    if !terminated { diagnose(result,string_literal,start,at); } emit(result.tokens,blot_parse_token::string,start,at); continue;
   }
   if c=='$'&&at+1<slen&&(lower(source[at+1])||upper(source[at+1])||source[at+1]=='_') { at++; emit(result.tokens,blot_parse_token::hash,start,at); continue; }
-  if c=='%'&&at+1<slen&&source[at+1]=='[' { at++; emit(result.tokens,blot_parse_token::symbol,start,at); continue; }
+  if (c=='%'||c=='~')&&at+1<slen&&source[at+1]=='[' { at++; emit(result.tokens,blot_parse_token::symbol,start,at); continue; }
   if symbolic(c)||c=='/' {
    at++;
-   while at<slen&&!(source[at]=='%'&&at+1<slen&&source[at+1]=='[')&&(symbolic(source[at])||(source[at]=='/'&&!(at+1<slen&&source[at+1]=='/'))) { at++; }
+   while at<slen&&!((source[at]=='%'||source[at]=='~')&&at+1<slen&&source[at+1]=='[')&&(symbolic(source[at])||(source[at]=='/'&&!(at+1<slen&&source[at+1]=='/'))) { at++; }
    let spelling=source[start..at]; var kind=blot_parse_token::symbol;
    if spelling=="->" { kind=blot_parse_token::arrow; } else if spelling=="=>" { kind=blot_parse_token::fat_arrow; } else if spelling=="<-" { kind=blot_parse_token::left_arrow; }
    else if spelling.len==1 {

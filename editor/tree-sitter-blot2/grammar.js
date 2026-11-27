@@ -50,6 +50,7 @@ export default grammar({
         $.bracketed,
         $.array,
         $.packed_array,
+        $.seq_array,
         $.spread,
         $.braced,
         $.reflected_member,
@@ -326,6 +327,7 @@ export default grammar({
           $.bracketed,
           $.array,
           $.packed_array,
+          $.seq_array,
           $.braced,
           $.member,
           alias("->", $.operator),
@@ -449,6 +451,16 @@ export default grammar({
           "]",
         ),
       ),
+    seq_array: ($) =>
+      prec(
+        3,
+        seq(
+          alias("~", $.seq_marker),
+          alias(token.immediate("["), "["),
+          repeat($._syntax),
+          "]",
+        ),
+      ),
     spread: (_) => "...",
     braced: ($) => seq("{", repeat(choice($.record_field, $._syntax)), "}"),
     record_field: ($) => prec(1, seq(field("name", $.identifier), ":")),
@@ -515,7 +527,7 @@ export default grammar({
       ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) =>
-      choice("and", "or", "not", "$", "%", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
+      choice("and", "or", "not", "$", "%", "~", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(

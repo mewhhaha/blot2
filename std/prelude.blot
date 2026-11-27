@@ -352,6 +352,81 @@ func Array.from_packed (values: %[a]): #[a] => Packed.to_array values
 func Array.extend_packed (values: own #[a]) -> (more: %[a]): #[a] =>
   return @storage.extend values more
 
+// Reversible generative sequences (`~[T]` / `Seq T`): 16-way SIMD-RRB tree
+// with readable inline focus gap, packed leaves (split-stream sums, SoA records),
+// zero-copy frozen spans, O(1) generative repeat/ramp, O(1) reverse/copy/freeze,
+// and O(log_16 m) split/concat/slice.
+func Seq.length (values: ~[a]): U32 => @storage.length values
+func Seq.is_empty (values: ~[a]): Bool => Seq.length values == 0
+func Seq.get (values: ~[a]) -> (index: U32): Maybe a =>
+  if index < Seq.length values:
+    return $Some (@storage.read values index)
+  return $Nothing
+func Seq.with_capacity (capacity: U32): ~[a] => @storage.with_capacity capacity
+func Seq.reserve (values: own ~[a]) -> (additional: U32): ~[a] =>
+  return @storage.reserve values additional
+func Seq.push (values: own ~[a]) -> (value: a): ~[a] =>
+  return @storage.push values value
+func Seq.pop (values: own ~[a]): (~[a], a) =>
+  let value = @storage.pop values
+  return (values, value)
+func Seq.push_front (values: own ~[a]) -> (value: a): ~[a] =>
+  return @storage.push_front values value
+func Seq.pop_front (values: own ~[a]): (~[a], a) =>
+  let value = @storage.pop_front values
+  return (values, value)
+func Seq.insert (values: own ~[a]) -> (index: U32) -> (value: a): ~[a] =>
+  return @storage.insert values index value
+func Seq.remove (values: own ~[a]) -> (index: U32): (~[a], a) =>
+  let value = @storage.remove values index
+  return (values, value)
+func Seq.reverse (values: ~[a]): ~[a] => @storage.reverse values
+func Seq.split (values: ~[a]) -> (index: U32): (~[a], ~[a]) =>
+  return @storage.split values index
+func Seq.concat (left: ~[a]) -> (right: ~[a]): ~[a] =>
+  return @storage.concat left right
+func Seq.slice (values: ~[a]) -> (start: U32) -> (end: U32): ~[a] =>
+  return @storage.slice values start end
+func Seq.reverse_range (values: ~[a]) -> (start: U32) -> (end: U32): ~[a] =>
+  let (left, rest) = @storage.split values start
+  let (mid, right) = @storage.split rest (U32.sub end start)
+  return @storage.concat (@storage.concat left (@storage.reverse mid)) right
+func Seq.repeat (count: U32) -> (value: a): ~[a] =>
+  return @storage.repeat count value
+func Seq.ramp (start: U32) -> (step: U32) -> (count: U32): ~[U32] =>
+  return @storage.ramp start step count
+func Seq.from_frozen_array (values: *#[a]): ~[a] =>
+  return @storage.from_frozen values
+func Seq.copy (values: ~[a]): ~[a] => @storage.copy values
+func Seq.extend (values: own ~[a]) -> (more: ~[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_array (values: own ~[a]) -> (more: #[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_packed (values: own ~[a]) -> (more: %[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_view (values: own ~[a]) -> (more: &[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.to_array (values: ~[a]): #[a] =>
+  let out: #[a] = @storage.with_capacity (Seq.length values)
+  return @storage.extend out values
+func Seq.from_array (values: #[a]): ~[a] =>
+  let out: ~[a] = @storage.with_capacity (Array.length values)
+  return @storage.extend out values
+func Seq.to_packed (values: ~[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (Seq.length values)
+  return @storage.extend out values
+func Seq.from_packed (values: %[a]): ~[a] =>
+  let out: ~[a] = @storage.with_capacity (Packed.length values)
+  return @storage.extend out values
+func Array.to_seq (values: #[a]): ~[a] => Seq.from_array values
+func Array.from_seq (values: ~[a]): #[a] => Seq.to_array values
+func Array.extend_seq (values: own #[a]) -> (more: ~[a]): #[a] =>
+  return @storage.extend values more
+func Packed.to_seq (values: %[a]): ~[a] => Seq.from_packed values
+func Packed.from_seq (values: ~[a]): %[a] => Seq.to_packed values
+func Packed.extend_seq (values: own %[a]) -> (more: ~[a]): %[a] =>
+  return @storage.extend values more
+
 func U8.from value : U8 => value.to_u8
 const U8.add = @u8.add
 const U8.sub = @u8.sub

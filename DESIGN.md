@@ -20,13 +20,15 @@ compiler pruning and vNext implementation plan.
    memory in place—including zero-copy `freeze` transitions and same-shape
    sum-type reuse (FBIP).
 2. **Intrinsics are symbols; user types are names.**
-   - Arrays use three unified symbols: `#[T]` (dynamic contiguous `Array T`,
-     with `push`/`pop`/`truncate`/`reserve`/`extend` gated by unique `own`
-     ownership), `#[n; T]` (fixed/linked lengths across fields and parameters
-     for zero-cost bounds-check elimination), and `%[T]` (packed non-indexable
-     sequential `Packed T` lowering to split-stream sums, SoA records/tuples,
-     and flat cursors). Borrowed read-only `#[T]` accepts `#[T]`, `#[n; T]`, and
-     `*#[T]`. (`~[T]` is reserved for a future list-like sequence structure.)
+   - Collections use four unified symbols: `#[T]` (dynamic contiguous
+     `Array T`, with `push`/`pop`/`truncate`/`reserve`/`extend` gated by unique
+     `own` ownership), `#[n; T]` (fixed/linked lengths across fields and
+     parameters for zero-cost bounds-check elimination), `%[T]` (packed
+     non-indexable sequential `Packed T` lowering to split-stream sums, SoA
+     records/tuples, and flat cursors), and `~[T]` (reversible generative
+     SIMD-RRB `Seq T` with `O(1)` `reverse`/`copy`/`freeze`/`repeat`/`ramp`,
+     readable focus gap, packed leaves, and `O(log_16 m)` `split`/`concat`/`slice`).
+     Borrowed read-only `#[T]` accepts `#[T]`, `#[n; T]`, and `*#[T]`.
    - Frozen/shared values use `*T` (`O(1)` `freeze`, freely aliasable; explicit
      `copy` to obtain a linear editable clone; zero refcount overhead on linear
      code).

@@ -6,7 +6,7 @@ import support.structural_adapters;
 
 import support.structural;
 import std;
-enum Op { ref, at, link, view, load, length, read, push, pop, truncate, copy, share, with_capacity, reserve, extend }
+enum Op { ref, at, link, view, load, length, read, push, pop, truncate, copy, share, with_capacity, reserve, extend, push_front, pop_front, insert, remove, reverse, split, concat, slice, repeat, ramp, from_frozen }
 fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if !starts_with(name, "@storage.") { return blot_support::Option<Op> { false, Op.ref , ..}; }
     let tail = name[9..];
@@ -25,17 +25,28 @@ fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if tail == "with_capacity" { return blot_support::Option<Op> { true, Op.with_capacity , ..}; }
     if tail == "reserve" { return blot_support::Option<Op> { true, Op.reserve , ..}; }
     if tail == "extend" { return blot_support::Option<Op> { true, Op.extend , ..}; }
+    if tail == "push_front" { return blot_support::Option<Op> { true, Op.push_front , ..}; }
+    if tail == "pop_front" { return blot_support::Option<Op> { true, Op.pop_front , ..}; }
+    if tail == "insert" { return blot_support::Option<Op> { true, Op.insert , ..}; }
+    if tail == "remove" { return blot_support::Option<Op> { true, Op.remove , ..}; }
+    if tail == "reverse" { return blot_support::Option<Op> { true, Op.reverse , ..}; }
+    if tail == "split" { return blot_support::Option<Op> { true, Op.split , ..}; }
+    if tail == "concat" { return blot_support::Option<Op> { true, Op.concat , ..}; }
+    if tail == "slice" { return blot_support::Option<Op> { true, Op.slice , ..}; }
+    if tail == "repeat" { return blot_support::Option<Op> { true, Op.repeat , ..}; }
+    if tail == "ramp" { return blot_support::Option<Op> { true, Op.ramp , ..}; }
+    if tail == "from_frozen" { return blot_support::Option<Op> { true, Op.from_frozen , ..}; }
     return blot_support::Option<Op> { false, Op.ref , ..};
 }
 fn arity(op: Op) -> u32 {
     match op {
-        ref, load, length, pop, copy, share, with_capacity => { return 1; },
-        at, link, read, push, truncate, reserve, extend => { return 2; },
-        view => { return 3; },
+        ref, load, length, pop, copy, share, with_capacity, pop_front, reverse, from_frozen => { return 1; },
+        at, link, read, push, truncate, reserve, extend, push_front, remove, split, concat, repeat => { return 2; },
+        view, insert, slice, ramp => { return 3; },
     }
 }
 fn writes(op: Op) -> bool {
-    match op { push, pop, truncate, share, reserve, extend => { return true; }, _ => { return false; }, }
+    match op { push, pop, truncate, share, reserve, extend, push_front, pop_front, insert, remove => { return true; }, _ => { return false; }, }
 }
 
 fn opCode(value: Op) -> u32 {
@@ -55,6 +66,17 @@ fn opCode(value: Op) -> u32 {
         extend => { return 12; },
         share => { return 13; },
         with_capacity => { return 14; },
+        push_front => { return 15; },
+        pop_front => { return 16; },
+        insert => { return 17; },
+        remove => { return 18; },
+        reverse => { return 19; },
+        split => { return 20; },
+        concat => { return 21; },
+        slice => { return 22; },
+        repeat => { return 23; },
+        ramp => { return 24; },
+        from_frozen => { return 25; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -74,6 +96,17 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         12 => { return Op.extend, blot_error::Error.none; },
         13 => { return Op.share, blot_error::Error.none; },
         14 => { return Op.with_capacity, blot_error::Error.none; },
+        15 => { return Op.push_front, blot_error::Error.none; },
+        16 => { return Op.pop_front, blot_error::Error.none; },
+        17 => { return Op.insert, blot_error::Error.none; },
+        18 => { return Op.remove, blot_error::Error.none; },
+        19 => { return Op.reverse, blot_error::Error.none; },
+        20 => { return Op.split, blot_error::Error.none; },
+        21 => { return Op.concat, blot_error::Error.none; },
+        22 => { return Op.slice, blot_error::Error.none; },
+        23 => { return Op.repeat, blot_error::Error.none; },
+        24 => { return Op.ramp, blot_error::Error.none; },
+        25 => { return Op.from_frozen, blot_error::Error.none; },
         _ => { return Op.ref, blot_error::Error.invalid_artifact; },
     }
 }

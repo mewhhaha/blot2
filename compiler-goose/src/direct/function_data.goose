@@ -118,6 +118,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     if tagOf(g, container.ty) == blot_direct_types::Tag.view {
         return neverVal(), g.fail(m, id, "Cannot write through a borrowed slice");
     }
+    if tagOf(g, container.ty) == blot_direct_types::Tag.seq {
+        return emitSeqIndexedUpdate(g, f, id, container, at);
+    }
     let position_value, error = expr(g, f, selectors[at].index);
     if error != blot_direct_types::Error.none { return position_value, error; }
     let index, error = scalarLocal(g, f, position_value, id);
@@ -146,7 +149,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
                 inner = loaded;
             }
             match tagOf(g, ty) {
-                array, view => {},
+                array, seq, view => {},
                 _ => {
                     g.failOpen(m, id);
                     g.put("indexed update of a ");

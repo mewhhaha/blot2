@@ -170,13 +170,15 @@ export async function formatSource(source: string): Promise<string> {
           comment: token.type === "named" && token.kind === "COMMENT",
         });
       }
-      // Split trailing `%` off combined symbol tokens before adjacent `[` (e.g. `*%[T]`, `=%[1]`).
+      // Split trailing `%` or `~` off combined symbol tokens before adjacent `[`
+      // (e.g. `*%[T]`, `*~[T]`, `=%[1]`, `=~[1]`, `=>~[1]`).
       const tokens: typeof rawTokens = [];
       for (let index = 0; index < rawTokens.length; index++) {
         const token = rawTokens[index];
         const next = rawTokens[index + 1];
         if (
-          !token.comment && token.text.length > 1 && token.text.endsWith("%") &&
+          !token.comment && token.text.length > 1 &&
+          (token.text.endsWith("%") || token.text.endsWith("~")) &&
           next?.text === "[" && next.start === token.end
         ) {
           tokens.push(
@@ -187,7 +189,7 @@ export async function formatSource(source: string): Promise<string> {
               comment: false,
             },
             {
-              text: "%",
+              text: token.text.slice(-1),
               start: token.end - 1,
               end: token.end,
               comment: false,

@@ -87,9 +87,12 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
     let args = m.children(id); if args.len != blot_check_storage_ops::arity(op) { return Contract {..}, blot_error::Error.invalid_artifact; }
     let input = m.typeOf(args[0]); let kind = blot_check_storage_types::info(m.types, input);
     var element = blot_check_storage_types::readableElement(m.types, input);
+    let index_element = blot_check_storage_types::indexReadableElement(m.types, input);
     let iter_element = blot_check_storage_types::iterableElement(m.types, input);
     let is_owned_packed = blot_check_storage_types::isOwnedPacked(m.types, input);
-    let is_growable = m.types.node(input).tag == blot_check_types::Tag.array || is_owned_packed;
+    let is_owned_seq = blot_check_storage_types::isOwnedSeq(m.types, input);
+    let seq_elem = blot_check_storage_types::seqElement(m.types, input);
+    let is_growable = m.types.node(input).tag == blot_check_types::Tag.array || is_owned_packed || is_owned_seq;
     var result = Contract {..};
     match op {
         ref, at, link, view => {
@@ -105,7 +108,7 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
         load => { if !kind.present || (kind.value.kind != blot_check_storage_types::ref && kind.value.kind != blot_check_storage_types::link) { return Contract {..}, blot_error::Error.invalid_artifact; }
             same(result, kind.value.element, n.ty); },
         length => { if !iter_element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, blot_check_types::u32_type, n.ty); },
-        read => { if !element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, element.value, n.ty); same(result, blot_check_types::u32_type, m.typeOf(args[1])); },
+        read => { if !index_element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, index_element.value, n.ty); same(result, blot_check_types::u32_type, m.typeOf(args[1])); },
         push => {
             if !is_growable || !iter_element.present { return Contract {..}, blot_error::Error.invalid_artifact; }
             same(result, iter_element.value, m.typeOf(args[1]));
@@ -131,7 +134,7 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
             same(result, expected, n.ty);
         },
         with_capacity => {
-            if m.types.node(n.ty).tag != blot_check_types::Tag.array && !blot_check_storage_types::isOwnedPacked(m.types, n.ty) { return Contract {..}, blot_error::Error.invalid_artifact; }
+            if m.types.node(n.ty).tag != blot_check_types::Tag.array && !blot_check_storage_types::isOwnedPacked(m.types, n.ty) && !blot_check_storage_types::isOwnedSeq(m.types, n.ty) { return Contract {..}, blot_error::Error.invalid_artifact; }
             same(result, blot_check_types::u32_type, input);
         },
         reserve => {
@@ -145,6 +148,76 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
             if !src_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
             same(result, iter_element.value, src_elem.value);
             same(result, input, n.ty);
+        },
+        push_front => {
+            if !is_owned_seq || !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, seq_elem.value, m.typeOf(args[1]));
+            same(result, input, n.ty);
+        },
+        pop_front => {
+            if !is_owned_seq || !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, seq_elem.value, n.ty);
+        },
+        insert => {
+            if !is_owned_seq || !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            same(result, seq_elem.value, m.typeOf(args[2]));
+            same(result, input, n.ty);
+        },
+        remove => {
+            if !is_owned_seq || !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            same(result, seq_elem.value, n.ty);
+        },
+        reverse => {
+            if !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_storage_types::unwrapShared(m.types, input), n.ty);
+        },
+        split => {
+            if !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            let out_node = m.types.node(n.ty);
+            if out_node.tag != blot_check_types::Tag.product || out_node.b != 2 { return Contract {..}, blot_error::Error.invalid_artifact; }
+            let out_items = m.types.list(blot_check_types::List { out_node.a, out_node.b , ..});
+            let out_seq = blot_check_storage_types::unwrapShared(m.types, input);
+            same(result, out_seq, out_items[0]);
+            same(result, out_seq, out_items[1]);
+        },
+        concat => {
+            if !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            let rhs_elem = blot_check_storage_types::seqElement(m.types, m.typeOf(args[1]));
+            if !rhs_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, seq_elem.value, rhs_elem.value);
+            same(result, blot_check_storage_types::unwrapShared(m.types, input), n.ty);
+        },
+        slice => {
+            if !seq_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            same(result, blot_check_types::u32_type, m.typeOf(args[2]));
+            same(result, blot_check_storage_types::unwrapShared(m.types, input), n.ty);
+        },
+        repeat => {
+            let out_seq = blot_check_storage_types::ownedSeqElement(m.types, n.ty);
+            if !out_seq.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, input);
+            same(result, out_seq.value, m.typeOf(args[1]));
+        },
+        ramp => {
+            let out_seq = blot_check_storage_types::ownedSeqElement(m.types, n.ty);
+            if !out_seq.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, input);
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            same(result, blot_check_types::u32_type, m.typeOf(args[2]));
+            same(result, blot_check_types::u32_type, out_seq.value);
+        },
+        from_frozen => {
+            let sh = blot_check_storage_types::sharedInner(m.types, input);
+            if !sh.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            let arr_elem = blot_check_storage_types::arrayElement(m.types, sh.value);
+            if !arr_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            let out_seq = blot_check_storage_types::ownedSeqElement(m.types, n.ty);
+            if !out_seq.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, arr_elem.value, out_seq.value);
         },
     }
     return result, blot_error::Error.none;
@@ -166,6 +239,7 @@ fn validate(m: const blot_check_core::Module&) -> blot_error::Error {
         } else if node.tag == blot_check_core::Tag.array {
             var element = blot_check_storage_types::arrayElement(m.types, node.ty);
             if !element.present { element = blot_check_storage_types::packedElement(m.types, node.ty); }
+            if !element.present { element = blot_check_storage_types::seqElement(m.types, node.ty); }
             if !element.present { return blot_error::Error.invalid_artifact; }
             for child in m.children(index as u32) { if m.typeOf(child) == blot_check_types::never { continue; } let same, error = equalStorageType(m.types, element.value, m.typeOf(child), remaining, 0); if error != blot_error::Error.none || !same { return blot_error::Error.invalid_artifact; } }
         }
