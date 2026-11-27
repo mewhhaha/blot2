@@ -146,7 +146,7 @@ fn type_identifier(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Sym
  if at(p,source,tokens,t_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false) { return identifier_syntax(p,source,tokens); }
  let t=expect(p,source,tokens,t_type_identifier); let name=intern(p,source,tokens,text(p,source,t)); if at(p,source,tokens,t_dot) { return identifier_syntax(p,source,tokens); } return name;
 }
-fn member_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_type_identifier||tag==t_kw_not||tag==t_kw_with; }
+fn member_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_type_identifier||tag==t_kw_not; }
 fn member_identifier(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbol {
  if p.failure!=blot_error::Error.none { return 0; } let t=current(p,source,tokens);
  if !member_tag(t.tag) { return fail(p,source,tokens,c_expected_token); }
@@ -371,7 +371,6 @@ let t_newline=blot_parse_token::newline;
 let t_indent=blot_parse_token::indent;
 let t_dedent=blot_parse_token::dedent;
 let t_kw_not=blot_parse_token::kw_not;
-let t_kw_with=blot_parse_token::kw_with;
 let t_kw_fork=blot_parse_token::kw_fork;
 let t_semicolon=blot_parse_token::semicolon;
 let t_kw_spark=blot_parse_token::kw_spark;
@@ -460,8 +459,7 @@ let a_numeric_error=blot_parse_ast::tag_numeric_error;
 let a_type_binder=blot_parse_ast::tag_type_binder;
 let a_type_usage=blot_parse_ast::tag_type_usage;
 let a_fork_expr=blot_parse_ast::tag_fork_expr;
-let a_with_stmt=blot_parse_ast::tag_with_stmt;
-let a_with_entry=blot_parse_ast::tag_with_entry;
+let a_handler_stmt=blot_parse_ast::tag_handler_stmt;
 let a_comptime_for=blot_parse_ast::tag_comptime_for;
 let a_comptime_if=blot_parse_ast::tag_comptime_if;
 let a_comptime_project=blot_parse_ast::tag_comptime_project;
@@ -1372,7 +1370,7 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   var forwarding: u32=0; if eat(p,source,tokens,t_dollar) { forwarding=1; } let value=expression(p,source,tokens); return add(p,source,tokens,a_return_stmt,value,forwarding,0,start);
  }
  if eat(p,source,tokens,t_kw_continue) { return add(p,source,tokens,a_continue_stmt,0,0,0,start); }
- if at(p,source,tokens,t_kw_if) { return if_statement(p,source,tokens); } if at(p,source,tokens,t_kw_for) { return for_statement(p,source,tokens); } if at(p,source,tokens,t_kw_with) { return with_statement(p,source,tokens); }
+ if at(p,source,tokens,t_kw_if) { return if_statement(p,source,tokens); } if at(p,source,tokens,t_kw_for) { return for_statement(p,source,tokens); } if handler_statement_ahead(p,source,tokens) { return handler_statement(p,source,tokens); }
  if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#" {
   if peek(p,tokens,1)==t_kw_for { return comptime_for(p,source,tokens,false); }
   if peek(p,tokens,1)==t_kw_if { return comptime_if_statement(p,source,tokens); }
@@ -1432,13 +1430,15 @@ fn assignment_operator(p: Parser&,tokens: const Token[:]) -> blot_parse_token::T
  }
  return t_eof;
 }
-fn with_entry_has_equal(p: Parser&,tokens: const Token[:]) -> bool {
- var nesting=0; var i=p.index;
+fn handler_statement_ahead(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
+ if !at(p,source,tokens,t_identifier)||text(p,source,current(p,source,tokens))!="handler" { return false; }
+ if peek(p,tokens,1)!=t_identifier||peek(p,tokens,2)!=t_colon { return false; }
+ var nesting=0; var i=p.index+3;
  while i<tokens.len {
   let tag=tokens[i].tag;
   if nesting==0 {
-   if tag==t_equal { return true; }
-   if tag==t_comma||tag==t_colon||tag==t_newline||tag==t_dedent||tag==t_eof { return false; }
+   if tag==t_fat_arrow { return true; }
+   if tag==t_newline||tag==t_dedent||tag==t_eof { return false; }
   }
   if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nesting++; }
   else if (tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace)&&nesting!=0 { nesting--; }
@@ -1446,28 +1446,70 @@ fn with_entry_has_equal(p: Parser&,tokens: const Token[:]) -> bool {
  }
  return false;
 }
-recursive fn with_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=expect(p,source,tokens,t_kw_with).start;
- var entries=ScratchIdBuffer {};
- while p.failure==blot_error::Error.none {
-  let entry_start=current(p,source,tokens).start;
-  if with_entry_has_equal(p,tokens) {
-   let effect_type=type_application(p,source,tokens);
-   expect(p,source,tokens,t_equal);
-   let handler=expression(p,source,tokens);
-   entries.push(add(p,source,tokens,a_with_entry,effect_type,handler,1,entry_start));
-  } else {
-   let expr=expression(p,source,tokens);
-   entries.push(add(p,source,tokens,a_with_entry,expr,0,0,entry_start));
-  }
-  if !eat(p,source,tokens,t_comma) { break; }
+fn handler_single_arm_ahead(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
+ if at(p,source,tokens,t_l_paren) { return true; }
+ if at(p,source,tokens,t_identifier) {
+  let next=peek(p,tokens,1);
+  if next==t_fat_arrow||next==t_arrow||next==t_colon { return true; }
  }
+ return false;
+}
+recursive fn handler_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let start=advance(p,source,tokens).start;
+ let name=lower_identifier(p,source,tokens);
  expect(p,source,tokens,t_colon);
- let body=suite(p,source,tokens);
- let range=list(p,source,tokens,entries.items);
- let result: Id = add(p,source,tokens,a_with_stmt,range.start,range.len,body,start);
- entries.deinit();
- return result;
+ let effect_type=type_application(p,source,tokens);
+ expect(p,source,tokens,t_fat_arrow);
+ if p.failure!=blot_error::Error.none { return 0; }
+ var body: Id=0;
+ if at(p,source,tokens,t_newline)&&peek(p,tokens,1)==t_indent {
+  let body_start=advance(p,source,tokens).start;
+  expect(p,source,tokens,t_indent);
+  newlines(p,source,tokens);
+  if p.failure==blot_error::Error.none&&at(p,source,tokens,t_kw_func) {
+   body=lambda(p,source,tokens);
+   newlines(p,source,tokens);
+   expect(p,source,tokens,t_dedent);
+  } else if p.failure==blot_error::Error.none&&handler_single_arm_ahead(p,source,tokens) {
+   let arm_start=current(p,source,tokens).start;
+   var empty_where=Where {};
+   body=lambda_tail(p,source,tokens,arm_start,false,empty_where);
+   newlines(p,source,tokens);
+   expect(p,source,tokens,t_dedent);
+  } else {
+   var fields=ScratchIdBuffer {};
+   while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_dedent)&&!at(p,source,tokens,t_eof) {
+    let arm_start=current(p,source,tokens).start;
+    let op_name=lower_identifier(p,source,tokens);
+    var empty_where=Where {};
+    let lam=lambda_tail(p,source,tokens,arm_start,false,empty_where);
+    fields.push(add(p,source,tokens,a_field,op_name,lam,0,arm_start));
+    eat(p,source,tokens,t_comma);
+    newlines(p,source,tokens);
+   }
+   expect(p,source,tokens,t_dedent);
+   let range=list(p,source,tokens,fields.items);
+   body=add(p,source,tokens,a_record,0,range.start,range.len,body_start);
+   fields.deinit();
+  }
+ } else if at(p,source,tokens,t_l_brace) {
+  body=record(p,source,tokens,0,current(p,source,tokens).start);
+ } else if at(p,source,tokens,t_kw_func) {
+  body=lambda(p,source,tokens);
+ } else if handler_single_arm_ahead(p,source,tokens) {
+  let arm_start=current(p,source,tokens).start;
+  var empty_where=Where {};
+  body=lambda_tail(p,source,tokens,arm_start,false,empty_where);
+ } else {
+  let arm_start=current(p,source,tokens).start;
+  let op_name=lower_identifier(p,source,tokens);
+  var empty_where=Where {};
+  let lam=lambda_tail(p,source,tokens,arm_start,false,empty_where);
+  let field_id=add(p,source,tokens,a_field,op_name,lam,0,arm_start);
+  let range=list(p,source,tokens,[field_id]);
+  body=add(p,source,tokens,a_record,0,range.start,range.len,arm_start);
+ }
+ return add(p,source,tokens,a_handler_stmt,name,effect_type,body,start);
 }
 recursive fn trailing_comptime_else(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  let saved=p.index; newlines(p,source,tokens);
@@ -1569,7 +1611,7 @@ fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i6
  return false;
 }
 fn is_statement_tag(tag: blot_parse_ast::Tag) -> bool {
- return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
+ return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_handler_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
 }
 fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_char_literal||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
 fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&) -> Parser {

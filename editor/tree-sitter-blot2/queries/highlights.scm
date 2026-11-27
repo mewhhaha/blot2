@@ -36,7 +36,8 @@
 (ever_loop "ever" @keyword.control.repeat)
 ["return" "break" "yield" "panic"] @keyword.control.return
 (request_complete_header "complete" @keyword.control)
-["do" "fork" "with" "freeze" "seal" "copy" "spark" "test"] @keyword.control
+(handler_header "handler" @keyword.storage.type)
+["do" "fork" "freeze" "seal" "copy" "spark" "test"] @keyword.control
 
 (self) @variable.builtin
 (intrinsic) @function.builtin

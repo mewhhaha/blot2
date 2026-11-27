@@ -117,6 +117,42 @@ export function parserSource(
         replace(token.span.end - 1, token.span.end, "E");
       }
     }
+    // `handler <name> : <Effect> =>` is contextual at statement start.
+    const prevText = prepared.tokens[index - 1]?.text;
+    const atStatementStart = !topLevel && delimiters === 0 &&
+      (prevText === "\uE000" || prevText === "\uE001" ||
+        prevText === "\uE002");
+    if (
+      atStatementStart && (token.text === "handler" || token.text === "handleR")
+    ) {
+      const nameTok = prepared.tokens[index + 1];
+      const colonTok = prepared.tokens[index + 2];
+      if (
+        nameTok?.type === "named" && nameTok.kind === "IDENT" &&
+        colonTok?.text === ":"
+      ) {
+        let nesting = 0;
+        let hasArrow = false;
+        for (let k = index + 3; k < prepared.tokens.length; k++) {
+          const t = prepared.tokens[k].text;
+          if (nesting === 0) {
+            if (t === "=>") {
+              hasArrow = true;
+              break;
+            }
+            if (t === "\uE000" || t === "\uE002") break;
+          }
+          if (t === "(" || t === "[" || t === "{") nesting++;
+          else if ((t === ")" || t === "]" || t === "}") && nesting > 0) {
+            nesting--;
+          }
+        }
+        if (hasArrow) {
+          if (token.text === "handleR") throw reservedMarker(token);
+          replace(token.span.end - 1, token.span.end, "R");
+        }
+      }
+    }
     if (token.text === "\uE000" && topLevel) {
       if (!declarationStart) sawPrivate = false;
       declarationStart = true;

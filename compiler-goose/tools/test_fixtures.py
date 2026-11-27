@@ -287,6 +287,20 @@ codes, diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
 `wasm_diffs=0`); only prelude frontend/lower work counters updated (`+12`
 prelude body elaborations/lowerings).
 
+Composable Effect Handlers (`handler`, `@handle`, `Layer`, `Handled`, 27
+November 2026) removed the `with` keyword and statement completely, added
+contextual `handler name: Effect => ...` local handler bindings, the 2-arg
+`@handle handler thunk` compiler intrinsic, `Function` builtin associated
+receiver dispatch (`0xfffffffc`), `Layer`/`Handled`/`layer`/`Layer.layer`/
+`Function.handle`/`Function.run`/`Handled.handle` in `std/prelude.blot`,
+value-returning `Tag.with_handle` across checking, uniqueness, and direct
+Wasm emission, contextual effect-row propagation into inline handler thunks,
+and `tag_handler_stmt` symbol relocation in `reuse/parse_packet.goose`.
+Re-recorded `expected.json`: all 109 fixtures keep 100% identical exit codes,
+diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
+`wasm_diffs=0`); only prelude frontend/lower work counters updated (`+5`
+prelude body elaborations/lowerings).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

@@ -125,19 +125,22 @@ io main (): U32 =>
   }
 });
 
-Deno.test("audit: fork rejects indirect Foreign via enclosing with handler", async () => {
+Deno.test("audit: fork rejects indirect Foreign via enclosing handler", async () => {
   await compileExpectedFailure(
     `
 type Boom is effect = { fire: U32 -> U32 }
 io main (cb: U32 -> U32 ! {Foreign}): U32 =>
   let xs = #[1, 2]
-  let v = 0
-  with Boom = { fire: func x => return use cb x }:
+  handler h_boom: Boom =>
+    fire x => return use cb x
+  use v <- (func () =>
     use r <- fork xs:
       xs[0] := 99
       use res <- Boom.fire 42
       return res + xs[0]
-    v := r
+    return r
+  ).handle h_boom
+    .run ()
   return v * 100 + xs[0]
 `,
     "sealed_effect",
@@ -268,20 +271,19 @@ io run (n: U32): U32 =>
   );
 });
 
-Deno.test("audit: with shadowing records, returning cells, and inside fork are sound (C7, C8, C9)", async () => {
+Deno.test("audit: handler shadowing records, returning cells, and inside fork are sound (C7, C8, C9)", async () => {
   await compileExpectedFailure(
     `
 type Ping is effect = { ping: Unit -> *#[U32] }
 io main (): U32 =>
   let r = { a: #[10, 20], b: #[30, 40] }
-  let leaked: *#[U32] = freeze #[0]
-  with Ping = { ping: func () =>
+  handler h_ping: Ping =>
+    ping () =>
       let f = freeze r.a
       r.b[0] := 31
       return f
-  }:
-    use f <- Ping.ping ()
-    leaked := f
+  let leaked = (func () => return use Ping.ping ()).handle h_ping
+    .run ()
   r.a[0] := 999
   return leaked[0] * 1000 + r.a[0]
 `,
@@ -293,13 +295,12 @@ io main (): U32 =>
 type Store is effect = { get: Unit -> #[U32] }
 io main (): U32 =>
   let arr = #[10, 20]
-  let alias: #[U32] = #[]
-  with Store = { get: func () =>
+  handler h_store: Store =>
+    get () =>
       arr[1] := 21
       return arr
-  }:
-    use x <- Store.get ()
-    alias := x
+  let alias = (func () => return use Store.get ()).handle h_store
+    .run ()
   arr[0] := 999
   return alias[0] * 1000 + arr[0]
 `,
@@ -311,13 +312,13 @@ io main (): U32 =>
 type Store is effect = { get: Unit -> { x: #[U32] } }
 io main (): U32 =>
   let arr = #[10, 20]
-  let alias: #[U32] = #[]
-  with Store = { get: func () =>
+  handler h_store: Store =>
+    get () =>
       arr[1] := 21
       return { x: arr }
-  }:
-    use r <- Store.get ()
-    alias := r.x
+  let r = (func () => return use Store.get ()).handle h_store
+    .run ()
+  let alias = r.x
   arr[0] := 999
   return alias[0] * 1000 + arr[0]
 `,
@@ -329,12 +330,13 @@ io main (): U32 =>
 type FreezeEff is effect = { go: Unit -> Unit }
 io main (): U32 =>
   let arr = #[10, 20]
-  with FreezeEff = { go: func () =>
+  handler h_freeze: FreezeEff =>
+    go () =>
       arr[1] := 21
       let _ = freeze arr
       return ()
-  }:
-    use FreezeEff.go ()
+  (func () => use FreezeEff.go ()).handle h_freeze
+    .run ()
   arr[0] := 99
   return arr[0]
 `,
@@ -346,12 +348,13 @@ io main (): U32 =>
 type Bump is effect = { step: Unit -> Unit }
 io main (): U32 =>
   let arr = #[10, 20]
-  with Bump = { step: func () =>
+  handler h_bump: Bump =>
+    step () =>
       arr[0] := 11
       arr[1] := 22
       return ()
-  }:
-    use Bump.step ()
+  (func () => use Bump.step ()).handle h_bump
+    .run ()
   return arr[0] * 100 + arr[1]
 `,
     (guest) => {
@@ -366,8 +369,10 @@ io main (): U32 =>
   let x = #[1, 2]
   let y = #[10, 20]
   let z: #[U32] = fork x:
-    with Mod = { touch: func () => y := y }:
-      use Mod.touch ()
+    handler h_mod: Mod =>
+      touch () => y := y
+    (func () => use Mod.touch ()).handle h_mod
+      .run ()
     return y
   z[0] := 777
   return y[0] * 1000 + z[0]
@@ -741,13 +746,18 @@ Deno.test("audit: frontend validation rejects invalid test return types, #[N; T]
     `
 type Ask is effect = { get: Unit -> U32 }
 io main (): U32 =>
-  let r: U32 = 0
-  with Ask = { get: func () => 1 }, Ask = { get: func () => 2 }:
-    use v <- Ask.get ()
-    r := v
-  return r
+  let n = 1
+  handler h: Ask =>
+    get () =>
+      n := n + 1
+      return n
+  let a = (func () => return use Ask.get ()).handle h
+    .run ()
+  let b = (func () => return use Ask.get ()).handle h
+    .run ()
+  return a + b
 `,
-    "duplicate_request_handler",
+    "borrow_conflict",
   );
 
   await compileExpectedFailure(

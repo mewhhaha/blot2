@@ -128,7 +128,6 @@ fn tokenName(tag:blot_parse_token::Tag)->const u8[:] {
  if tag==blot_parse_token::indent {return "indent";}
  if tag==blot_parse_token::dedent {return "dedent";}
  if tag==blot_parse_token::kw_not {return "kw_not";}
- if tag==blot_parse_token::kw_with {return "kw_with";}
  if tag==blot_parse_token::kw_fork {return "kw_fork";}
  if tag==blot_parse_token::semicolon {return "semicolon";}
  if tag==blot_parse_token::kw_spark {return "kw_spark";}

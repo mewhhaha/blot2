@@ -269,7 +269,6 @@ const SURFACE_TOKEN_MAP: Record<string, string> = {
   indent: "an indented block",
   dedent: "end of block",
   kw_not: "'not'",
-  kw_with: "'with'",
   kw_fork: "'fork'",
   semicolon: "';'",
   kw_spark: "'spark'",
@@ -637,7 +636,7 @@ io main (): U32 =>
     rawCodes: ["aliased_update", "borrow_conflict"],
     title: "In-place `:=` or storage mutation on aliased/borrowed value",
     summary:
-      "This `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live name, borrow, `with` capture, or caller may still observe.",
+      "This `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live name, borrow, `handler` capture, or caller may still observe.",
     why:
       "Blot's `:=` operator updates array storage in place only when the compiler statically proves unique ownership. Updating through a borrowed parameter or while `let alias = arr` is still used later would expose mutation through an immutable alias.",
     before: `io main (): U32 =>
@@ -653,7 +652,7 @@ io main (): U32 =>
     checklist: [
       "If a local `let b = a` is still read later, snapshot with `let b = a.copy` (or finish reading `b` before mutating `a`).",
       "If `a` is a function parameter, mark it `own` (`func f (a: own #[U32]): #[U32]`) so the caller transfers unique ownership.",
-      "Inside `with` handlers or captures, avoid aliasing the mutated binding outside the handler; copy before entering or thread state explicitly.",
+      "Inside `handler` bindings or captures, avoid aliasing or reading a shadowed local while the handler holds it; copy before entering or finish running the handler first.",
     ],
   },
   OWN_ARGUMENT: {
@@ -698,18 +697,22 @@ func good (xs: own #[U32]): #[U32] => return consume_and_grow xs`,
     summary:
       "Declarations marked `io` cannot leave algebraic effects unhandled or use parameter/result types outside the raw ABI-8 boundary contract.",
     why:
-      "Raw `io` entry points accept ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback), while `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `io`, and every effect must be handled lexically with `with ...:` or `do <provider>:`.",
+      "Raw `io` entry points accept ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback), while `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `io`, and every effect must be handled via `handler ...` + `.handle ... .run ...` (or `@handle` / `do <provider>:`).",
     before: `type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
   use t <- Clock.now ()
   return t`,
     after: `type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { now: func () => return 42 }:
+  handler clock: Clock =>
+    now () => 42
+  return (func () =>
     use t <- Clock.now ()
-    return t`,
+    return t
+  ).handle clock
+    .run ()`,
     checklist: [
-      "Handle every effect reported in `(unhandled: Effect.op)` with `with Effect = { op: func ... => ... }:` or `do provider:`.",
+      "Handle every effect reported in `(unhandled: Effect.op)` with a `handler h: Effect => ...` binding and `.handle h .run ...` (or `@handle h thunk` / `do provider:`).",
       "Use ABI-8 boundary types on raw `io` entries: `Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback.",
       "For FlatNumeric / PersistentSafe structs and typed packets, use `#kernel` or `#process` (fixed-size `#[N; T]` and closures cannot cross raw `io`).",
     ],
@@ -727,7 +730,7 @@ io main (): U32 =>
     summary:
       "An expression performs an algebraic effect that is not permitted in this pure context (`const`, `let`, module initializer, or pure function signature).",
     why:
-      "Blot functions, `const` definitions, and top-level initializers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `with` / `do`.",
+      "Blot functions, `const` definitions, and top-level initializers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `handler` + `.handle ... .run` / `@handle`.",
     before: `type Clock is effect = { now: Unit -> U32 }
 func read_time (): U32 =>
   let t = Clock.now ()
@@ -738,7 +741,7 @@ func read_time (): U32 =>
   return t`,
     checklist: [
       "Use `use x <- effect_call` (not `let x = ...`) to invoke effectful operations.",
-      "Handle local effects with `with Effect = { ... }:` or `do provider:` before crossing a pure `const` or function boundary.",
+      "Handle local effects with `handler h: Effect => ...` and `.handle h .run ...` (or `@handle` / `do provider:`) before crossing a pure `const` or function boundary.",
       "Ensure both branches of an `if`/`case` and handler bodies match the expected effect row.",
     ],
   },
@@ -767,20 +770,26 @@ func read_time (): U32 =>
     summary:
       "An algebraic effect reference, effect row annotation, handler operation signature, provider, or scoped capability failed effect checking.",
     why:
-      "Effect declarations must be declared with `type Name is effect = { op: In -> Out }`, handler operations must match their declared signatures, and scoped capabilities or resolvers cannot escape their lexical handler.",
+      "Effect declarations must be declared with `type Name is effect = { op: In -> Out }`, handler operations must match their declared signatures, and scoped capabilities or stateful handlers cannot escape their defining frame.",
     before: `type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { missing: func () => return 0 }:
-    return 0`,
+  handler clock: Clock =>
+    missing () => 0
+  return (func () => return 0).handle clock
+    .run ()`,
     after: `type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { now: func () => return 42 }:
+  handler clock: Clock =>
+    now () => 42
+  return (func () =>
     use t <- Clock.now ()
-    return t`,
+    return t
+  ).handle clock
+    .run ()`,
     checklist: [
       "Check the effect family and operation names against the `type Name is effect = { ... }` declaration.",
       "Match every handler function's parameter and return types to the effect's operation signatures.",
-      "Keep scoped effect capabilities and resolvers inside the `with` / `do` block that provides them.",
+      "Keep stateful `handler` bindings and scoped effect capabilities inside the frame that installs them.",
     ],
   },
   KERNEL_EFFECTFUL: {
@@ -1394,7 +1403,7 @@ function isCallArgumentPosition(index: LineIndex, startByte: number): boolean {
   if (!trimmedBefore) return false;
   if (!/[A-Za-z0-9_$\])}]$/.test(trimmedBefore)) return false;
   if (
-    /\b(?:return|break|if|then|else|in|and|or|not|let|const|use|case|of|with)$/
+    /\b(?:return|break|if|then|else|in|and|or|not|let|const|use|case|of)$/
       .test(trimmedBefore)
   ) {
     return false;
@@ -1435,7 +1444,7 @@ function formatOwnParameterSuggestion(
   return `(${name}: own #[T])`;
 }
 
-function isInsideWithBlock(index: LineIndex, byteOffset: number): boolean {
+function isInsideHandlerBlock(index: LineIndex, byteOffset: number): boolean {
   const line1 = byteOffsetToLineCol(index, byteOffset).line;
   const currentLine = index.lines[line1 - 1] ?? "";
   const currentIndent = currentLine.length - currentLine.trimStart().length;
@@ -1444,7 +1453,7 @@ function isInsideWithBlock(index: LineIndex, byteOffset: number): boolean {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("//")) continue;
     const indent = line.length - line.trimStart().length;
-    if (indent < currentIndent && /^with\b/.test(trimmed)) return true;
+    if (indent < currentIndent && /^handler\b/.test(trimmed)) return true;
     if (indent === 0) break;
   }
   return false;
@@ -1878,16 +1887,16 @@ function buildHeadlineAndFix(
     const name = subjectName || extractBindingIdent(snippet) || "this value";
     const copyExpr = subjectName ? `${subjectName}.copy` : "value.copy";
     const where = originLine ? ` (line ${originLine})` : "";
-    const inWithContext = /\bwith\b/i.test(record.message) ||
+    const inHandlerContext = /\b(?:with|handler)\b/i.test(record.message) ||
       (index !== null && !holderName && record.origin_kind !== "parameter" &&
-        isInsideWithBlock(index, record.start));
-    if (inWithContext) {
+        isInsideHandlerBlock(index, record.start));
+    if (inHandlerContext) {
       return {
         headline:
-          `Cannot mutate \`${name}\` in place while captured or aliased inside a \`with\` handler.`,
-        primaryLabel: "aliased write inside `with` handler",
+          `Cannot mutate \`${name}\` in place while captured or aliased inside a \`handler\`.`,
+        primaryLabel: "aliased write inside `handler`",
         fix:
-          `Avoid aliasing \`${name}\` outside the \`with\` handler, snapshot with \`${copyExpr}\` before entering, or thread state explicitly through the handler.`,
+          `Avoid aliasing \`${name}\` outside the \`handler\`, snapshot with \`${copyExpr}\` before entering, or thread state explicitly through the handler.`,
       };
     }
     if (record.origin_kind === "borrowed") {
@@ -1976,7 +1985,7 @@ function buildHeadlineAndFix(
           `Entry function leaves effect \`${op}\` unhandled across the Wasm boundary.`,
         primaryLabel: `unhandled effect \`${op}\``,
         fix:
-          `Handle \`${op}\` inside the entry function with \`with ${family} = { ${member}: func ... => ... }:\` or \`do <provider>:\`.`,
+          `Handle \`${op}\` inside the entry function with \`handler h: ${family} => ${member} ... => ...\` and \`.handle h .run ...\` (or \`@handle\` / \`do <provider>:\`).`,
       };
     }
     return {
@@ -2039,7 +2048,7 @@ function buildHeadlineAndFix(
       headline: record.message,
       primaryLabel: "effect not allowed here",
       fix:
-        "Bind effectful calls with `use x <- ...` inside an effectful scope, or handle the effect locally with `with ...:` / `do <provider>:`.",
+        "Bind effectful calls with `use x <- ...` inside an effectful scope, or handle the effect locally with `handler` + `.handle ... .run` / `@handle` / `do <provider>:`.",
     };
   }
 

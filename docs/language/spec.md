@@ -104,13 +104,14 @@ Reserved everywhere:
 ```
 and  as  break  case  const  continue  data  effect  else  ever  false  for
 fork  func  if  import  in  is  let  not  of  or  return  spark  then  true
-type  use  with
+type  use
 ```
 
 Contextual keywords (ordinary names elsewhere): `opaque`, `trait` (after `is`);
 `private`, `export` (start of module item); `from` (imports); `where` (after
-signature); `self` (RHS of `:=`); `own` (before parameter type). Bare `entry`,
-`kernel` and `process` are ordinary names.
+signature); `self` (RHS of `:=`); `own` (before parameter type); `handler`
+(before `<name>: <Effect> =>` at statement start). Bare `entry`, `kernel`,
+`process`, and `with` are ordinary names.
 
 ### 3.4 Literals
 
@@ -135,7 +136,7 @@ Escape   = '\"' | "\\" | "\n" | "\r" | "\t"
 | `.` | member / chain / field splice `.(f)` | type member / trait output | |
 | `..` | range (`start..end`) | | |
 | `:` | suite opener; annotation; field | annotation; field | field |
-| `=` | definition; `with` binding | definition; field default | |
+| `=` | definition | definition; field default | |
 | `:=` | shadowing evolution | | |
 | `->` | curried parameter separator | function type | |
 | `=>` | function / arm body | | arm body |
@@ -318,16 +319,18 @@ type Log is effect = { write: Text -> Unit }
 
 - An effect is a nominal record type of operations. Declaring one grants no IO.
 - Calling `Log.write msg` requires `Log` in the enclosing function's effect set
-  (`! {Log}`) unless handled by an enclosing `with Log = ...:` block.
+  (`! {Log}`) unless handled by an enclosing `@handle` / `.handle ... .run`
+  installation.
 - **Closed effect sets only (no `! {| e}` row variables).** Because downward
   higher-order callbacks are templated (Section 6.4), effects performed inside
   callbacks flow directly into the caller without row polymorphism. Storable
   `A -> B` and `*(A -> B)` types declare concrete closed effect sets.
 - `Foreign` is the sole built-in effect, marking host callbacks. Source cannot
   declare or handle `Foreign`.
-- **No magic built-in `State` effect.** Scoped `with` handlers may capture and
-  linearly shadow outer locals (Section 9.9), expressing scoped state, counters,
-  accumulators, and deterministic replay recorders in ordinary source code.
+- **No magic built-in `State` effect.** Scoped `handler` bindings may capture
+  and linearly shadow outer locals (Section 9.6), expressing scoped state,
+  counters, accumulators, and deterministic replay recorders in ordinary source
+  code.
 
 ### 5.6 Tags
 
@@ -613,7 +616,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
   reconstructing a matching data variant on a linear local reuses storage in
   place with zero allocation. If the compiler cannot prove linearity at an array
   update, it rejects the statement with an error suggesting `copy` or `own`.
-- Rebinding an outer local inside `if`, `if let`, statement `case`, `with`, or
+- Rebinding an outer local inside `if`, `if let`, statement `case`, `handler`, or
   `for` carries out to the statements that follow (types must match at joins and
   loop backedges).
 
@@ -679,31 +682,43 @@ let score = fork world:
 - An expression used as a statement must have type `Unit`; discard non-`Unit`
   values explicitly with `let _ = expr`.
 
-### 9.6 Scoped Effect Handlers: `with`
+### 9.6 Composable Scoped Effect Handlers: `handler`, `@handle`, `Layer`
 
 ```
-WithStmt  = "with" WithEntry,+ ":" Suite
-WithEntry = TypePath "=" "{" HandlerField,* "}"
-          | Expression
+HandlerStmt = "handler" LowerName ":" TypeApp "=>" HandlerBody
+HandlerBody = IndentedArms | RecordLiteral | Lambda | CallableArm
 ```
 
 ```blot
-let lines: #[+Text] = #[]
-with Log = { write: func msg => lines := self.push msg }:
-  use run_game ()
+let lines: #[Text] = #[]
+handler log: Log =>
+  write msg => lines := self.push msg
+
+let value = run_game.handle log
+  .handle clock
+  .run initial_state
 ```
 
-- `with` installs one or more effect handlers for its suite and all transitive
-  calls inside it. Handlers are **strictly scoped (non-escaping)**.
-- A handler may be a pre-built pure effect record (`with quiet:`) or an inline
-  scoped handler (`with Log = { ... }:`).
-- An inline scoped handler may:
+- `@handle handler thunk` is the core compiler intrinsic: it installs `handler`
+  (an effect record, local `handler` binding, or `Layer`), runs `thunk ()`,
+  subtracts the handled effects, and returns `thunk`'s result.
+- The standard prelude (`std/prelude.blot`) provides pure value wrappers and
+  fluent chaining on top of `@handle`:
+  - `type Layer [inner, outer] is data = $Layer { inner: inner, outer: outer }`
+    and `layer a b` / `env.layer c` to bundle reusable handler stacks (including
+    at module top level with `const env = layer a b`).
+  - `type Handled [body, handler] is data = $Handled { body: body, handler: handler }`,
+    `Function.handle`, `Handled.handle`, `Function.run`, and `.run value` to
+    peel effects one layer at a time (`eff.handle h1 .handle h2 .run value`) or
+    install a handler/layer directly (`env.run thunk`).
+- A local `handler` binding may:
   - capture outer locals (including `Foreign` host callbacks);
-  - perform outer effects (those effects become effects of the `with` statement);
-  - **linearly shadow outer locals** (`lines := self.push msg`). While inside
-    the `with` suite, any outer local shadowed by the handler is exclusively
-    owned by the handler (inaccessible directly from the suite body) and returns
-    to the outer scope with its final shadowed value when `with` exits.
+  - perform outer effects (resolved against outer handlers at installation);
+  - **linearly shadow outer locals** (`lines := self.push msg`). From the
+    `handler` declaration until it is consumed at `.run` / `@handle`, any
+    shadowed outer local is locked (inaccessible directly) and the stateful
+    handler cannot escape its defining frame or be installed twice. When `.run`
+    / `@handle` finishes, the outer local unlocks with its updated final value.
 
 ### 9.7 Effects: `use`
 
@@ -779,8 +794,8 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 | `=` mutable store, `lent` functions, `@storage.write` | `:=` on `own` values + `let (a, w) = ...; x := w` |
 | First-class escaping capturing closures | 2A templated downward closures, `A -> B` fn ptrs, `*(A -> B)` frozen closures |
 | Open effect-row variables (`! {\| e}`) | Closed effect sets (2A templates propagate callback effects) |
-| Built-in `State` / `@effect.state/run/reader/writer/provider/scope` | Scoped `with Effect = { ... }:` handlers shadowing outer locals |
-| `@computation`, `@requests`, `yield`, `complete`, `do (monad ...)` | Ordinary `let ... else:` and `with` |
+| Built-in `State` / `@effect.state/run/reader/writer/provider/scope` | Composable `handler` bindings + `.handle ... .run` / `@handle` / `layer` shadowing outer locals |
+| `@computation`, `@requests`, `yield`, `complete`, `do (monad ...)`, `with` | Ordinary `let ... else:` and `handler` + `.handle ... .run` / `@handle` |
 | `is contract`, `impl`, `@type.call`, string predicates (`associated`, `field`, `result`, `type_eq`) | `is trait`, `const Type.Trait`, named outputs `{ out }` |
 | Row-polymorphic records, `@record.merge`, `std/path` | Closed structural records |
 | `forall`, `exists`, `pack`, `unpack`, `@code.*`, `@proof.*`, `@usage.*` | Monomorphized generics, `#[n; T]`, `#run`, `#for` |

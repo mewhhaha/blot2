@@ -180,7 +180,7 @@ recursive fn withHandleNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         g.s.handle_cells_len += 1;
     }
     pushHandleCells(g, f, saved, f.depth, cells_mark as u32, cell_count as u32);
-    let inner, error = stmt(g, f, n.a);
+    let inner, error = expr(g, f, n.a);
     if error != blot_direct_types::Error.none {
         f.handles_len -= 1;
         g.s.handle_cells_len = cells_mark;

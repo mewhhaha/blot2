@@ -357,6 +357,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::GlobalFrame
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::GlobalFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::GlobalTrace)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::GlobalTrace,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::HandleBuild)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::HandleBuild,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImplementationOrderContext)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ImplementationOrderContext,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImportArena)->bool {return equalFields(left,right);}
@@ -377,6 +379,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LiveCallees
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LiveCallees,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LiveProducer)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LiveProducer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LocalComposite)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LocalComposite,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LocalHandler)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LocalHandler,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LoopCarry)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LoopCarry,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LoopExit)->bool {return equalFields(left,right);}

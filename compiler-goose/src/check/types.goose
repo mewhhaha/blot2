@@ -189,6 +189,7 @@ fn receiverIdentity(value: Node) -> blot_support::Option<NominalIdentity> {
         array => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, none , ..} , ..}; },
         list => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, none - 1 , ..} , ..}; },
         cursor => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, none - 2 , ..} , ..}; },
+        function => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, none - 3 , ..} , ..}; },
         _ => { return blot_support::Option<NominalIdentity> { false, default<NominalIdentity>() , ..}; },
     }
 }

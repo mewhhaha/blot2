@@ -31,13 +31,13 @@ func run (body: Unit -> Unit ! { Test }): Report =>
   let passed = 0
   let groups: #[Text] = #[]
   let packet: Report = #[report_magic, report_version, 0, 0]
-  with Test = {
-    pass: func () => passed := self + 1,
-    fail: func failure => packet := append_failure (text.join " / " groups) failure self,
-    push_group: func name => groups := Array.push self name,
-    pop_group: func () => groups := if self.length > 0 then Array.truncate self (self.length - 1) else self,
-  }:
-    use body ()
+  handler h_test: Test =>
+    pass () => passed := self + 1
+    fail failure => packet := append_failure (text.join " / " groups) failure self
+    push_group name => groups := Array.push self name
+    pop_group () => groups := if self.length > 0 then Array.truncate self (self.length - 1) else self
+  body.handle h_test
+    .run ()
   packet[2] := passed
   return packet
 

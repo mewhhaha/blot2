@@ -33,7 +33,7 @@ Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax tabl
 
 - Declare with `type Eff is effect = { op: In -> Out }`.
 - Invoke with `use res <- Eff.op arg` (never `let res = Eff.op arg`).
-- Handle locally with `with Eff = { op: func arg => return ... }:` or `do provider:` before returning from any `io`, `#kernel`, or `spark` comprehension.
+- Handle locally with `handler h: Eff => op arg => ...` and `eff.handle h .run value` (or `@handle h thunk` / `layer h1 h2`) before returning from any `io`, `#kernel`, or `spark` comprehension.
 
 ## Fast Verification Loop
 

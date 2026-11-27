@@ -77,16 +77,9 @@ fn processNode<C>(self_:Walker<C>&,id:Id)->Error {
    idx=count;
    while idx!=0 { idx--; let entry=self_.tree.node(self_.tree.list(entries)[idx]); { let propagated_error = self_.visit(entry.b); if propagated_error != blot_error::Error.none { return propagated_error; } } }
   },
-  blot_parse_ast::tag_with_stmt=>{
-   { let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  blot_parse_ast::tag_handler_stmt=>{
+   { let propagated_error = self_.push(Event.bind {n.a, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
    { let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }
-   let entries=blot_parse_ast::List {n.a,n.b, ..};
-   var idx=self_.tree.list(entries).len;
-   while idx!=0 {
-    idx--; let entry=self_.tree.node(self_.tree.list(entries)[idx]);
-    if entry.c==1 {{ let propagated_error = self_.visit(entry.b); if propagated_error != blot_error::Error.none { return propagated_error; } }}
-    else {{ let propagated_error = self_.visit(entry.a); if propagated_error != blot_error::Error.none { return propagated_error; } }}
-   }
   },
   blot_parse_ast::tag_comptime_for=>{
    let body=self_.tree.extra.items[n.c];

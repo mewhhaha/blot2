@@ -94,7 +94,6 @@ fn surface_token_name(tag: blot_parse_token::Tag) -> const u8[:] {
  if tag==blot_parse_token::indent { return "an indented block"; }
  if tag==blot_parse_token::dedent { return "end of block"; }
  if tag==blot_parse_token::kw_not { return "'not'"; }
- if tag==blot_parse_token::kw_with { return "'with'"; }
  if tag==blot_parse_token::kw_fork { return "'fork'"; }
  if tag==blot_parse_token::semicolon { return "';'"; }
  if tag==blot_parse_token::kw_spark { return "'spark'"; }

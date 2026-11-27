@@ -24,6 +24,9 @@ type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
 type Iteration [state, result] is data = $Continue state | $Done result
 type Type witness is data = $Type witness
+// Composable effect handler layers and handled computations.
+type Layer [inner, outer] is data = $Layer { inner: inner, outer: outer }
+type Handled [body, handler] is data = $Handled { body: body, handler: handler }
 // Represented opaque handles for compiler-verified multi-core batch kernels and isolated processes.
 type Kernel [ctx, item, out] is opaque = (U32, (U32, U32), (U32, U32), (U32, U32))
 type Process [cfg, cmd, reply] is opaque = (U32, (U32, U32))
@@ -45,6 +48,12 @@ func always value -> ignored => value
 func compose outer -> inner -> value => outer (inner value)
 func flip combine -> right -> left => combine left right
 func on combine -> project -> left -> right => combine (project left) (project right)
+
+func layer inner -> outer => $Layer { inner, outer }
+func Layer.layer (self: Layer [a, b]) -> outer => $Layer { inner: self, outer }
+func Function.handle f -> h => $Handled { body: f, handler: h }
+func Function.run f -> arg => f arg
+func Handled.handle (self: Handled [b, h]) -> next => $Handled { body: self, handler: next }
 
 func Bool.not value => if value then false else true
 func Bool.eq left -> right => if left then right else Bool.not right

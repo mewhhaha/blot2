@@ -204,7 +204,7 @@ export type LiteralKind =
   | "case"
   | "of"
   | "fork"
-  | "with"
+  | "handleR"
   | "for"
   | "in"
   | "fields"
@@ -403,8 +403,12 @@ export type RuleName =
   | "suite"
   | "statement"
   | "fork_statement"
-  | "with_statement"
-  | "with_entry"
+  | "handler_statement"
+  | "handler_suite"
+  | "handler_inline_body"
+  | "handler_named_arm_line"
+  | "handler_named_arm"
+  | "handler_callable_arm"
   | "comptime_for"
   | "comptime_if"
   | "comptime_else"
@@ -1313,7 +1317,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor | WithStatementCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | HandlerStatementCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1326,18 +1330,47 @@ export interface ForkStatementCursor extends RuleCursorBase<"fork_statement"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
-export interface WithStatementCursor extends RuleCursorBase<"with_statement"> {
-  field(name: "body"): SuiteCursor;
-  field(name: "entries"): ReadonlyArray<WithEntryCursor>;
+export interface HandlerStatementCursor extends RuleCursorBase<"handler_statement"> {
+  field(name: "body"): HandlerInlineBodyCursor | HandlerSuiteCursor;
+  field(name: "effect"): TypeApplicationCursor;
+  field(name: "name"): SourceIdentifierCursor;
   field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: "entries"): ReadonlyArray<WithEntryCursor>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
-export interface WithEntryCursor extends RuleCursorBase<"with_entry"> {
-  field(name: "handler"): ExpressionCursor | null;
-  field(name: "target"): TypeApplicationCursor;
+export interface HandlerSuiteCursor extends RuleCursorBase<"handler_suite"> {
+  field(name: "arm"): HandlerCallableArmCursor | null;
+  field(name: "arms"): ReadonlyArray<HandlerNamedArmLineCursor> | null;
+  field(name: "lambda"): LambdaCursor | null;
   field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface HandlerInlineBodyCursor extends RuleCursorBase<"handler_inline_body"> {
+}
+
+export interface HandlerNamedArmLineCursor extends RuleCursorBase<"handler_named_arm_line"> {
+  field(name: "arm"): HandlerNamedArmCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface HandlerNamedArmCursor extends RuleCursorBase<"handler_named_arm"> {
+  field(name: "body"): EffectStepCursor | ExpressionCursor | RebindingCursor | SuiteCursor;
+  field(name: "name"): SourceIdentifierCursor;
+  field(name: "parameter"): ReadonlyArray<ParameterCursor>;
+  field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameter"): ReadonlyArray<ParameterCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface HandlerCallableArmCursor extends RuleCursorBase<"handler_callable_arm"> {
+  field(name: "body"): EffectStepCursor | ExpressionCursor | RebindingCursor | SuiteCursor;
+  field(name: "parameter"): ReadonlyArray<ParameterCursor>;
+  field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameter"): ReadonlyArray<ParameterCursor>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -1715,8 +1748,12 @@ export type AnyRuleCursor =
   | SuiteCursor
   | StatementCursor
   | ForkStatementCursor
-  | WithStatementCursor
-  | WithEntryCursor
+  | HandlerStatementCursor
+  | HandlerSuiteCursor
+  | HandlerInlineBodyCursor
+  | HandlerNamedArmLineCursor
+  | HandlerNamedArmCursor
+  | HandlerCallableArmCursor
   | ComptimeForCursor
   | ComptimeIfCursor
   | ComptimeElseCursor

@@ -1339,7 +1339,7 @@ fn identityOf(self_:const Engine&,ty:u32)->blot_support::Option<Identity> {retur
 fn indexAssociated(self_:Engine&)->blot_error::Error {
     for slot in 0..(self_.imported_global_order.capacity as i64) {if !blot_support_zigmap::used(self_.zig_orders,self_.imported_global_order,slot as u32) {continue;}let key=blot_support_zigmap::keyAt(self_.zig_orders,self_.imported_global_order,slot as u32);let found .= self_.imported_globals.get(key);assert(found!=null);let target:ExternalTarget=found;let text=self_.pool.get(key);let dot=lastDot(text);if !dot.present {continue;}let head=text[..dot.value];let name,present=self_.pool.lookup(head);if !present {continue;}if self_.builtin_catalog || self_.catalogs.nominal_names.contains(Qualified{0,name, ..}) {let binding,err=self_.importedBinding(target);if err!=blot_error::Error.none {return err;}if binding.present {self_.catalogs.globals.insert(key,binding.value);blot_support_zigmap::put(self_.zig_orders,self_.global_order,key,0);}}}
     for slot in 0..(self_.global_order.capacity as i64) {if !blot_support_zigmap::used(self_.zig_orders,self_.global_order,slot as u32) {continue;}let entry_key=blot_support_zigmap::keyAt(self_.zig_orders,self_.global_order,slot as u32);if self_.catalogs.implementation_names.contains(Qualified{0,entry_key, ..}) {continue;}let entry_found .= self_.catalogs.globals.get(entry_key);assert(entry_found!=null);let entry_val:u32=entry_found;let text=self_.pool.get(entry_key);let dot=lastDot(text);if !dot.present {continue;}let head=text[..dot.value];let member,present=self_.pool.lookup(text[dot.value+1..]);if !present {continue;}var identity=blot_support::none<Identity>();let name,present=self_.pool.lookup(head);if present {let scalar_lookup_18 .= self_.catalogs.nominal_names.get(Qualified{0,name, ..});if scalar_lookup_18 && self_.nominals[scalar_lookup_18].alias==0 {let index:u32=scalar_lookup_18;identity=blot_support::some(self_.nominals[index].identity);}}
-        if !identity.present && self_.builtin_catalog {let builtin=blot_check_types::numericBuiltin(head);if builtin!=0 {identity=blot_support::some(Identity{0,builtin, ..});}else if head=="Bool" {identity=blot_support::some(Identity{0,blot_check_types::boolean, ..});}else if head=="Unit" {identity=blot_support::some(Identity{0,blot_check_types::unit, ..});}else if head=="Array" {identity=blot_support::some(Identity{0,0xffffffff, ..});}else {let kind=blot_check_storage_types::named(head);if kind.present {identity=blot_support::some(Identity{0xffffffff,kind.value, ..});}}}
+        if !identity.present && self_.builtin_catalog {let builtin=blot_check_types::numericBuiltin(head);if builtin!=0 {identity=blot_support::some(Identity{0,builtin, ..});}else if head=="Bool" {identity=blot_support::some(Identity{0,blot_check_types::boolean, ..});}else if head=="Unit" {identity=blot_support::some(Identity{0,blot_check_types::unit, ..});}else if head=="Array" {identity=blot_support::some(Identity{0,0xffffffff, ..});}else if head=="Function" {identity=blot_support::some(Identity{0,0xfffffffc, ..});}else {let kind=blot_check_storage_types::named(head);if kind.present {identity=blot_support::some(Identity{0xffffffff,kind.value, ..});}}}
         if identity.present {let owner=identity.value;if owner.unit!=0 && owner.unit!=self_.unit && !(self_.builtin_catalog && blot_check_storage_types::identity(owner.unit,owner.decl).present) {continue;}let operator=memberOperator(text[dot.value+1..]);let index=self_.associated.len as u32;self_.associated.push(Associated{owner,member,operator,entry_val, ..});if operator!=blot_check_types::Operator.none && self_.bindings[entry_val].capability_parameters.own!=0 {let err=self_.diagnostic(Code.own_parameter,self_.bindings[entry_val].declaration);if err!=blot_error::Error.none {return err;}}self_.catalogs.associated_members.insert(AssociatedMember{owner,member, ..},index);if operator!=blot_check_types::Operator.none {self_.catalogs.associated_ops.insert(AssociatedKey{owner,operator, ..},index);}}
     }return blot_error::Error.none;
 }
@@ -1408,7 +1408,7 @@ recursive fn collectAnnotationNames(self_:Engine&,id:u32,depth:i64)->blot_error:
     blot_parse_ast::tag_product,blot_parse_ast::tag_array,blot_parse_ast::tag_record,blot_parse_ast::tag_type_product,blot_parse_ast::tag_type_array,blot_parse_ast::tag_type_record=>{let syntax_source_4=id;let syntax_count_4=self_.tree.children(syntax_source_4).len;for syntax_index_4 in 0..syntax_count_4 {let child=self_.tree.children(syntax_source_4)[syntax_index_4];if !self_.annotationChildTrivial(child) {let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}}},
     blot_parse_ast::tag_block=>{if !self_.annotationChildTrivial(node.c) {let err=self_.collectAnnotationNames(node.c,depth+1);if err!=blot_error::Error.none {return err;}}let syntax_source_5=id;let syntax_count_5=self_.tree.children(syntax_source_5).len;for syntax_index_5 in 0..syntax_count_5 {let child=self_.tree.children(syntax_source_5)[syntax_index_5];if !self_.annotationChildTrivial(child) {let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}}},
     blot_parse_ast::tag_fork_expr=>{let err=self_.collectAnnotationNames(node.c,depth+1);if err!=blot_error::Error.none {return err;}},
-    blot_parse_ast::tag_with_stmt=>{let entries=blot_parse_ast::List{node.a,node.b, ..};let ecount=self_.tree.list(entries).len;for ei in 0..ecount {let en=self_.tree.node(self_.tree.list(entries)[ei]);let err=self_.collectAnnotationNames(en.a,depth+1);if err!=blot_error::Error.none {return err;}if en.c==1 {let err=self_.collectAnnotationNames(en.b,depth+1);if err!=blot_error::Error.none {return err;}}}return self_.collectAnnotationNames(node.c,depth+1);},
+    blot_parse_ast::tag_handler_stmt=>{let err=self_.collectAnnotationNames(node.b,depth+1);if err!=blot_error::Error.none {return err;}return self_.collectAnnotationNames(node.c,depth+1);},
     blot_parse_ast::tag_comptime_for=>{let err=self_.collectAnnotationNames(node.b,depth+1);if err!=blot_error::Error.none {return err;}return self_.collectAnnotationNames(self_.tree.extra.items[node.c],depth+1);},
     blot_parse_ast::tag_comptime_if=>{for child in [node.a,node.b,node.c] {let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
     blot_parse_ast::tag_comptime_project=>{return self_.collectAnnotationNames(node.a,depth+1);},
@@ -2207,7 +2207,28 @@ var comptime_lambda_depth:i64=0;
 var comptime_field_vars:u32[256]=[0;256];
 var comptime_field_var_len:i64=0;
 let comptime_meta_tag_base:u32=0x40000000;
-fn resetWithState() { with_handler_len=0; with_locked_len=0; with_shadowed_len=0; with_shadowed_overflow=false; with_active_len=0; fork_outer_len=0; fork_ambient_floor=0; comptime_binder_len=0; comptime_lambda_depth=0; comptime_field_var_len=0; }
+let handle_site_tag_base:u32=0x80000000;
+let handle_composite_let_tag:u32=0x80000001;
+let handle_materialized_tag:u32=0x80000002;
+struct LocalHandler { binding:u32=0, source:u32=0, family_idx:u32=0, effect_nom:u32=0, shadowed_start:i64=0, shadowed_len:i64=0, ops_start:i64=0, ops_len:i64=0, args_start:i64=0, args_len:i64=0, consumed:bool=false, materialized:bool=false, has_effects:bool=false }
+var local_handlers:LocalHandler[1024]=[LocalHandler{};1024];
+var local_handlers_len:i64=0;
+var lh_op_tmpls:u32[4096]=[0;4096];
+var lh_op_nodes:u32[4096]=[0;4096];
+var lh_op_sigs:u32[4096]=[0;4096];
+var lh_op_rows:u32[4096]=[0;4096];
+var lh_ops_len:i64=0;
+var lh_nom_args:u32[2048]=[0;2048];
+var lh_nom_args_len:i64=0;
+struct LocalComposite { binding:u32=0, kind:u8=0, left_expr:u32=0, right_expr:u32=0, left_dotted_name:u32=0, consumed:bool=false }
+var local_composites:LocalComposite[1024]=[LocalComposite{};1024];
+var local_composites_len:i64=0;
+var allow_local_handler_ref:i64=0;
+var saw_nonpure_handler_ref:bool=false;
+fn resetWithState() { with_handler_len=0; with_locked_len=0; with_shadowed_len=0; with_shadowed_overflow=false; with_active_len=0; fork_outer_len=0; fork_ambient_floor=0; comptime_binder_len=0; comptime_lambda_depth=0; comptime_field_var_len=0; local_handlers_len=0; lh_ops_len=0; lh_nom_args_len=0; local_composites_len=0; allow_local_handler_ref=0; saw_nonpure_handler_ref=false; }
+fn findLocalHandler(binding:u32)->i64 { if binding==0 { return -1; } var i=local_handlers_len; while i>0 { i-=1; if local_handlers[i].binding==binding { return i; } } return -1; }
+fn findLocalComposite(binding:u32)->i64 { if binding==0 { return -1; } var i=local_composites_len; while i>0 { i-=1; if local_composites[i].binding==binding { return i; } } return -1; }
+fn unlockWithBinding(binding:u32) { if binding==0 { return; } for i in 0..with_locked_len { if with_locked_bindings[i]==binding { with_locked_bindings[i]=0; } } }
 fn isActiveWithForeign(label:u32)->bool {
  var i=with_active_len;
  while i>0 {
@@ -2433,7 +2454,7 @@ fn checkDataTagsAndDefaults(self_:Engine&)->blot_error::Error {
  self_.env.resize(saved_env_len);
  return err;
 }
-fn isWithLocked(binding:u32)->bool { for i in 0..with_locked_len { if with_locked_bindings[i]==binding { return true; } } return false; }
+fn isWithLocked(binding:u32)->bool { if binding==0 { return false; } for i in 0..with_locked_len { if with_locked_bindings[i]==binding { return true; } } return false; }
 fn findWithOuterTarget(self_:const Engine&,previous:u32)->u32 {
  if with_handler_len==0 || previous==0 { return 0; }
  let top=with_handler_stack[with_handler_len-1];
@@ -2557,7 +2578,7 @@ recursive fn instantiateEffectOpTypes(self_:Engine&,family_idx:u32,nom_args:cons
  equation_type_ids.free_slice(old);
  return failure;
 }
-recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family_idx:u32,outer_ambient:u32,allow_effects:bool,out_op_sigs:IdBuffer&,out_op_nodes:IdBuffer&,out_op_foreign:IdBuffer&)->u32,blot_error::Error {
+recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family_idx:u32,outer_ambient:u32,allow_effects:bool,out_op_sigs:IdBuffer&,out_op_nodes:IdBuffer&,out_op_rows:IdBuffer&)->u32,blot_error::Error {
  let family=self_.effect_families[family_idx];
  let resolved,rerr=self_.types.resolve(required,0);
  if rerr!=blot_error::Error.none { return 0,rerr; }
@@ -2572,7 +2593,6 @@ recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family
  if ierr!=blot_error::Error.none { return 0,ierr; }
  let ops=checkedTypeList(self_.types,family.operations);
  let op_count=ops.len as i64;
- let syntax=self_.tree.node(source);
  if family.callable {
   let tmpl_idx=self_.types.list(ops)[0];
   let expected_sig=out_op_sigs.items[0];
@@ -2580,28 +2600,26 @@ recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family
   if err!=blot_error::Error.none { return 0,err; }
   let cerr=self_.constrain(actual,expected_sig,source);
   if cerr!=blot_error::Error.none { return 0,cerr; }
-  var uses_foreign=false;
+  var op_row:u32=0;
   if allow_effects {
    let sferr=self_.solveFields();
    if sferr!=blot_error::Error.none { return 0,sferr; }
-   let op_row=self_.types.node(self_.types.head(expected_sig,0)).c;
-   let uf,uerr=self_.rowUsesForeign(op_row);
-   if uerr!=blot_error::Error.none { return 0,uerr; }
-   uses_foreign=uf;
-   let eerr=self_.constrainEffects(op_row,outer_ambient,source);
-   if eerr!=blot_error::Error.none { return 0,eerr; }
+   op_row=self_.types.node(self_.types.head(expected_sig,0)).c;
+   if outer_ambient!=0xffffffff {
+    let eerr=self_.constrainEffects(op_row,outer_ambient,source);
+    if eerr!=blot_error::Error.none { return 0,eerr; }
+   }
   }
-  var uf_flag:u32=0;if uses_foreign { uf_flag=1; }
-  let af=out_op_foreign.append(uf_flag); if af!=blot_error::Error.none { return 0,af; }
+  let ar=out_op_rows.append(op_row); if ar!=blot_error::Error.none { return 0,ar; }
   let a1=out_op_nodes.append(tmpl_idx); if a1!=blot_error::Error.none { return 0,a1; }
   let a2=out_op_nodes.append(source); if a2!=blot_error::Error.none { return 0,a2; }
   self_.expr_types[source]=required;
   return required,blot_error::Error.none;
  }
  let supplied=boolean_runs.alloc_slice(op_count);
- let op_foreign=boolean_runs.alloc_slice(op_count);
+ let op_rows=equation_type_ids.alloc_slice(op_count);
  let field_asts=equation_type_ids.alloc_slice(op_count);
- for oi in 0..op_count { supplied[oi]=false; op_foreign[oi]=false; field_asts[oi]=0; }
+ for oi in 0..op_count { supplied[oi]=false; op_rows[oi]=0; field_asts[oi]=0; }
  var failure=blot_error::Error.none;
  let child_count=self_.tree.children(source).len;
  for ci in 0..child_count {
@@ -2637,11 +2655,11 @@ recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family
      let sferr=self_.solveFields();
      if sferr!=blot_error::Error.none { failure=sferr; break; }
      let op_row=self_.types.node(self_.types.head(expected_sig,0)).c;
-     let uf,uerr=self_.rowUsesForeign(op_row);
-     if uerr!=blot_error::Error.none { failure=uerr; break; }
-     op_foreign[oi]=uf;
-     let eerr=self_.constrainEffects(op_row,outer_ambient,child);
-     if eerr!=blot_error::Error.none { failure=eerr; break; }
+     op_rows[oi]=op_row;
+     if outer_ambient!=0xffffffff {
+      let eerr=self_.constrainEffects(op_row,outer_ambient,child);
+      if eerr!=blot_error::Error.none { failure=eerr; break; }
+     }
     }
     self_.expr_types[child]=expected_sig;
     break;
@@ -2661,336 +2679,1257 @@ recursive fn checkEffectRecordValue(self_:Engine&,source:u32,required:u32,family
     break;
    }
    let tmpl_idx=self_.types.list(ops)[oi];
-   var of_flag:u32=0;if op_foreign[oi] { of_flag=1; }
-   let af=out_op_foreign.append(of_flag); if af!=blot_error::Error.none { failure=af; break; }
+   let ar=out_op_rows.append(op_rows[oi]); if ar!=blot_error::Error.none { failure=ar; break; }
    let a1=out_op_nodes.append(tmpl_idx); if a1!=blot_error::Error.none { failure=a1; break; }
    let a2=out_op_nodes.append(field_asts[oi]); if a2!=blot_error::Error.none { failure=a2; break; }
   }
  }
  equation_type_ids.free_slice(field_asts);
- boolean_runs.free_slice(op_foreign);
+ equation_type_ids.free_slice(op_rows);
  boolean_runs.free_slice(supplied);
  if failure!=blot_error::Error.none { return 0,failure; }
  self_.expr_types[source]=required;
  return required,blot_error::Error.none;
 }
-recursive fn withStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {
- let node=self_.tree.node(id);
- let outer_ambient=self_.ambient;
- let base_env_len=self_.env.len;
- if with_handler_len>=64 { return Flow{..},blot_error::Error.type_limit; }
- with_handler_stack[with_handler_len]=WithHandlerScope{ env_base:base_env_len, owner:self_.owner, shadowed_start:with_shadowed_len, shadowed_len:0 };
- with_handler_len+=1;
- var handled_labels=IdBuffer{..};
- var handled_foreign=IdBuffer{..};
- let entries=blot_parse_ast::List{node.a,node.b, ..};
- let entry_count=self_.tree.list(entries).len;
- var failure=blot_error::Error.none;
- for ei in 0..entry_count {
-  let entry_id=self_.tree.list(entries)[ei];
-  let entry=self_.tree.node(entry_id);
-  if entry.c==1 {
-   var rev_args=IdBuffer{..};
-   var head=entry.a;
-   while self_.tree.node(head).tag==blot_parse_ast::tag_type_apply {
-    let aerr=rev_args.append(self_.tree.node(head).b);
-    if aerr!=blot_error::Error.none { failure=aerr; break; }
-    head=self_.tree.node(head).a;
+fn materializeLocalHandler(self_:Engine&,lh_idx:i64,source:u32)->blot_error::Error {
+ if local_handlers[lh_idx].materialized { return blot_error::Error.none; }
+ let lh=local_handlers[lh_idx];
+ for oi in 0..lh.ops_len {
+  let op_row=lh_op_rows[lh.ops_start+oi];
+  let eerr=self_.constrainEffects(op_row,0,source);
+  if eerr!=blot_error::Error.none { return eerr; }
+ }
+ local_handlers[lh_idx].materialized=true;
+ self_.projections[lh.source]=handle_materialized_tag;
+ return blot_error::Error.none;
+}
+fn checkLocalHandlerOrCompositeUse(self_:Engine&,binding:u32,source:u32)->bool,blot_error::Error {
+ let lh_idx=findLocalHandler(binding);
+ if lh_idx>=0 {
+  let lh=local_handlers[lh_idx];
+  if allow_local_handler_ref==0 {
+   if lh.shadowed_len!=0 {
+    let err=self_.diagnostic(Code.borrow_conflict,source);
+    return true,err;
    }
-   if failure!=blot_error::Error.none { rev_args.deinit(equation_type_ids); break; }
-   reverseIds(rev_args.items);
-   let head_node=self_.tree.node(head);
-   if head_node.tag==blot_parse_ast::tag_type_name && self_.pool.get(head_node.a)=="Foreign" {
-    let derr=self_.diagnostic(Code.sealed_effect,entry.a);
-    rev_args.deinit(equation_type_ids);
-    if derr!=blot_error::Error.none { failure=derr; break; }
-    continue;
-   }
-   var has_ef=false; var family_idx:u32=0;
-   if head_node.tag==blot_parse_ast::tag_type_name {
-    let lk .= self_.catalogs.effect_family_names.get(self_.catalogKey(head_node.a));
-    if lk { family_idx=lk; has_ef=true; }
-   }
-   if !has_ef {
-    let derr=self_.diagnostic(Code.unknown_effect,entry.a);
-    rev_args.deinit(equation_type_ids);
-    if derr!=blot_error::Error.none { failure=derr; break; }
-    continue;
-   }
-   let effect_nom,nerr=self_.effectRecordAnnotation(family_idx,rev_args.items,entry.a);
-   rev_args.deinit(equation_type_ids);
-   if nerr!=blot_error::Error.none { failure=nerr; break; }
-   let family=self_.effect_families[family_idx];
-   let resolved_nom,rnerr=self_.types.resolve(effect_nom,0);
-   if rnerr!=blot_error::Error.none { failure=rnerr; break; }
-   let nom_node=self_.types.node(resolved_nom);
-   if nom_node.tag!=blot_check_types::Tag.nominal { continue; }
-   var handler_src=entry.b;
-   while self_.tree.node(handler_src).tag==blot_parse_ast::tag_group { handler_src=self_.tree.node(handler_src).a; }
-   let handler_tag=self_.tree.node(handler_src).tag;
-   let is_inline=(!family.callable && handler_tag==blot_parse_ast::tag_record && self_.tree.node(handler_src).a==0) || (family.callable && handler_tag==blot_parse_ast::tag_lambda);
-   var op_sigs=IdBuffer{..};
-   var op_nodes=IdBuffer{..};
-   var op_foreign=IdBuffer{..};
-   if is_inline {
-    let _,cerr=self_.checkEffectRecordValue(handler_src,effect_nom,family_idx,outer_ambient,true,op_sigs,op_nodes,op_foreign);
-    if cerr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_foreign.deinit(equation_type_ids); failure=cerr; break; }
-    self_.expr_types[entry.b]=effect_nom;
-    self_.projections[entry_id]=1;
-   } else {
-    let actual,eerr=self_.contextualLambda(entry.b,effect_nom);
-    if eerr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_foreign.deinit(equation_type_ids); failure=eerr; break; }
-    let cerr=self_.constrain(actual,effect_nom,entry.b);
-    if cerr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_foreign.deinit(equation_type_ids); failure=cerr; break; }
-    let arg_n=self_.types.nominalArguments(nom_node).len;
-    let na=equation_type_ids.alloc_slice(arg_n);
-    for ai in 0..arg_n { na[ai]=self_.types.nominalArguments(nom_node)[ai]; }
-    let ierr=self_.instantiateEffectOpTypes(family_idx,na,0,entry_id,op_sigs);
-    equation_type_ids.free_slice(na);
-    if ierr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_foreign.deinit(equation_type_ids); failure=ierr; break; }
-    let ops=checkedTypeList(self_.types,family.operations);
-    for oi in 0..(ops.len as i64) {
-     let a1=op_nodes.append(self_.types.list(ops)[oi]); if a1!=blot_error::Error.none { failure=a1; break; }
-     let a2=op_nodes.append(oi as u32); if a2!=blot_error::Error.none { failure=a2; break; }
-    }
-    if failure!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_foreign.deinit(equation_type_ids); break; }
-    self_.projections[entry_id]=0;
-   }
-   var saved_types=IdBuffer{..};
-   let arg_n=self_.types.nominalArguments(nom_node).len;
-   let na=equation_type_ids.alloc_slice(arg_n);
-   for ai in 0..arg_n {
-    let a=self_.types.nominalArguments(nom_node)[ai];
-    na[ai]=a;
-    let aerr=saved_types.append(a);
-    if aerr!=blot_error::Error.none { failure=aerr; break; }
-   }
-   if failure==blot_error::Error.none {
-    for sig in op_sigs.items { let aerr=saved_types.append(sig); if aerr!=blot_error::Error.none { failure=aerr; break; } }
-   }
-   if failure==blot_error::Error.none {
-    let ops=checkedTypeList(self_.types,family.operations);
-    var dup_reported=false;
-    for oi in 0..(ops.len as i64) {
-     let tmpl=self_.effect_templates[self_.types.list(ops)[oi]];
-     let lbl,lerr=self_.types.internScopedOperation(tmpl.identity,Identity{0,0, ..},na);
-     if lerr!=blot_error::Error.none { failure=lerr; break; }
-     if inList(handled_labels.items,lbl) {
-      if !dup_reported {
-       dup_reported=true;
-       let derr=self_.diagnostic(Code.duplicate_request_handler,entry_id);
-       if derr!=blot_error::Error.none { failure=derr; break; }
-       self_.diagnostics[self_.diagnostics.len-1].detail=blot_support::some<const u8[:]>(ownDiagnosticText("Duplicate effect handler in the same `with` clause"));
-      }
-     } else {
-      let aerr=handled_labels.append(lbl);
-      if aerr!=blot_error::Error.none { failure=aerr; break; }
-      var is_foreign:u32=0;
-      if is_inline && oi<op_foreign.items.len { is_foreign=op_foreign.items[oi]; }
-      let ferr=handled_foreign.append(is_foreign);
-      if ferr!=blot_error::Error.none { failure=ferr; break; }
-     }
-    }
-   }
-   equation_type_ids.free_slice(na);
-   if failure==blot_error::Error.none {
-    let tl,terr=self_.types.saveList(saved_types.items);
-    if terr!=blot_error::Error.none { failure=terr; }
-    else {
-     let nl,nlerr=self_.types.saveList(op_nodes.items);
-     if nlerr!=blot_error::Error.none { failure=nlerr; }
-     else {
-      self_.resolved[entry_id]=family_idx;
-      self_.access_types[entry_id]=tl;
-      self_.access_nodes[entry_id]=nl;
-      self_.expr_types[entry_id]=effect_nom;
-     }
-    }
-   }
-   saved_types.deinit(equation_type_ids);
-   op_sigs.deinit(equation_type_ids);
-   op_nodes.deinit(equation_type_ids);
-   op_foreign.deinit(equation_type_ids);
-   if failure!=blot_error::Error.none { break; }
-  } else {
-   let actual,eerr=self_.expression(entry.a);
-   if eerr!=blot_error::Error.none { failure=eerr; break; }
-   let resolved,rerr=self_.types.resolve(actual,0);
-   if rerr!=blot_error::Error.none { failure=rerr; break; }
-   let ef_opt=self_.effectFamilyNominal(resolved);
-   if !ef_opt.present {
-    let derr=self_.diagnostic(Code.invalid_provider,entry.a);
-    if derr!=blot_error::Error.none { failure=derr; break; }
-    continue;
-   }
-   let family_idx=ef_opt.value;
-   let family=self_.effect_families[family_idx];
-   let nom_node=self_.types.node(resolved);
-   let arg_n=self_.types.nominalArguments(nom_node).len;
-   let na=equation_type_ids.alloc_slice(arg_n);
-   for ai in 0..arg_n { na[ai]=self_.types.nominalArguments(nom_node)[ai]; }
-   var op_sigs=IdBuffer{..};
-   var op_nodes=IdBuffer{..};
-   var saved_types=IdBuffer{..};
-   let ierr=self_.instantiateEffectOpTypes(family_idx,na,0,entry_id,op_sigs);
-   if ierr!=blot_error::Error.none { failure=ierr; }
-   if failure==blot_error::Error.none {
-    for ai in 0..arg_n { let aerr=saved_types.append(na[ai]); if aerr!=blot_error::Error.none { failure=aerr; break; } }
-   }
-   if failure==blot_error::Error.none {
-    for sig in op_sigs.items { let aerr=saved_types.append(sig); if aerr!=blot_error::Error.none { failure=aerr; break; } }
-   }
-   if failure==blot_error::Error.none {
-    let ops=checkedTypeList(self_.types,family.operations);
-    var dup_reported=false;
-    for oi in 0..(ops.len as i64) {
-     let tmpl_idx=self_.types.list(ops)[oi];
-     let tmpl=self_.effect_templates[tmpl_idx];
-     let lbl,lerr=self_.types.internScopedOperation(tmpl.identity,Identity{0,0, ..},na);
-     if lerr!=blot_error::Error.none { failure=lerr; break; }
-     if inList(handled_labels.items,lbl) {
-      if !dup_reported {
-       dup_reported=true;
-       let derr=self_.diagnostic(Code.duplicate_request_handler,entry_id);
-       if derr!=blot_error::Error.none { failure=derr; break; }
-       self_.diagnostics[self_.diagnostics.len-1].detail=blot_support::some<const u8[:]>(ownDiagnosticText("Duplicate effect handler in the same `with` clause"));
-      }
-     } else {
-      let a1=handled_labels.append(lbl); if a1!=blot_error::Error.none { failure=a1; break; }
-      let f1=handled_foreign.append(0); if f1!=blot_error::Error.none { failure=f1; break; }
-     }
-     let a2=op_nodes.append(tmpl_idx); if a2!=blot_error::Error.none { failure=a2; break; }
-     let a3=op_nodes.append(oi as u32); if a3!=blot_error::Error.none { failure=a3; break; }
-    }
-   }
-   equation_type_ids.free_slice(na);
-   if failure==blot_error::Error.none {
-    let tl,terr=self_.types.saveList(saved_types.items);
-    if terr!=blot_error::Error.none { failure=terr; }
-    else {
-     let nl,nlerr=self_.types.saveList(op_nodes.items);
-     if nlerr!=blot_error::Error.none { failure=nlerr; }
-     else {
-      self_.resolved[entry_id]=family_idx;
-      self_.access_types[entry_id]=tl;
-      self_.access_nodes[entry_id]=nl;
-      self_.projections[entry_id]=0;
-      self_.expr_types[entry_id]=resolved;
-     }
-    }
-   }
-   saved_types.deinit(equation_type_ids);
-   op_sigs.deinit(equation_type_ids);
-   op_nodes.deinit(equation_type_ids);
-   if failure!=blot_error::Error.none { break; }
+   let merr=self_.materializeLocalHandler(lh_idx,source);
+   return false,merr;
+  }
+  if lh.shadowed_len!=0 && lh.consumed {
+   let err=self_.diagnostic(Code.borrow_conflict,source);
+   return true,err;
+  }
+  if lh.shadowed_len==0 && !lh.has_effects {
+   let merr=self_.materializeLocalHandler(lh_idx,source);
+   return false,merr;
+  }
+  saw_nonpure_handler_ref=true;
+  return false,blot_error::Error.none;
+ }
+ let lc_idx=findLocalComposite(binding);
+ if lc_idx>=0 {
+  if allow_local_handler_ref==0 || local_composites[lc_idx].consumed {
+   let err=self_.diagnostic(Code.borrow_conflict,source);
+   return true,err;
+  }
+  saw_nonpure_handler_ref=true;
+  return false,blot_error::Error.none;
+ }
+ return false,blot_error::Error.none;
+}
+fn extractNominalPair(self_:Engine&,ann_node:blot_check_types::Node)->bool,u32,u32,blot_error::Error {
+ let nargs=self_.types.nominalArguments(ann_node);
+ if nargs.len==2 { return true,nargs[0],nargs[1],blot_error::Error.none; }
+ if nargs.len==1 {
+  let inner,ierr=self_.types.resolve(nargs[0],0);
+  if ierr!=blot_error::Error.none { return false,0,0,ierr; }
+  let pnode=self_.types.node(inner);
+  if pnode.tag==blot_check_types::Tag.product && pnode.b==2 {
+   let elems=self_.types.list(blot_check_types::List{pnode.a,pnode.b, ..});
+   return true,elems[0],elems[1],blot_error::Error.none;
   }
  }
+ return false,0,0,blot_error::Error.none;
+}
+fn matchPreludePairNominal(self_:Engine&,ty:u32,name:const u8[:])->bool,u32,u32,blot_error::Error {
+ if ty==0 { return false,0,0,blot_error::Error.none; }
+ let resolved,rerr=self_.types.resolve(ty,0);
+ if rerr!=blot_error::Error.none { return false,0,0,rerr; }
+ let node=self_.types.node(resolved);
+ if node.tag!=blot_check_types::Tag.nominal { return false,0,0,blot_error::Error.none; }
+ let nom=self_.lookupBuiltinNominal(name,2);
+ if !nom.present { return false,0,0,blot_error::Error.none; }
+ let ident=self_.nominals[nom.value].identity;
+ if node.a!=ident.unit || node.b!=ident.decl { return false,0,0,blot_error::Error.none; }
+ return self_.extractNominalPair(node);
+}
+fn isHandleableType(self_:Engine&,ty:u32)->bool,blot_error::Error {
+ if ty==0 { return false,blot_error::Error.none; }
+ let resolved,rerr=self_.types.resolve(ty,0);
+ if rerr!=blot_error::Error.none { return false,rerr; }
+ if self_.effectFamilyNominal(resolved).present { return true,blot_error::Error.none; }
+ let is_l,_,_,lerr=self_.matchPreludePairNominal(resolved,"Layer");
+ if lerr!=blot_error::Error.none { return false,lerr; }
+ if is_l { return true,blot_error::Error.none; }
+ let is_h,_,_,herr=self_.matchPreludePairNominal(resolved,"Handled");
+ if herr!=blot_error::Error.none { return false,herr; }
+ return is_h,blot_error::Error.none;
+}
+fn isForeignEffectType(self_:Engine&,ty:u32)->bool {
+ if ty==0 { return false; }
+ let root=self_.types.head(ty,0);
+ let node=self_.types.node(root);
+ if node.tag!=blot_check_types::Tag.nominal { return false; }
+ let ef=self_.effectFamilyNominal(root);
+ if ef.present && self_.pool.get(self_.effect_families[ef.value].name)=="Foreign" { return true; }
+ let ni=self_.nominalIndex(Identity{node.a,node.b, ..});
+ if ni.present && self_.pool.get(self_.nominals[ni.value].name)=="Foreign" { return true; }
+ return false;
+}
+fn unwrapGroup(tree:const blot_parse_ast::Tree&,original:u32)->u32 {
+ var cur=original;
+ while cur!=0 && tree.node(cur).tag==blot_parse_ast::tag_group { cur=tree.node(cur).a; }
+ return cur;
+}
+fn endsWithDotMember(text:const u8[:],member:const u8[:])->i64 {
+ if text.len<=member.len+1 { return -1; }
+ let dot=text.len-member.len-1;
+ if text[dot]!='.' as u8 { return -1; }
+ if text[dot+1..]==member { return dot; }
+ return -1;
+}
+fn isSyntacticCompositeExpr(self_:const Engine&,original:u32)->u8,u32,u32,u32 {
+ let id=unwrapGroup(self_.tree,original);
+ if id==0 { return 0,0,0,0; }
+ let node=self_.tree.node(id);
+ if node.tag==blot_parse_ast::tag_record && node.a!=0 {
+  let cname=self_.pool.get(node.a);
+  if cname=="Layer" || cname=="Handled" {
+   var f0_name="inner"; var f1_name="outer"; var kind:u8=1;
+   if cname=="Handled" { f0_name="body"; f1_name="handler"; kind=2; }
+   var left:u32=0; var right:u32=0;
+   let ccount=self_.tree.children(id).len;
+   for ci in 0..ccount {
+    let cid=self_.tree.children(id)[ci];
+    let cf=self_.tree.node(cid);
+    let fn_=self_.pool.get(cf.a);
+    var v=cf.b; if v==0 { v=cid; }
+    if fn_==f0_name { left=v; } else if fn_==f1_name { right=v; }
+   }
+   if left!=0 && right!=0 { return kind,left,right,0; }
+  }
+  return 0,0,0,0;
+ }
+ if node.tag!=blot_parse_ast::tag_apply { return 0,0,0,0; }
+ let callee=unwrapGroup(self_.tree,node.a);
+ let cnode=self_.tree.node(callee);
+ if cnode.tag==blot_parse_ast::tag_apply {
+  let head=unwrapGroup(self_.tree,cnode.a);
+  let hnode=self_.tree.node(head);
+  if hnode.tag==blot_parse_ast::tag_name && self_.pool.get(hnode.a)=="layer" && !self_.lookup(hnode.a).present {
+   return 1,cnode.b,node.b,0;
+  }
+ }
+ if cnode.tag==blot_parse_ast::tag_field_access {
+  let m=self_.pool.get(cnode.b);
+  if m=="layer" { return 1,cnode.a,node.b,0; }
+  if m=="handle" { return 2,cnode.a,node.b,0; }
+ }
+ if cnode.tag==blot_parse_ast::tag_name && !self_.lookup(cnode.a).present && !self_.catalogs.globals.contains(cnode.a) {
+  let txt=self_.pool.get(cnode.a);
+  if endsWithDotMember(txt,"layer")>0 { return 1,0,node.b,callee; }
+  if endsWithDotMember(txt,"handle")>0 { return 2,0,node.b,callee; }
+ }
+ return 0,0,0,0;
+}
+recursive fn handlerStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {
+ let node=self_.tree.node(id);
+ var rev_args=IdBuffer{..};
+ var head=node.b;
+ while self_.tree.node(head).tag==blot_parse_ast::tag_type_apply {
+  let aerr=rev_args.append(self_.tree.node(head).b);
+  if aerr!=blot_error::Error.none { rev_args.deinit(equation_type_ids); return Flow{..},aerr; }
+  head=self_.tree.node(head).a;
+ }
+ reverseIds(rev_args.items);
+ let head_node=self_.tree.node(head);
+ if head_node.tag==blot_parse_ast::tag_type_name && self_.pool.get(head_node.a)=="Foreign" {
+  rev_args.deinit(equation_type_ids);
+  let derr=self_.diagnostic(Code.sealed_effect,node.b);
+  if derr!=blot_error::Error.none { return Flow{..},derr; }
+  let ft,ferr=self_.types.fresh();
+  if ferr!=blot_error::Error.none { return Flow{..},ferr; }
+  let b,berr=self_.addBinding(Binding{name:node.a,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:ft,scheme:blot_check_types::Scheme{root:ft, ..}, ..});
+  if berr!=blot_error::Error.none { return Flow{..},berr; }
+  self_.env.push(Entry{name:node.a,binding:b, ..});
+  self_.resolved[id]=b;
+  self_.expr_types[id]=blot_check_types::unit;
+  return Flow{..},blot_error::Error.none;
+ }
+ var has_ef=false; var family_idx:u32=0;
+ if head_node.tag==blot_parse_ast::tag_type_name {
+  let lk .= self_.catalogs.effect_family_names.get(self_.catalogKey(head_node.a));
+  if lk { family_idx=lk; has_ef=true; }
+ }
+ if !has_ef {
+  rev_args.deinit(equation_type_ids);
+  let derr=self_.diagnostic(Code.unknown_effect,node.b);
+  if derr!=blot_error::Error.none { return Flow{..},derr; }
+  let ft,ferr=self_.types.fresh();
+  if ferr!=blot_error::Error.none { return Flow{..},ferr; }
+  let b,berr=self_.addBinding(Binding{name:node.a,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:ft,scheme:blot_check_types::Scheme{root:ft, ..}, ..});
+  if berr!=blot_error::Error.none { return Flow{..},berr; }
+  self_.env.push(Entry{name:node.a,binding:b, ..});
+  self_.resolved[id]=b;
+  self_.expr_types[id]=blot_check_types::unit;
+  return Flow{..},blot_error::Error.none;
+ }
+ let effect_nom,nerr=self_.effectRecordAnnotation(family_idx,rev_args.items,node.b);
+ rev_args.deinit(equation_type_ids);
+ if nerr!=blot_error::Error.none { return Flow{..},nerr; }
+ let resolved_nom,rnerr=self_.types.resolve(effect_nom,0);
+ if rnerr!=blot_error::Error.none { return Flow{..},rnerr; }
+ let nom_node=self_.types.node(resolved_nom);
+ if nom_node.tag!=blot_check_types::Tag.nominal {
+  let b,berr=self_.addBinding(Binding{name:node.a,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:effect_nom,scheme:blot_check_types::Scheme{root:effect_nom, ..}, ..});
+  if berr!=blot_error::Error.none { return Flow{..},berr; }
+  self_.env.push(Entry{name:node.a,binding:b, ..});
+  self_.resolved[id]=b;
+  self_.expr_types[id]=blot_check_types::unit;
+  return Flow{..},blot_error::Error.none;
+ }
+ let family=self_.effect_families[family_idx];
+ let handler_src=unwrapGroup(self_.tree,node.c);
+ if !family.callable && self_.tree.node(handler_src).tag!=blot_parse_ast::tag_record {
+  let derr=self_.diagnostic(Code.type_mismatch,handler_src);
+  if derr!=blot_error::Error.none { return Flow{..},derr; }
+  let b,berr=self_.addBinding(Binding{name:node.a,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:effect_nom,scheme:blot_check_types::Scheme{root:effect_nom, ..}, ..});
+  if berr!=blot_error::Error.none { return Flow{..},berr; }
+  self_.env.push(Entry{name:node.a,binding:b, ..});
+  self_.resolved[id]=b;
+  self_.expr_types[id]=blot_check_types::unit;
+  return Flow{..},blot_error::Error.none;
+ }
+ if with_handler_len>=64 { return Flow{..},blot_error::Error.type_limit; }
+ with_handler_stack[with_handler_len]=WithHandlerScope{ env_base:self_.env.len, owner:self_.owner, shadowed_start:with_shadowed_len, shadowed_len:0 };
+ with_handler_len+=1;
+ var op_sigs=IdBuffer{..};
+ var op_nodes=IdBuffer{..};
+ var op_rows=IdBuffer{..};
+ let _,cerr=self_.checkEffectRecordValue(handler_src,effect_nom,family_idx,0xffffffff,true,op_sigs,op_nodes,op_rows);
  let top=with_handler_stack[with_handler_len-1];
  with_handler_len-=1;
  if with_shadowed_overflow {
   with_shadowed_overflow=false;
   with_shadowed_len=top.shadowed_start;
-  handled_labels.deinit(equation_type_ids);
-  handled_foreign.deinit(equation_type_ids);
+  op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
   return Flow{..},blot_error::Error.type_limit;
  }
- if failure!=blot_error::Error.none {
+ if cerr!=blot_error::Error.none {
   with_shadowed_len=top.shadowed_start;
-  handled_labels.deinit(equation_type_ids);
-  handled_foreign.deinit(equation_type_ids);
-  return Flow{..},failure;
+  op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
+  return Flow{..},cerr;
  }
- let locked_mark=with_locked_len;
+ self_.expr_types[node.c]=effect_nom;
+ var has_effects=false;
+ for oi in 0..op_rows.items.len {
+  let rr,rrerr=self_.types.resolveEffects(op_rows.items[oi],0);
+  if rrerr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids); return Flow{..},rrerr; }
+  let rnode=self_.types.row(rr);
+  if rnode.labels.len!=0 || rnode.tail!=blot_check_effects::Tail.closed { has_effects=true; }
+ }
  for si in top.shadowed_start..(top.shadowed_start+top.shadowed_len) {
   if with_locked_len>=4096 {
-   with_locked_len=locked_mark;
-   with_shadowed_len=top.shadowed_start;
-   handled_labels.deinit(equation_type_ids);
-   handled_foreign.deinit(equation_type_ids);
+   op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
    return Flow{..},blot_error::Error.type_limit;
   }
   with_locked_bindings[with_locked_len]=with_shadowed_runs[si];
   with_locked_len+=1;
  }
- let outer_resolved,orerr=self_.types.resolveEffects(outer_ambient,0);
- if orerr!=blot_error::Error.none {
-  with_locked_len=locked_mark;
-  with_shadowed_len=top.shadowed_start;
-  handled_labels.deinit(equation_type_ids);
-  handled_foreign.deinit(equation_type_ids);
-  return Flow{..},orerr;
+ let binding,berr=self_.addBinding(Binding{name:node.a,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:effect_nom,scheme:blot_check_types::Scheme{root:effect_nom, ..}, ..});
+ if berr!=blot_error::Error.none {
+  op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
+  return Flow{..},berr;
  }
- let active_mark=with_active_len;
- for hi in 0..handled_foreign.items.len {
-  if with_active_len>=1024 {
-   with_active_len=active_mark;
-   with_locked_len=locked_mark;
-   with_shadowed_len=top.shadowed_start;
-   handled_labels.deinit(equation_type_ids);
-   handled_foreign.deinit(equation_type_ids);
-   return Flow{..},blot_error::Error.type_limit;
-  }
-  with_active_labels[with_active_len]=handled_labels.items[hi];
-  with_active_foreign[with_active_len]=handled_foreign.items[hi]!=0;
+ self_.env.push(Entry{name:node.a,binding:binding, ..});
+ self_.resolved[id]=binding;
+ self_.expr_types[id]=blot_check_types::unit;
+ let op_n=op_rows.items.len;
+ let arg_n=self_.types.nominalArguments(nom_node).len;
+ if local_handlers_len>=1024 || lh_ops_len+op_n>4096 || lh_nom_args_len+arg_n>2048 {
+  op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
+  return Flow{..},blot_error::Error.type_limit;
+ }
+ let ops_start=lh_ops_len;
+ for oi in 0..op_n {
+  lh_op_tmpls[lh_ops_len]=op_nodes.items[oi*2];
+  lh_op_nodes[lh_ops_len]=op_nodes.items[oi*2+1];
+  lh_op_sigs[lh_ops_len]=op_sigs.items[oi];
+  lh_op_rows[lh_ops_len]=op_rows.items[oi];
+  lh_ops_len+=1;
+ }
+ let args_start=lh_nom_args_len;
+ for ai in 0..arg_n {
+  lh_nom_args[lh_nom_args_len]=self_.types.nominalArguments(nom_node)[ai];
+  lh_nom_args_len+=1;
+ }
+ local_handlers[local_handlers_len]=LocalHandler{
+  binding:binding, source:id, family_idx:family_idx, effect_nom:effect_nom,
+  shadowed_start:top.shadowed_start, shadowed_len:top.shadowed_len,
+  ops_start:ops_start, ops_len:op_n, args_start:args_start, args_len:arg_n,
+  consumed:false, materialized:false, has_effects:has_effects,
+ };
+ local_handlers_len+=1;
+ op_sigs.deinit(equation_type_ids); op_nodes.deinit(equation_type_ids); op_rows.deinit(equation_type_ids);
+ return Flow{..},blot_error::Error.none;
+}
+recursive fn resolveDottedPrefix(self_:Engine&,id:u32,dot_pos:i64)->u32,blot_error::Error {
+ let full=self_.pool.get(self_.tree.node(id).a);
+ let prefix_text=full[..dot_pos];
+ let prefix_sym,ierr=self_.pool.intern(prefix_text);
+ if ierr!=blot_error::Error.none { return 0,blot_error::Error.type_limit; }
+ let found=self_.lookup(prefix_sym);
+ if found.present {
+  let binding=found.value;
+  if isWithLocked(binding) { return self_.diagnosticFresh(Code.borrow_conflict,id); }
+  let rej,lerr=self_.checkLocalHandlerOrCompositeUse(binding,id);
+  if lerr!=blot_error::Error.none { return 0,lerr; }
+  if rej { return self_.types.fresh(); }
+  self_.resolved[id]=binding;
+  let ty,err=self_.instantiate(binding,id);
+  if err!=blot_error::Error.none { return 0,err; }
+  self_.expr_types[id]=ty;
+  return ty,blot_error::Error.none;
+ }
+ let global,gerr=self_.globalBinding(prefix_sym);
+ if gerr!=blot_error::Error.none { return 0,gerr; }
+ if global.present {
+  let ty,rerr=self_.globalReference(global.value,id);
+  if rerr!=blot_error::Error.none { return 0,rerr; }
+  self_.expr_types[id]=ty;
+  return ty,blot_error::Error.none;
+ }
+ let qualified,qerr=self_.qualifiedValue(id,prefix_sym);
+ if qerr!=blot_error::Error.none { return 0,qerr; }
+ if qualified.present {
+  self_.expr_types[id]=qualified.value;
+  return qualified.value,blot_error::Error.none;
+ }
+ let tmpl,terr=self_.operationTemplate(prefix_sym);
+ if terr!=blot_error::Error.none { return 0,terr; }
+ if tmpl.present {
+  let ty,oerr=self_.operationValue(id,tmpl.value,blot_support::none<const u32[:]>());
+  if oerr!=blot_error::Error.none { return 0,oerr; }
+  self_.expr_types[id]=ty;
+  return ty,blot_error::Error.none;
+ }
+ let ty,uerr=self_.unknownNameDiagnosticFresh(id,prefix_sym);
+ self_.expr_types[id]=ty;
+ return ty,uerr;
+}
+struct HandleBuild {
+ site_id:u32=0,
+ outer_ambient:u32=0,
+ cur_ambient:u32=0,
+ num_bases:u32=0,
+ num_layers:u32=0,
+ bases_words:IdBuffer=IdBuffer{..},
+ layers_words:IdBuffer=IdBuffer{..},
+ site_types:IdBuffer=IdBuffer{..},
+ unlock_lhs:IdBuffer=IdBuffer{..},
+ unlock_outers:IdBuffer=IdBuffer{..},
+ unlock_afters:IdBuffer=IdBuffer{..},
+}
+fn deinit(self_:HandleBuild&) {
+ self_.bases_words.deinit(equation_type_ids);
+ self_.layers_words.deinit(equation_type_ids);
+ self_.site_types.deinit(equation_type_ids);
+ self_.unlock_lhs.deinit(equation_type_ids);
+ self_.unlock_outers.deinit(equation_type_ids);
+ self_.unlock_afters.deinit(equation_type_ids);
+}
+fn appendSiteType(b:HandleBuild&,ty:u32)->u32,blot_error::Error {
+ let idx=b.site_types.items.len as u32;
+ let err=b.site_types.append(ty);
+ return idx,err;
+}
+fn addHandleBase(b:HandleBuild&,base_kind:u32,base_ast:u32,base_ty:u32)->u32,blot_error::Error {
+ let ty_idx,terr=appendSiteType(b,base_ty);
+ if terr!=blot_error::Error.none { return 0,terr; }
+ let e1=b.bases_words.append(base_kind); if e1!=blot_error::Error.none { return 0,e1; }
+ let e2=b.bases_words.append(base_ast); if e2!=blot_error::Error.none { return 0,e2; }
+ let e3=b.bases_words.append(ty_idx); if e3!=blot_error::Error.none { return 0,e3; }
+ let idx=b.num_bases;
+ b.num_bases+=1;
+ return idx,blot_error::Error.none;
+}
+fn extendHandleAmbient(self_:Engine&,cur:u32,new_labels:const u32[:])->u32,blot_error::Error {
+ let resolved,rerr=self_.types.resolveEffects(cur,0);
+ if rerr!=blot_error::Error.none { return 0,rerr; }
+ var labels=IdBuffer{..};
+ for lbl in new_labels {
+  let e=labels.append(lbl);
+  if e!=blot_error::Error.none { labels.deinit(equation_type_ids); return 0,e; }
+ }
+ let existing=checkedRowLabels(self_.types,resolved);
+ for ei in 0..(existing.len as i64) {
+  let e=labels.append(self_.types.effects.list(existing)[ei]);
+  if e!=blot_error::Error.none { labels.deinit(equation_type_ids); return 0,e; }
+ }
+ let row,ererr=self_.types.effects.rowAt(labels.items,self_.types.row(resolved).tail,self_.types.row(resolved).cursor);
+ labels.deinit(equation_type_ids);
+ if ererr!=blot_error::Error.none { return 0,blot_check_types::effectError(ererr); }
+ return row,blot_error::Error.none;
+}
+recursive fn addLocalHandlerLayer(self_:Engine&,b:HandleBuild&,lh_idx:i64,site_ast:u32)->blot_error::Error {
+ let lh=local_handlers[lh_idx];
+ if lh.shadowed_len!=0 && lh.consumed {
+  return self_.diagnostic(Code.borrow_conflict,site_ast);
+ }
+ let args_ty_start=b.site_types.items.len as u32;
+ let na=equation_type_ids.alloc_slice(lh.args_len);
+ for ai in 0..lh.args_len {
+  let a=lh_nom_args[lh.args_start+ai];
+  na[ai]=a;
+  let e=b.site_types.append(a);
+  if e!=blot_error::Error.none { equation_type_ids.free_slice(na); return e; }
+ }
+ var layer_labels=IdBuffer{..};
+ var layer_foreign=IdBuffer{..};
+ var failure=blot_error::Error.none;
+ for oi in 0..lh.ops_len {
+  let sig=lh_op_sigs[lh.ops_start+oi];
+  let op_row=lh_op_rows[lh.ops_start+oi];
+  let tmpl_idx=lh_op_tmpls[lh.ops_start+oi];
+  let e0=b.site_types.append(sig);
+  if e0!=blot_error::Error.none { failure=e0; break; }
+  let open_row,oerr=self_.types.openFunctionEffect(op_row);
+  if oerr!=blot_error::Error.none { failure=oerr; break; }
+  let uf,uerr=self_.rowUsesForeign(op_row);
+  if uerr!=blot_error::Error.none { failure=uerr; break; }
+  let cerr=self_.constrainEffects(open_row,b.cur_ambient,site_ast);
+  if cerr!=blot_error::Error.none { failure=cerr; break; }
+  let tmpl=self_.effect_templates[tmpl_idx];
+  let lbl,lerr=self_.types.internScopedOperation(tmpl.identity,Identity{0,0, ..},na);
+  if lerr!=blot_error::Error.none { failure=lerr; break; }
+  let a1=layer_labels.append(lbl); if a1!=blot_error::Error.none { failure=a1; break; }
+  var uf_w:u32=0; if uf { uf_w=1; }
+  let a2=layer_foreign.append(uf_w); if a2!=blot_error::Error.none { failure=a2; break; }
+ }
+ equation_type_ids.free_slice(na);
+ if failure!=blot_error::Error.none { layer_labels.deinit(equation_type_ids); layer_foreign.deinit(equation_type_ids); return failure; }
+ for li in 0..layer_labels.items.len {
+  if with_active_len>=1024 { layer_labels.deinit(equation_type_ids); layer_foreign.deinit(equation_type_ids); return blot_error::Error.type_limit; }
+  with_active_labels[with_active_len]=layer_labels.items[li];
+  with_active_foreign[with_active_len]=layer_foreign.items[li]!=0;
   with_active_len+=1;
  }
- handled_foreign.deinit(equation_type_ids);
- let outer_labels=checkedRowLabels(self_.types,outer_resolved);
- for oi in 0..(outer_labels.len as i64) {
-  let aerr=handled_labels.append(self_.types.effects.list(outer_labels)[oi]);
-  if aerr!=blot_error::Error.none {
-   with_active_len=active_mark;
-   with_locked_len=locked_mark;
-   with_shadowed_len=top.shadowed_start;
-   handled_labels.deinit(equation_type_ids);
-   return Flow{..},aerr;
-  }
+ let next_amb,aerr=self_.extendHandleAmbient(b.cur_ambient,layer_labels.items);
+ layer_labels.deinit(equation_type_ids);
+ layer_foreign.deinit(equation_type_ids);
+ if aerr!=blot_error::Error.none { return aerr; }
+ b.cur_ambient=next_amb;
+ // Record layer header: family_idx, layer_kind=0, site_ast, arg_n, args_ty_start, num_cells, [outer_b, after_b...], lh_source, op_n, [tmpl_idx, field_or_expr...]
+ for w in [lh.family_idx,0 as u32,site_ast,lh.args_len as u32,args_ty_start,lh.shadowed_len as u32] {
+  let e=b.layers_words.append(w); if e!=blot_error::Error.none { return e; }
  }
- let extended_row,ererr=self_.types.effects.rowAt(handled_labels.items,self_.types.row(outer_resolved).tail,self_.types.row(outer_resolved).cursor);
- handled_labels.deinit(equation_type_ids);
- if ererr!=blot_error::Error.none {
-  with_active_len=active_mark;
-  with_locked_len=locked_mark;
-  with_shadowed_len=top.shadowed_start;
-  return Flow{..},blot_check_types::effectError(ererr);
- }
- let base=global_entry_runs.alloc_slice(self_.env.len);
- for entry,index in self_.env { base[index]=entry; }
- self_.ambient=extended_row;
- let flow,serr=self_.suite(node.c);
- self_.ambient=outer_ambient;
- with_active_len=active_mark;
- with_locked_len=locked_mark;
- if serr!=blot_error::Error.none {
-  if base.len!=0 { global_entry_runs.free_slice(base); }
-  with_shadowed_len=top.shadowed_start;
-  return Flow{..},serr;
- }
- for &entry in base { entry.binding=self_.latestSuccessor(entry.binding); }
- self_.env.clear();
- self_.env.append(base);
- if base.len!=0 { global_entry_runs.free_slice(base); }
- var cell_pairs=IdBuffer{..};
- for si in top.shadowed_start..(top.shadowed_start+top.shadowed_len) {
+ let eu0=b.unlock_lhs.append(lh_idx as u32);
+ if eu0!=blot_error::Error.none { return eu0; }
+ for si in lh.shadowed_start..(lh.shadowed_start+lh.shadowed_len) {
   let outer_b=with_shadowed_runs[si];
   let ob=self_.bindings[outer_b];
-  let after_b,berr=self_.addBinding(Binding{ read:true, name:ob.name, declaration:id, owner:self_.owner, kind:blot_reuse_principal_interface::Kind.local, ty:ob.ty, scheme:blot_check_types::Scheme{root:ob.ty, ..}, predecessor:outer_b, .. });
-  if berr!=blot_error::Error.none { failure=berr; break; }
-  self_.env.push(Entry{ name:ob.name, binding:after_b, .. });
-  let a1=cell_pairs.append(outer_b); if a1!=blot_error::Error.none { failure=a1; break; }
-  let a2=cell_pairs.append(after_b); if a2!=blot_error::Error.none { failure=a2; break; }
+  let after_b,berr=self_.addBinding(Binding{ read:true, name:ob.name, declaration:b.site_id, owner:self_.owner, kind:blot_reuse_principal_interface::Kind.local, ty:ob.ty, scheme:blot_check_types::Scheme{root:ob.ty, ..}, predecessor:outer_b, .. });
+  if berr!=blot_error::Error.none { return berr; }
+  let e1=b.layers_words.append(outer_b); if e1!=blot_error::Error.none { return e1; }
+  let e2=b.layers_words.append(after_b); if e2!=blot_error::Error.none { return e2; }
+  let e3=b.unlock_outers.append(outer_b); if e3!=blot_error::Error.none { return e3; }
+  let e4=b.unlock_afters.append(after_b); if e4!=blot_error::Error.none { return e4; }
  }
- with_shadowed_len=top.shadowed_start;
+ let esrc=b.layers_words.append(lh.source); if esrc!=blot_error::Error.none { return esrc; }
+ let eopn=b.layers_words.append(lh.ops_len as u32); if eopn!=blot_error::Error.none { return eopn; }
+ for oi in 0..lh.ops_len {
+  let e1=b.layers_words.append(lh_op_tmpls[lh.ops_start+oi]); if e1!=blot_error::Error.none { return e1; }
+  let e2=b.layers_words.append(lh_op_nodes[lh.ops_start+oi]); if e2!=blot_error::Error.none { return e2; }
+ }
+ b.num_layers+=1;
+ return blot_error::Error.none;
+}
+recursive fn addRuntimeHandlerType(self_:Engine&,b:HandleBuild&,base_idx:u32,ty:u32,path:IdBuffer&,site_ast:u32,depth:i64)->blot_error::Error {
+ if depth>=128 { return blot_error::Error.type_limit; }
+ let resolved,rerr=self_.types.resolve(ty,0);
+ if rerr!=blot_error::Error.none { return rerr; }
+ let is_layer,inner_ty,outer_ty,lerr=self_.matchPreludePairNominal(resolved,"Layer");
+ if lerr!=blot_error::Error.none { return lerr; }
+ if is_layer {
+  let outer_sym,oerr=self_.pool.intern("outer");
+  if oerr!=blot_error::Error.none { return blot_error::Error.type_limit; }
+  let inner_sym,ierr=self_.pool.intern("inner");
+  if ierr!=blot_error::Error.none { return blot_error::Error.type_limit; }
+  let outer_ty_idx,oterr=appendSiteType(b,outer_ty);
+  if oterr!=blot_error::Error.none { return oterr; }
+  let mark=path.items.len;
+  for w in [outer_sym,1 as u32,outer_ty_idx] { let e=path.append(w); if e!=blot_error::Error.none { path.resize(mark); return e; } }
+  let err1=self_.addRuntimeHandlerType(b,base_idx,outer_ty,path,site_ast,depth+1);
+  path.resize(mark);
+  if err1!=blot_error::Error.none { return err1; }
+  let inner_ty_idx,iterr=appendSiteType(b,inner_ty);
+  if iterr!=blot_error::Error.none { return iterr; }
+  for w in [inner_sym,0 as u32,inner_ty_idx] { let e=path.append(w); if e!=blot_error::Error.none { path.resize(mark); return e; } }
+  let err2=self_.addRuntimeHandlerType(b,base_idx,inner_ty,path,site_ast,depth+1);
+  path.resize(mark);
+  return err2;
+ }
+ if self_.isForeignEffectType(resolved) {
+  return self_.diagnostic(Code.sealed_effect,site_ast);
+ }
+ let ef_opt=self_.effectFamilyNominal(resolved);
+ if !ef_opt.present {
+  return self_.diagnostic(Code.invalid_provider,site_ast);
+ }
+ let family_idx=ef_opt.value;
+ let family=self_.effect_families[family_idx];
+ let nom_node=self_.types.node(resolved);
+ let arg_n=self_.types.nominalArguments(nom_node).len;
+ let na=equation_type_ids.alloc_slice(arg_n);
+ for ai in 0..arg_n { na[ai]=self_.types.nominalArguments(nom_node)[ai]; }
+ var op_sigs=IdBuffer{..};
+ let ierr=self_.instantiateEffectOpTypes(family_idx,na,0,site_ast,op_sigs);
+ if ierr!=blot_error::Error.none { op_sigs.deinit(equation_type_ids); equation_type_ids.free_slice(na); return ierr; }
+ let args_ty_start=b.site_types.items.len as u32;
+ var failure=blot_error::Error.none;
+ for ai in 0..arg_n { let e=b.site_types.append(na[ai]); if e!=blot_error::Error.none { failure=e; break; } }
  if failure==blot_error::Error.none {
-  let cl,cerr=self_.types.saveList(cell_pairs.items);
-  if cerr!=blot_error::Error.none { failure=cerr; }
-  else { self_.access_nodes[id]=cl; }
+  for sig in op_sigs.items { let e=b.site_types.append(sig); if e!=blot_error::Error.none { failure=e; break; } }
  }
- cell_pairs.deinit(equation_type_ids);
- if failure!=blot_error::Error.none { return Flow{..},failure; }
- self_.expr_types[id]=blot_check_types::unit;
- if flow.exits { self_.expr_types[id]=blot_check_types::never; }
- return flow,blot_error::Error.none;
+ let ops=checkedTypeList(self_.types,family.operations);
+ let op_n=ops.len as i64;
+ var layer_labels=IdBuffer{..};
+ if failure==blot_error::Error.none {
+  for oi in 0..op_n {
+   let tmpl_idx=self_.types.list(ops)[oi];
+   let tmpl=self_.effect_templates[tmpl_idx];
+   let lbl,lerr=self_.types.internScopedOperation(tmpl.identity,Identity{0,0, ..},na);
+   if lerr!=blot_error::Error.none { failure=lerr; break; }
+   let e=layer_labels.append(lbl); if e!=blot_error::Error.none { failure=e; break; }
+  }
+ }
+ equation_type_ids.free_slice(na);
+ op_sigs.deinit(equation_type_ids);
+ if failure!=blot_error::Error.none { layer_labels.deinit(equation_type_ids); return failure; }
+ for lbl in layer_labels.items {
+  if with_active_len>=1024 { layer_labels.deinit(equation_type_ids); return blot_error::Error.type_limit; }
+  with_active_labels[with_active_len]=lbl;
+  with_active_foreign[with_active_len]=false;
+  with_active_len+=1;
+ }
+ let next_amb,aerr=self_.extendHandleAmbient(b.cur_ambient,layer_labels.items);
+ layer_labels.deinit(equation_type_ids);
+ if aerr!=blot_error::Error.none { return aerr; }
+ b.cur_ambient=next_amb;
+ // Record layer header: family_idx, layer_kind=1, site_ast, arg_n, args_ty_start, num_cells=0, base_idx, path_len, [path...], op_n, [tmpl_idx, oi...]
+ let path_steps=(path.items.len/3) as u32;
+ for w in [family_idx,1 as u32,site_ast,arg_n as u32,args_ty_start,0 as u32,base_idx,path_steps] {
+  let e=b.layers_words.append(w); if e!=blot_error::Error.none { return e; }
+ }
+ for pw in path.items { let e=b.layers_words.append(pw); if e!=blot_error::Error.none { return e; } }
+ let eopn=b.layers_words.append(op_n as u32); if eopn!=blot_error::Error.none { return eopn; }
+ for oi in 0..op_n {
+  let tmpl_idx=self_.types.list(ops)[oi];
+  let e1=b.layers_words.append(tmpl_idx); if e1!=blot_error::Error.none { return e1; }
+  let e2=b.layers_words.append(oi as u32); if e2!=blot_error::Error.none { return e2; }
+ }
+ b.num_layers+=1;
+ return blot_error::Error.none;
+}
+recursive fn addHandlerExpr(self_:Engine&,b:HandleBuild&,h_ast:u32,h_dotted_node:u32,depth:i64)->blot_error::Error {
+ if depth>=128 { return blot_error::Error.type_limit; }
+ if h_dotted_node!=0 {
+  let txt=self_.pool.get(self_.tree.node(h_dotted_node).a);
+  var dot=endsWithDotMember(txt,"layer");
+  if dot<0 { dot=endsWithDotMember(txt,"run"); }
+  if dot>0 {
+   let pref=txt[..dot];
+   if !firstDot(pref).present {
+    let psym,pk=self_.pool.lookup(pref);
+    if pk {
+     let loc=self_.lookup(psym);
+     if loc.present {
+      let lh_idx=findLocalHandler(loc.value);
+      if lh_idx>=0 && !local_handlers[lh_idx].materialized {
+       return self_.addLocalHandlerLayer(b,lh_idx,h_dotted_node);
+      }
+      let lc_idx=findLocalComposite(loc.value);
+      if lc_idx>=0 {
+       let lc=local_composites[lc_idx];
+       if lc.kind!=1 { return self_.diagnostic(Code.invalid_provider,h_dotted_node); }
+       if lc.consumed { return self_.diagnostic(Code.borrow_conflict,h_dotted_node); }
+       local_composites[lc_idx].consumed=true;
+       let e1=self_.addHandlerExpr(b,lc.right_expr,0,depth+1);
+       if e1!=blot_error::Error.none { return e1; }
+       return self_.addHandlerExpr(b,lc.left_expr,lc.left_dotted_name,depth+1);
+      }
+     }
+    }
+   }
+   let saved_amb=self_.ambient;
+   self_.ambient=b.outer_ambient;
+   let base_ty,rerr=self_.resolveDottedPrefix(h_dotted_node,dot);
+   self_.ambient=saved_amb;
+   if rerr!=blot_error::Error.none { return rerr; }
+   let base_idx,berr=addHandleBase(b,1,h_dotted_node,base_ty);
+   if berr!=blot_error::Error.none { return berr; }
+   var path=IdBuffer{..};
+   let aerr=self_.addRuntimeHandlerType(b,base_idx,base_ty,path,h_dotted_node,depth+1);
+   path.deinit(equation_type_ids);
+   return aerr;
+  }
+ }
+ let u_ast=unwrapGroup(self_.tree,h_ast);
+ let unode=self_.tree.node(u_ast);
+ if unode.tag==blot_parse_ast::tag_field && unode.b==0 {
+  // Shorthand field inside `$Layer { inner, outer }`
+  let loc=self_.lookup(unode.a);
+  if loc.present {
+   let lh_idx=findLocalHandler(loc.value);
+   if lh_idx>=0 && !local_handlers[lh_idx].materialized {
+    return self_.addLocalHandlerLayer(b,lh_idx,u_ast);
+   }
+   let lc_idx=findLocalComposite(loc.value);
+   if lc_idx>=0 {
+    let lc=local_composites[lc_idx];
+    if lc.kind!=1 { return self_.diagnostic(Code.invalid_provider,u_ast); }
+    if lc.consumed { return self_.diagnostic(Code.borrow_conflict,u_ast); }
+    local_composites[lc_idx].consumed=true;
+    let e1=self_.addHandlerExpr(b,lc.right_expr,0,depth+1);
+    if e1!=blot_error::Error.none { return e1; }
+    return self_.addHandlerExpr(b,lc.left_expr,lc.left_dotted_name,depth+1);
+   }
+  }
+  let saved_amb=self_.ambient;
+  self_.ambient=b.outer_ambient;
+  let sh_ty,serr=self_.shorthand(u_ast,unode.a);
+  self_.ambient=saved_amb;
+  if serr!=blot_error::Error.none { return serr; }
+  self_.expr_types[u_ast]=sh_ty;
+  let base_idx,berr=addHandleBase(b,1,u_ast,sh_ty);
+  if berr!=blot_error::Error.none { return berr; }
+  var path=IdBuffer{..};
+  let aerr=self_.addRuntimeHandlerType(b,base_idx,sh_ty,path,u_ast,depth+1);
+  path.deinit(equation_type_ids);
+  return aerr;
+ }
+ if unode.tag==blot_parse_ast::tag_name {
+  let loc=self_.lookup(unode.a);
+  if loc.present {
+   let lh_idx=findLocalHandler(loc.value);
+   if lh_idx>=0 && !local_handlers[lh_idx].materialized {
+    self_.resolved[u_ast]=loc.value;
+    self_.expr_types[u_ast]=local_handlers[lh_idx].effect_nom;
+    return self_.addLocalHandlerLayer(b,lh_idx,u_ast);
+   }
+   let lc_idx=findLocalComposite(loc.value);
+   if lc_idx>=0 {
+    let lc=local_composites[lc_idx];
+    if lc.kind!=1 { return self_.diagnostic(Code.invalid_provider,u_ast); }
+    if lc.consumed { return self_.diagnostic(Code.borrow_conflict,u_ast); }
+    local_composites[lc_idx].consumed=true;
+    let e1=self_.addHandlerExpr(b,lc.right_expr,0,depth+1);
+    if e1!=blot_error::Error.none { return e1; }
+    return self_.addHandlerExpr(b,lc.left_expr,lc.left_dotted_name,depth+1);
+   }
+  }
+ }
+ let ckind,cleft,cright,cdotted=self_.isSyntacticCompositeExpr(u_ast);
+ if ckind==1 {
+  let e1=self_.addHandlerExpr(b,cright,0,depth+1);
+  if e1!=blot_error::Error.none { return e1; }
+  return self_.addHandlerExpr(b,cleft,cdotted,depth+1);
+ }
+ let saved_amb=self_.ambient;
+ self_.ambient=b.outer_ambient;
+ let h_ty,herr=self_.expression(h_ast);
+ self_.ambient=saved_amb;
+ if herr!=blot_error::Error.none { return herr; }
+ let base_idx,berr=addHandleBase(b,0,h_ast,h_ty);
+ if berr!=blot_error::Error.none { return berr; }
+ var path=IdBuffer{..};
+ let aerr=self_.addRuntimeHandlerType(b,base_idx,h_ty,path,h_ast,depth+1);
+ path.deinit(equation_type_ids);
+ return aerr;
+}
+recursive fn unwindRuntimeHandled(self_:Engine&,b:HandleBuild&,base_idx:u32,start_ty:u32,site_ast:u32,out_body_path:IdBuffer&)->u32,blot_error::Error {
+ let handler_sym,herr=self_.pool.intern("handler");
+ if herr!=blot_error::Error.none { return 0,blot_error::Error.type_limit; }
+ let body_sym,berr=self_.pool.intern("body");
+ if berr!=blot_error::Error.none { return 0,blot_error::Error.type_limit; }
+ var cur_ty=start_ty;
+ var steps:i64=0;
+ while steps<128 {
+  let is_h,body_ty,h_ty,merr=self_.matchPreludePairNominal(cur_ty,"Handled");
+  if merr!=blot_error::Error.none { return 0,merr; }
+  if !is_h { break; }
+  let h_ty_idx,hterr=appendSiteType(b,h_ty);
+  if hterr!=blot_error::Error.none { return 0,hterr; }
+  let mark=out_body_path.items.len;
+  for w in [handler_sym,1 as u32,h_ty_idx] { let e=out_body_path.append(w); if e!=blot_error::Error.none { return 0,e; } }
+  let aerr=self_.addRuntimeHandlerType(b,base_idx,h_ty,out_body_path,site_ast,0);
+  out_body_path.resize(mark);
+  if aerr!=blot_error::Error.none { return 0,aerr; }
+  let body_ty_idx,bterr=appendSiteType(b,body_ty);
+  if bterr!=blot_error::Error.none { return 0,bterr; }
+  for w in [body_sym,0 as u32,body_ty_idx] { let e=out_body_path.append(w); if e!=blot_error::Error.none { return 0,e; } }
+  cur_ty=body_ty;
+  steps+=1;
+ }
+ return cur_ty,blot_error::Error.none;
+}
+// Core handler installation + body invocation check.
+// handler_asts: list of handler AST nodes (outermost to innermost); if handler_dotted!=0 it is used instead of handler_asts.
+// pre_recv_ast / pre_recv_ty: when non-zero, an already-checked runtime expression (either Handled or Layer/effect)
+//   pre_recv_mode: 0 = none, 1 = prechecked runtime handler (body = body_ast, arg = 0), 2 = prechecked runtime Handled (arg = arg_ast)
+recursive fn checkHandleRun(self_:Engine&,site_id:u32,handler_asts:const u32[:],handler_dotted:u32,body_kind_in:u32,body_ast_in:u32,body_dot:i64,arg_ast:u32,pre_recv_mode:u32,pre_recv_ast:u32,pre_recv_ty:u32)->u32,blot_error::Error {
+ let outer_ambient=self_.ambient;
+ let active_mark=with_active_len;
+ var b=HandleBuild{ site_id:site_id, outer_ambient:outer_ambient, cur_ambient:outer_ambient, .. };
+ var failure=blot_error::Error.none;
+ if pre_recv_mode==1 {
+  let base_idx,berr=addHandleBase(b,0,pre_recv_ast,pre_recv_ty);
+  if berr!=blot_error::Error.none { failure=berr; }
+  else {
+   var path=IdBuffer{..};
+   failure=self_.addRuntimeHandlerType(b,base_idx,pre_recv_ty,path,pre_recv_ast,0);
+   path.deinit(equation_type_ids);
+  }
+ } else if handler_dotted!=0 {
+  failure=self_.addHandlerExpr(b,0,handler_dotted,0);
+ } else {
+  for h_ast in handler_asts {
+   failure=self_.addHandlerExpr(b,h_ast,0,0);
+   if failure!=blot_error::Error.none { break; }
+  }
+ }
+ var body_kind:u32=body_kind_in;
+ var body_arg1:u32=body_ast_in;
+ var body_arg2:u32=0;
+ var body_path=IdBuffer{..};
+ var body_raw_ty:u32=0;
+ if failure==blot_error::Error.none {
+  if pre_recv_mode==2 {
+   let base_idx,berr=addHandleBase(b,0,pre_recv_ast,pre_recv_ty);
+   if berr!=blot_error::Error.none { failure=berr; }
+   else {
+    let bty,uerr=self_.unwindRuntimeHandled(b,base_idx,pre_recv_ty,pre_recv_ast,body_path);
+    if uerr!=blot_error::Error.none { failure=uerr; }
+    else {
+     body_kind=2;
+     body_arg1=base_idx;
+     body_arg2=(body_path.items.len/3) as u32;
+     body_raw_ty=bty;
+    }
+   }
+  } else {
+   self_.ambient=b.cur_ambient;
+   if body_kind_in==1 {
+    let bty,berr=self_.resolveDottedPrefix(body_ast_in,body_dot);
+    if berr!=blot_error::Error.none { failure=berr; }
+    else { body_raw_ty=bty; }
+   } else {
+    let saved_els=self_.expected_lambda_source;
+    let saved_elt=self_.expected_lambda_type;
+    let body_u=unwrapGroup(self_.tree,body_ast_in);
+    if self_.tree.node(body_u).tag==blot_parse_ast::tag_lambda {
+     let fp,fperr=self_.types.fresh();
+     if fperr!=blot_error::Error.none { failure=fperr; }
+     else {
+      let fr,frerr=self_.types.fresh();
+      if frerr!=blot_error::Error.none { failure=frerr; }
+      else {
+       let exp_fn,eferr=self_.types.functionWithEffects(fp,fr,b.cur_ambient);
+       if eferr!=blot_error::Error.none { failure=eferr; }
+       else {
+        self_.expected_lambda_source=body_u;
+        self_.expected_lambda_type=exp_fn;
+       }
+      }
+     }
+    }
+    if failure==blot_error::Error.none {
+     let bty,berr=self_.expression(body_ast_in);
+     if berr!=blot_error::Error.none { failure=berr; }
+     else { body_raw_ty=bty; }
+    }
+    self_.expected_lambda_source=saved_els;
+    self_.expected_lambda_type=saved_elt;
+   }
+   if failure==blot_error::Error.none {
+    // Check if body itself evaluated to a runtime Handled value (e.g. `wrapped.handle h2 .run arg`).
+    let is_h,_,_,herr=self_.matchPreludePairNominal(body_raw_ty,"Handled");
+    if herr!=blot_error::Error.none { failure=herr; }
+    else if is_h {
+     let base_idx,berr=addHandleBase(b,body_kind_in,body_ast_in,body_raw_ty);
+     if berr!=blot_error::Error.none { failure=berr; }
+     else {
+      let bty,uerr=self_.unwindRuntimeHandled(b,base_idx,body_raw_ty,body_ast_in,body_path);
+      if uerr!=blot_error::Error.none { failure=uerr; }
+      else {
+       body_kind=2;
+       body_arg1=base_idx;
+       body_arg2=(body_path.items.len/3) as u32;
+       body_raw_ty=bty;
+      }
+     }
+    }
+   }
+  }
+ }
+ var result_ty:u32=0;
+ if failure==blot_error::Error.none {
+  let resolved,rerr=self_.types.resolve(body_raw_ty,0);
+  if rerr!=blot_error::Error.none { failure=rerr; }
+  else {
+   let opened,oerr=self_.types.openCovariant(resolved);
+   if oerr!=blot_error::Error.none { failure=oerr; }
+   else {
+    var function_ty=opened;
+    let qid,qerr=self_.types.resolve(function_ty,0);
+    if qerr!=blot_error::Error.none { failure=qerr; }
+    else {
+     let qn=self_.types.node(qid);
+     if qn.tag==blot_check_types::Tag.usage && (qn.b==blot_parse_ast::usagekind_once || qn.b==blot_parse_ast::usagekind_many || qn.b==blot_parse_ast::usagekind_cleanup || qn.b==blot_parse_ast::usagekind_concurrent) {
+      function_ty=qn.a;
+     } else {
+      let shared_fn=blot_check_storage_types::sharedInner(self_.types,qid);
+      if shared_fn.present { function_ty=shared_fn.value; }
+     }
+     let froot,frerr=self_.types.resolve(function_ty,0);
+     if frerr!=blot_error::Error.none { failure=frerr; }
+     else {
+      let function=self_.types.node(froot);
+      if body_kind!=2 {
+       let bti,btierr=appendSiteType(b,function_ty);
+       if btierr!=blot_error::Error.none { failure=btierr; }
+       else { body_arg2=bti; }
+      }
+      var arg_ty:u32=blot_check_types::unit;
+      if failure==blot_error::Error.none && arg_ast!=0 {
+       self_.ambient=outer_ambient;
+       let aty,aerr=ordinaryArgument(self_,arg_ast,function);
+       if aerr!=blot_error::Error.none { failure=aerr; }
+       else { arg_ty=aty; }
+      }
+      if failure==blot_error::Error.none {
+       self_.ambient=b.cur_ambient;
+       let initial,ferr=self_.types.fresh();
+       if ferr!=blot_error::Error.none { failure=ferr; }
+       else {
+        var given=arg_ty;
+        var takes=false;
+        if arg_ast!=0 {
+         var marked=arg_ast;
+         while self_.tree.node(marked).tag==blot_parse_ast::tag_group {
+          if self_.tree.node(marked).b==1 { takes=true; }
+          marked=self_.tree.node(marked).a;
+         }
+        }
+        if function.tag==blot_check_types::Tag.function {
+         let wanted,werr=self_.types.resolve(function.a,0);
+         if werr!=blot_error::Error.none { failure=werr; }
+         else {
+          let wrapper=self_.types.node(wanted);
+          if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {
+           takes=true;
+          } else if !takes && arg_ast!=0 {
+           let actual=self_.types.head(arg_ty,0);
+           let actual_node=self_.types.node(actual);
+           let actual_info=blot_check_storage_types::info(self_.types,actual);
+           let wanted_info=blot_check_storage_types::info(self_.types,wanted);
+           if wrapper.tag==blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.array && actual_node.tag!=blot_check_types::Tag.variable {
+            let readable=blot_check_storage_types::readableElement(self_.types,actual);
+            if readable.present && (!actual_info.present || actual_info.value.kind!=blot_check_storage_types::view) {
+             failure=self_.constrain(readable.value,wrapper.a,site_id);
+             given=wanted;
+            }
+           } else if wanted_info.present && wanted_info.value.kind==blot_check_storage_types::sized_array && actual!=wanted && actual_node.tag!=blot_check_types::Tag.variable {
+            let act_unwrapped=self_.types.head(blot_check_storage_types::unwrapShared(self_.types,actual),0);
+            let act_uinfo=blot_check_storage_types::info(self_.types,act_unwrapped);
+            if act_uinfo.present && blot_check_storage_types::isSized(act_uinfo.value.kind) {
+             let wlen=blot_check_storage_types::lengthOf(self_.types,wanted);
+             let alen=blot_check_storage_types::lengthOf(self_.types,act_unwrapped);
+             failure=self_.constrain(alen.value,wlen.value,site_id);
+             if failure==blot_error::Error.none { failure=self_.constrain(act_uinfo.value.element,wanted_info.value.element,site_id); }
+             given=wanted;
+            }
+           } else if actual_info.present && actual_info.value.kind==blot_check_storage_types::shared && wrapper.tag!=blot_check_types::Tag.variable && (!wanted_info.present || wanted_info.value.kind!=blot_check_storage_types::shared) {
+            failure=self_.constrain(actual_info.value.element,wanted,site_id);
+            given=wanted;
+           }
+          }
+         }
+        }
+        if failure==blot_error::Error.none && takes {
+         let wrapped,werr=self_.types.usage(arg_ty,blot_parse_ast::usagekind_own,0);
+         if werr!=blot_error::Error.none { failure=werr; }
+         else { given=wrapped; }
+        }
+        if failure==blot_error::Error.none {
+         let inv,ierr=self_.invocation(given,initial);
+         if ierr!=blot_error::Error.none { failure=ierr; }
+         else {
+          failure=self_.constrain(function_ty,inv,site_id);
+          if failure==blot_error::Error.none {
+           result_ty=initial;
+           let rfn,rfne=self_.types.resolve(function_ty,0);
+           if rfne!=blot_error::Error.none { failure=rfne; }
+           else {
+            let fn_node=self_.types.node(rfn);
+            if fn_node.tag==blot_check_types::Tag.never { result_ty=blot_check_types::never; }
+            else if fn_node.tag==blot_check_types::Tag.function {
+             let rb,rbe=self_.types.resolve(fn_node.b,0);
+             if rbe!=blot_error::Error.none { failure=rbe; }
+             else if rb==blot_check_types::never { result_ty=blot_check_types::never; }
+            }
+           }
+           if failure==blot_error::Error.none && arg_ast!=0 {
+            let ra,rae=self_.types.resolve(arg_ty,0);
+            if rae!=blot_error::Error.none { failure=rae; }
+            else if ra==blot_check_types::never { result_ty=blot_check_types::never; }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+ self_.ambient=outer_ambient;
+ with_active_len=active_mark;
+ if failure==blot_error::Error.none {
+  for lh_u in b.unlock_lhs.items { local_handlers[lh_u as i64].consumed=true; }
+  for ui in 0..b.unlock_outers.items.len {
+   let outer_b=b.unlock_outers.items[ui];
+   let after_b=b.unlock_afters.items[ui];
+   unlockWithBinding(outer_b);
+   self_.env.push(Entry{ name:self_.bindings[outer_b].name, binding:after_b, .. });
+  }
+  var final_words=IdBuffer{..};
+  var enc_err=final_words.append(b.num_bases);
+  if enc_err==blot_error::Error.none {
+   for w in b.bases_words.items { enc_err=final_words.append(w); if enc_err!=blot_error::Error.none { break; } }
+  }
+  if enc_err==blot_error::Error.none {
+   for w in [body_kind,body_arg1,body_arg2] { enc_err=final_words.append(w); if enc_err!=blot_error::Error.none { break; } }
+  }
+  if enc_err==blot_error::Error.none && body_kind==2 {
+   for w in body_path.items { enc_err=final_words.append(w); if enc_err!=blot_error::Error.none { break; } }
+  }
+  if enc_err==blot_error::Error.none { enc_err=final_words.append(arg_ast); }
+  if enc_err==blot_error::Error.none { enc_err=final_words.append(b.num_layers); }
+  if enc_err==blot_error::Error.none {
+   for w in b.layers_words.items { enc_err=final_words.append(w); if enc_err!=blot_error::Error.none { break; } }
+  }
+  if enc_err!=blot_error::Error.none { failure=enc_err; }
+  else {
+   let nl,nlerr=self_.types.saveList(final_words.items);
+   if nlerr!=blot_error::Error.none { failure=nlerr; }
+   else {
+    let tl,tlerr=self_.types.saveList(b.site_types.items);
+    if tlerr!=blot_error::Error.none { failure=tlerr; }
+    else {
+     self_.access_nodes[site_id]=nl;
+     self_.access_types[site_id]=tl;
+     self_.projections[site_id]=handle_site_tag_base;
+    }
+   }
+  }
+  final_words.deinit(equation_type_ids);
+ }
+ body_path.deinit(equation_type_ids);
+ b.deinit();
+ if failure!=blot_error::Error.none { return 0,failure; }
+ return result_ty,blot_error::Error.none;
+}
+recursive fn handleIntrinsicApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {
+ let outer=self_.tree.node(id);
+ let inner_id=unwrapGroup(self_.tree,outer.a);
+ let inner=self_.tree.node(inner_id);
+ if inner.tag!=blot_parse_ast::tag_apply { return blot_support::none<u32>(),blot_error::Error.none; }
+ let head_id=unwrapGroup(self_.tree,inner.a);
+ let head=self_.tree.node(head_id);
+ if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@handle" { return blot_support::none<u32>(),blot_error::Error.none; }
+ let hs:u32[1]=[inner.b];
+ let res,err=self_.checkHandleRun(id,hs[..],0,0,outer.b,0,0,0,0,0);
+ return blot_support::some(res),err;
+}
+recursive fn finishOrdinaryCalleeApplication(self_:Engine&,id:u32,leaf:u32,callee_ty:u32)->u32,blot_error::Error {
+ let node=self_.tree.node(id);
+ let pending_begin=self_.pending.len;
+ let resolved,err=self_.types.resolve(callee_ty,0);
+ if err!=blot_error::Error.none { return 0,err; }
+ let opened,err=self_.types.openCovariant(resolved);
+ if err!=blot_error::Error.none { return 0,err; }
+ var function_ty=opened;
+ let qid,err=self_.types.resolve(function_ty,0);
+ if err!=blot_error::Error.none { return 0,err; }
+ let qualified=self_.types.node(qid);
+ let cleanup=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_cleanup;
+ let concurrent=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_concurrent;
+ if qualified.tag==blot_check_types::Tag.usage && (qualified.b==blot_parse_ast::usagekind_once || qualified.b==blot_parse_ast::usagekind_many || cleanup || concurrent) {
+  function_ty=qualified.a;
+ } else {
+  let shared_fn=blot_check_storage_types::sharedInner(self_.types,qid);
+  if shared_fn.present { function_ty=shared_fn.value; }
+ }
+ self_.expr_types[node.a]=function_ty;
+ if cleanup || concurrent { self_.expr_types[node.a]=qid; }
+ let froot,err=self_.types.resolve(function_ty,0);
+ if err!=blot_error::Error.none { return 0,err; }
+ let function=self_.types.node(froot);
+ let saved=self_.exact_argument_types;
+ let evidence,err=self_.evidenceCall(node.a,0);
+ if err!=blot_error::Error.none { return 0,err; }
+ self_.exact_argument_types=saved || evidence;
+ let argument,error=ordinaryArgument(self_,node.b,function);
+ self_.exact_argument_types=saved;
+ if error!=blot_error::Error.none { return 0,error; }
+ return ordinaryApplicationFinish(self_,id,leaf,node,pending_begin,function_ty,function,argument);
+}
+recursive fn unwindHandleChain(self_:Engine&,start_expr:u32,layers:IdBuffer&)->u32,u32,i64,blot_error::Error {
+ var cur=unwrapGroup(self_.tree,start_expr);
+ var steps:i64=0;
+ while steps<128 {
+  let ckind,cleft,cright,cdotted=self_.isSyntacticCompositeExpr(cur);
+  if ckind==2 {
+   let aerr=layers.append(cright);
+   if aerr!=blot_error::Error.none { return 0,0,0,aerr; }
+   if cdotted!=0 {
+    let txt=self_.pool.get(self_.tree.node(cdotted).a);
+    let dot=endsWithDotMember(txt,"handle");
+    let pref=txt[..dot];
+    if !firstDot(pref).present {
+     let psym,pk=self_.pool.lookup(pref);
+     if pk {
+      let loc=self_.lookup(psym);
+      if loc.present {
+       let lc_idx=findLocalComposite(loc.value);
+       if lc_idx>=0 && local_composites[lc_idx].kind==2 {
+        if local_composites[lc_idx].consumed { return 0,0,0,self_.diagnostic(Code.borrow_conflict,cdotted); }
+        local_composites[lc_idx].consumed=true;
+        let lc=local_composites[lc_idx];
+        let a2=layers.append(lc.right_expr);
+        if a2!=blot_error::Error.none { return 0,0,0,a2; }
+        if lc.left_dotted_name!=0 {
+         let ltxt=self_.pool.get(self_.tree.node(lc.left_dotted_name).a);
+         let ldot=endsWithDotMember(ltxt,"handle");
+         return 1,lc.left_dotted_name,ldot,blot_error::Error.none;
+        }
+        cur=unwrapGroup(self_.tree,lc.left_expr);
+        steps+=1;
+        continue;
+       }
+      }
+     }
+    }
+    return 1,cdotted,dot,blot_error::Error.none;
+   }
+   cur=unwrapGroup(self_.tree,cleft);
+   steps+=1;
+   continue;
+  }
+  let cnode=self_.tree.node(cur);
+  if cnode.tag==blot_parse_ast::tag_name {
+   let loc=self_.lookup(cnode.a);
+   if loc.present {
+    let lc_idx=findLocalComposite(loc.value);
+    if lc_idx>=0 && local_composites[lc_idx].kind==2 {
+     if local_composites[lc_idx].consumed { return 0,0,0,self_.diagnostic(Code.borrow_conflict,cur); }
+     local_composites[lc_idx].consumed=true;
+     let lc=local_composites[lc_idx];
+     let a2=layers.append(lc.right_expr);
+     if a2!=blot_error::Error.none { return 0,0,0,a2; }
+     if lc.left_dotted_name!=0 {
+      let ltxt=self_.pool.get(self_.tree.node(lc.left_dotted_name).a);
+      let ldot=endsWithDotMember(ltxt,"handle");
+      return 1,lc.left_dotted_name,ldot,blot_error::Error.none;
+     }
+     cur=unwrapGroup(self_.tree,lc.left_expr);
+     steps+=1;
+     continue;
+    }
+   }
+  }
+  break;
+ }
+ return 0,cur,0,blot_error::Error.none;
+}
+recursive fn handleRunApplication(self_:Engine&,id:u32,leaf:u32)->blot_support::Option<u32>,blot_error::Error {
+ let node=self_.tree.node(id);
+ let callee=unwrapGroup(self_.tree,node.a);
+ let cnode=self_.tree.node(callee);
+ if cnode.tag==blot_parse_ast::tag_name {
+  if self_.lookup(cnode.a).present || self_.catalogs.globals.contains(cnode.a) { return blot_support::none<u32>(),blot_error::Error.none; }
+  let txt=self_.pool.get(cnode.a);
+  let dot=endsWithDotMember(txt,"run");
+  if dot<=0 { return blot_support::none<u32>(),blot_error::Error.none; }
+  let pref=txt[..dot];
+  if !firstDot(pref).present {
+   let psym,pk=self_.pool.lookup(pref);
+   if !pk { return blot_support::none<u32>(),blot_error::Error.none; }
+   let loc=self_.lookup(psym);
+   if loc.present {
+    let bnd=loc.value;
+    if isWithLocked(bnd) { let f,e=self_.diagnosticFresh(Code.borrow_conflict,callee); return blot_support::some(f),e; }
+    let lh_idx=findLocalHandler(bnd);
+    if lh_idx>=0 {
+     let res,err=self_.checkHandleRun(id,[],callee,0,node.b,0,0,0,0,0);
+     return blot_support::some(res),err;
+    }
+    let lc_idx=findLocalComposite(bnd);
+    if lc_idx>=0 {
+     let lc=local_composites[lc_idx];
+     if lc.kind==1 {
+      let res,err=self_.checkHandleRun(id,[],callee,0,node.b,0,0,0,0,0);
+      return blot_support::some(res),err;
+     }
+     if lc.consumed { let f,e=self_.diagnosticFresh(Code.borrow_conflict,callee); return blot_support::some(f),e; }
+     local_composites[lc_idx].consumed=true;
+     var layers=IdBuffer{..};
+     let a1=layers.append(lc.right_expr);
+     if a1!=blot_error::Error.none { layers.deinit(equation_type_ids); return blot_support::none<u32>(),a1; }
+     var bkind:u32=0; var bast:u32=lc.left_expr; var bdot:i64=0;
+     if lc.left_dotted_name!=0 {
+      let ltxt=self_.pool.get(self_.tree.node(lc.left_dotted_name).a);
+      bkind=1; bast=lc.left_dotted_name; bdot=endsWithDotMember(ltxt,"handle");
+     } else {
+      let uk,ua,ud,uerr=self_.unwindHandleChain(lc.left_expr,layers);
+      if uerr!=blot_error::Error.none { layers.deinit(equation_type_ids); return blot_support::none<u32>(),uerr; }
+      bkind=uk; bast=ua; bdot=ud;
+     }
+     let res,err=self_.checkHandleRun(id,layers.items,0,bkind,bast,bdot,node.b,0,0,0);
+     layers.deinit(equation_type_ids);
+     return blot_support::some(res),err;
+    }
+    let handleable,herr=self_.isHandleableType(self_.bindings[bnd].ty);
+    if herr!=blot_error::Error.none { return blot_support::none<u32>(),herr; }
+    if !handleable { return blot_support::none<u32>(),blot_error::Error.none; }
+    let is_h,_,_,mherr=self_.matchPreludePairNominal(self_.bindings[bnd].ty,"Handled");
+    if mherr!=blot_error::Error.none { return blot_support::none<u32>(),mherr; }
+    if is_h {
+     let res,err=self_.checkHandleRun(id,[],0,1,callee,dot,node.b,0,0,0);
+     return blot_support::some(res),err;
+    }
+    let res,err=self_.checkHandleRun(id,[],callee,0,node.b,0,0,0,0,0);
+    return blot_support::some(res),err;
+   }
+   let glob,gerr=self_.globalBinding(psym);
+   if gerr!=blot_error::Error.none { return blot_support::none<u32>(),gerr; }
+   if !glob.present { return blot_support::none<u32>(),blot_error::Error.none; }
+   let perr=self_.prepareGlobal(glob.value);
+   if perr!=blot_error::Error.none { return blot_support::none<u32>(),perr; }
+   let gty=self_.bindings[glob.value].ty;
+   let handleable,herr=self_.isHandleableType(gty);
+   if herr!=blot_error::Error.none { return blot_support::none<u32>(),herr; }
+   if !handleable { return blot_support::none<u32>(),blot_error::Error.none; }
+   let is_h,_,_,mherr=self_.matchPreludePairNominal(gty,"Handled");
+   if mherr!=blot_error::Error.none { return blot_support::none<u32>(),mherr; }
+   if is_h {
+    let res,err=self_.checkHandleRun(id,[],0,1,callee,dot,node.b,0,0,0);
+    return blot_support::some(res),err;
+   }
+   let res,err=self_.checkHandleRun(id,[],callee,0,node.b,0,0,0,0,0);
+   return blot_support::some(res),err;
+  }
+  // Multi-dot prefix (e.g. `mod.env.run` or `r.h.run`): peek root to see if it could be handleable, else leave to ordinary path.
+  let fdot=firstDot(pref);
+  let rsym,rk=self_.pool.lookup(pref[..fdot.value]);
+  if !rk { return blot_support::none<u32>(),blot_error::Error.none; }
+  var has_root=self_.lookup(rsym).present || self_.catalogs.globals.contains(rsym) || self_.isNamespace(rsym);
+  if !has_root { return blot_support::none<u32>(),blot_error::Error.none; }
+  // Check if imported module member `mod.env` or record field `r.h` has a handleable type.
+  if !self_.lookup(rsym).present && !self_.catalogs.globals.contains(rsym) {
+   let rest=pref[fdot.value+1..];
+   if !firstDot(rest).present {
+    let msym,mk=self_.pool.lookup(rest);
+    if !mk { return blot_support::none<u32>(),blot_error::Error.none; }
+    let imp,ierr=self_.qualifiedImportBinding(Qualified{namespace_:rsym,member:msym, ..});
+    if ierr!=blot_error::Error.none { return blot_support::none<u32>(),ierr; }
+    if !imp.present { return blot_support::none<u32>(),blot_error::Error.none; }
+    let perr=self_.prepareGlobal(imp.value);
+    if perr!=blot_error::Error.none { return blot_support::none<u32>(),perr; }
+    let handleable,herr=self_.isHandleableType(self_.bindings[imp.value].ty);
+    if herr!=blot_error::Error.none { return blot_support::none<u32>(),herr; }
+    if !handleable { return blot_support::none<u32>(),blot_error::Error.none; }
+    let is_h,_,_,mherr=self_.matchPreludePairNominal(self_.bindings[imp.value].ty,"Handled");
+    if mherr!=blot_error::Error.none { return blot_support::none<u32>(),mherr; }
+    if is_h {
+     let res,err=self_.checkHandleRun(id,[],0,1,callee,dot,node.b,0,0,0);
+     return blot_support::some(res),err;
+    }
+    let res,err=self_.checkHandleRun(id,[],callee,0,node.b,0,0,0,0,0);
+    return blot_support::some(res),err;
+   }
+  }
+  return blot_support::none<u32>(),blot_error::Error.none;
+ }
+ if cnode.tag!=blot_parse_ast::tag_field_access || self_.pool.get(cnode.b)!="run" {
+  return blot_support::none<u32>(),blot_error::Error.none;
+ }
+ let recv_expr=cnode.a;
+ var layers=IdBuffer{..};
+ let bkind,bast,bdot,uerr=self_.unwindHandleChain(recv_expr,layers);
+ if uerr!=blot_error::Error.none { layers.deinit(equation_type_ids); return blot_support::none<u32>(),uerr; }
+ if layers.items.len!=0 {
+  let res,err=self_.checkHandleRun(id,layers.items,0,bkind,bast,bdot,node.b,0,0,0);
+  layers.deinit(equation_type_ids);
+  return blot_support::some(res),err;
+ }
+ layers.deinit(equation_type_ids);
+ let recv_u=unwrapGroup(self_.tree,recv_expr);
+ let rkind,_,_,_=self_.isSyntacticCompositeExpr(recv_u);
+ if rkind==1 {
+  let hs:u32[1]=[recv_u];
+  let res,err=self_.checkHandleRun(id,hs[..],0,0,node.b,0,0,0,0,0);
+  return blot_support::some(res),err;
+ }
+ if self_.tree.node(recv_u).tag==blot_parse_ast::tag_name {
+  let loc=self_.lookup(self_.tree.node(recv_u).a);
+  if loc.present && (findLocalHandler(loc.value)>=0 || findLocalComposite(loc.value)>=0) {
+   let hs:u32[1]=[recv_u];
+   let res,err=self_.checkHandleRun(id,hs[..],0,0,node.b,0,0,0,0,0);
+   return blot_support::some(res),err;
+  }
+ }
+ // Evaluate arbitrary receiver once; if Handled/Layer/effect -> handle-run, else finish ordinary `.run` call!
+ let recv_ty,rerr=self_.expression(recv_expr);
+ if rerr!=blot_error::Error.none { return blot_support::none<u32>(),rerr; }
+ let is_h,_,_,mherr=self_.matchPreludePairNominal(recv_ty,"Handled");
+ if mherr!=blot_error::Error.none { return blot_support::none<u32>(),mherr; }
+ if is_h {
+  let res,err=self_.checkHandleRun(id,[],0,0,0,0,node.b,2,recv_expr,recv_ty);
+  return blot_support::some(res),err;
+ }
+ let handleable,herr=self_.isHandleableType(recv_ty);
+ if herr!=blot_error::Error.none { return blot_support::none<u32>(),herr; }
+ if handleable {
+  let res,err=self_.checkHandleRun(id,[],0,0,node.b,0,0,1,recv_expr,recv_ty);
+  return blot_support::some(res),err;
+ }
+ let operation,operr=self_.scopedOperation(callee,recv_ty,cnode.b,recv_expr);
+ if operr!=blot_error::Error.none { return blot_support::none<u32>(),operr; }
+ var callee_ty:u32=0;
+ if operation.present {
+  callee_ty=operation.value;
+ } else {
+  let projected,perr=self_.projectField(recv_ty,cnode.b,callee,false,blot_support::none<PendingObligation>());
+  if perr!=blot_error::Error.none { return blot_support::none<u32>(),perr; }
+  self_.projection_resolved[callee]=projected.projection;
+  callee_ty=projected.ty;
+ }
+ self_.expr_types[callee]=callee_ty;
+ let ord_res,ord_err=self_.finishOrdinaryCalleeApplication(id,leaf,callee_ty);
+ return blot_support::some(ord_res),ord_err;
 }
 recursive fn nominalAnnotation(self_:Engine&,head:u32,arguments:const u32[:],source:u32)->u32,blot_error::Error {if self_.editorAt(head) {for argument in arguments {let root,err=self_.annotation(argument);if err!=blot_error::Error.none {return 0,err;}}let result,err=self_.captureEditor(head,0,self_.catalogKey(self_.tree.node(head).a).namespace_);if err!=blot_error::Error.none {return 0,err;}self_.editor_capture.value.kind=blot_reuse_completion_probe::Kind.type_;self_.expr_types[head]=result;return result,blot_error::Error.none;}let name=self_.tree.node(head).a;let text=self_.pool.get(name);let len_lit=blot_check_storage_types::parseLengthLiteral(text);if len_lit.present {if arguments.len!=0 {let err=self_.typeArity(source,TypeApplication.extra);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}return blot_check_storage_types::makeLengthLiteral(self_.types,len_lit.value);}let storage=blot_check_storage_types::named(text);if storage.present && (starts_with(text,"@storage.") || !self_.catalogs.nominal_names.contains(self_.catalogKey(name))) {let want_arity=blot_check_storage_types::arity(storage.value);if arguments.len!=want_arity {var application=TypeApplication.extra;if arguments.len<want_arity {application=TypeApplication.missing_nominal;}let err=self_.typeArity(source,application);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}if want_arity==2 {let length,err=self_.annotation(arguments[0]);if err!=blot_error::Error.none {return 0,err;}let element,err=self_.annotation(arguments[1]);if err!=blot_error::Error.none {return 0,err;}return blot_check_storage_types::makeSized(self_.types,storage.value,length,element);}let element,err=self_.annotation(arguments[0]);if err!=blot_error::Error.none {return 0,err;}return blot_check_storage_types::make(self_.types,storage.value,element);}let projection,err=self_.projectionAnnotation(name,arguments,source);if err!=blot_error::Error.none {return 0,err;}if projection.present {return projection.value,blot_error::Error.none;}if text=="Array" {if arguments.len==0 {let err=self_.typeArity(source,TypeApplication.missing_array);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let before=self_.diagnostics.len;if arguments.len>1 {for argument in arguments {let err=self_.argumentTypeNames(argument,0);if err!=blot_error::Error.none {return 0,err;}}}if self_.diagnostics.len!=before {return self_.types.fresh();}let element,err=self_.annotation(arguments[0]);if err!=blot_error::Error.none {return 0,err;}self_.applicationDiagnosticOrigin(before,source);if self_.diagnostics.len!=before {return self_.types.fresh();}if arguments.len>1 {let err=self_.typeArity(source,TypeApplication.extra);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}return self_.types.sequence(blot_check_types::Tag.array,element);}for builtin in ["Unit","Bool","U32","F32","U8","I32","U64","I64","F64","EffectSet","EffectDescriptor"] {if text==builtin {let before=self_.diagnostics.len;for argument in arguments {let err=self_.argumentTypeNames(argument,0);if err!=blot_error::Error.none {return 0,err;}}if self_.diagnostics.len==before {let err=self_.typeArity(source,TypeApplication.extra);if err!=blot_error::Error.none {return 0,err;}}return self_.types.fresh();}}let selected:u32={var has_nom=false;var nom_val:u32=0;var has_tr=false;var tr_val:u32=0;var has_ef=false;var ef_val:u32=0;{let scalar_lookup_61 .= self_.catalogs.nominal_names.get(self_.catalogKey(name));if scalar_lookup_61 {nom_val=scalar_lookup_61;has_nom=true;}else {let trait_lookup .= self_.catalogs.contract_names.get(self_.catalogKey(name));if trait_lookup {tr_val=trait_lookup;has_tr=true;}else {let ef_lookup .= self_.catalogs.effect_family_names.get(self_.catalogKey(name));if ef_lookup {ef_val=ef_lookup;has_ef=true;}}}}if !has_nom {if has_tr {return self_.traitRecordAnnotation(tr_val,arguments,source);}if has_ef {return self_.effectRecordAnnotation(ef_val,arguments,source);}return self_.diagnosticFresh(Code.unsupported_type,source);}nom_val};let index=selected;let nominal=self_.nominals[index];let before=self_.diagnostics.len;if arguments.len!=nominal.parameters.len {for argument in arguments {let err=self_.argumentTypeNames(argument,0);if err!=blot_error::Error.none {return 0,err;}}}if self_.diagnostics.len!=before {return self_.types.fresh();}let old=equation_type_ids.alloc_slice(nominal.variables.len);let type_span_72=checkedTypeList(self_.types,nominal.variables);for ordinal in 0..(type_span_72.len as i64) {let value=self_.types.list(type_span_72)[ordinal];old[ordinal]=value;}let fresh=equation_type_ids.alloc_slice(old.len);let shapes=equation_type_ids.alloc_slice(nominal.parameters.len);let type_span_73=checkedTypeList(self_.types,nominal.parameters);for ordinal in 0..(type_span_73.len as i64) {let value=self_.types.list(type_span_73)[ordinal];shapes[ordinal]=value;}var args=IdBuffer{..};let result,error=nominalAnnotationArguments(self_,index,nominal,source,arguments,before,old,fresh,shapes,args);args.deinit(equation_type_ids);equation_type_ids.free_slice(shapes);equation_type_ids.free_slice(fresh);equation_type_ids.free_slice(old);return result,error;}
 recursive fn nominalAnnotationArguments(self_:Engine&,index:u32,nominal:Nominal,source:u32,arguments:const u32[:],before:i64,old:const u32[:],fresh:u32[:],shapes:const u32[:],args:IdBuffer&)->u32,blot_error::Error {for &replacement in fresh {let root,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}replacement=root;}let count=min(arguments.len,shapes.len);for argument,ordinal in arguments[..count] {let pattern=self_.parameter_patterns.list(nominal.patterns)[ordinal];let actual,err=self_.parameterArgument(pattern,argument,true,0);if err!=blot_error::Error.none {return 0,err;}let selected,err=self_.types.substitute(shapes[ordinal],old,fresh);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(selected,actual,argument);if err!=blot_error::Error.none {return 0,err;}let root,err=self_.types.resolve(selected,0);if err!=blot_error::Error.none {return 0,err;}let err=args.append(root);if err!=blot_error::Error.none {return 0,err;}}self_.applicationDiagnosticOrigin(before,source);if arguments.len!=shapes.len {if self_.diagnostics.len==before {var application=TypeApplication.extra;if arguments.len<shapes.len {application=TypeApplication.missing_nominal;}let err=self_.typeArity(source,application);if err!=blot_error::Error.none {return 0,err;}}return self_.types.fresh();}let alias,err=self_.aliasInstance(index,old,fresh,source);if err!=blot_error::Error.none {return 0,err;}if alias.present {return alias.value,blot_error::Error.none;}return self_.types.nominal(nominal.identity,args.items);}
@@ -3247,7 +4186,7 @@ fn next(self_:NameParts&,pool:const blot_parse_symbols::Pool&)->blot_support::Op
 fn peek(self_:const NameParts&,pool:const blot_parse_symbols::Pool&)->blot_support::Option<const u8[:]> {if self_.finished {return blot_support::none<const u8[:]>();}let text=pool.get(self_.name);var end=self_.position;while end<text.len {if text[end]=='.' as u8 {break;}end+=1;}return blot_support::some<const u8[:]>(text[self_.position..end]);}
 
 recursive fn qualifiedValue(self_:Engine&,id:u32,name:u32)->blot_support::Option<u32>,blot_error::Error {var parts=NameParts{name:name, ..};let first=parts.next(self_.pool);assert(first.present);if !parts.peek(self_.pool).present {return blot_support::none<u32>(),blot_error::Error.none;}let root,known=self_.pool.lookup(first.value);if !known {return blot_support::none<u32>(),blot_error::Error.none;}var binding=self_.lookup(root);if !binding.present {let global,err=self_.globalBinding(root);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}binding=global;}if !binding.present {let member=parts.next(self_.pool);assert(member.present);if self_.editorAt(id) && !parts.peek(self_.pool).present && self_.isNamespace(root) {let capture,err=self_.captureEditor(id,0,root);return blot_support::some(capture),err;}let symbol,known=self_.pool.lookup(member.value);if known {let imported,err=self_.qualifiedImportBinding(Qualified{namespace_:root,member:symbol, ..});if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}binding=imported;}}if !binding.present {return blot_support::none<u32>(),blot_error::Error.none;}var path=IdBuffer{..};var types=IdBuffer{..};let result,err=qualifiedValueParts(self_,id,binding.value,parts,path,types);types.deinit(equation_type_ids);path.deinit(equation_type_ids);return result,err;}
-recursive fn qualifiedValueParts(self_:Engine&,id:u32,target:u32,parts:NameParts&,path:IdBuffer&,types:IdBuffer&)->blot_support::Option<u32>,blot_error::Error {if isWithLocked(target) {let root,err=self_.diagnosticFresh(Code.borrow_conflict,id);return blot_support::some(root),err;}var ty:u32=0;if self_.bindings[target].kind==blot_reuse_principal_interface::Kind.global || self_.bindings[target].kind==blot_reuse_principal_interface::Kind.external {let root,err=self_.globalReference(target,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=root;}else {let root,err=self_.instantiate(target,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=root;}self_.resolved[id]=target;let err=types.append(ty);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}loop {let part=parts.next(self_.pool);if !part.present {break;}if self_.editorAt(id) && !parts.peek(self_.pool).present {let result,err=self_.captureEditor(id,ty,0);return blot_support::some(result),err;}let symbol,known=self_.pool.lookup(part.value);if !known {let root,err=self_.diagnosticFresh(Code.unknown_field,id);return blot_support::some(root),err;}let operation,err=self_.scopedOperation(id,ty,symbol,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}if operation.present {self_.operation_uses[self_.operation_refs[id]-1].capability_binding=target;let list,err=self_.types.saveList(path.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_paths[id]=list;let list,err=self_.types.saveList(types.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_types[id]=list;if parts.peek(self_.pool).present {let err=self_.diagnostic(Code.effect_identity_scope,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}}return operation,blot_error::Error.none;}let projected,err=self_.projectField(ty,symbol,id,false,blot_support::none<PendingObligation>());if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=projected.ty;let err=path.append(projected.projection);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=types.append(ty);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}}let list,err=self_.types.saveList(path.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_paths[id]=list;let list,err=self_.types.saveList(types.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_types[id]=list;return blot_support::some(ty),blot_error::Error.none;}
+recursive fn qualifiedValueParts(self_:Engine&,id:u32,target:u32,parts:NameParts&,path:IdBuffer&,types:IdBuffer&)->blot_support::Option<u32>,blot_error::Error {if isWithLocked(target) {let root,err=self_.diagnosticFresh(Code.borrow_conflict,id);return blot_support::some(root),err;}let lh_rej,lh_err=self_.checkLocalHandlerOrCompositeUse(target,id);if lh_err!=blot_error::Error.none {return blot_support::none<u32>(),lh_err;}if lh_rej {let root,err=self_.types.fresh();return blot_support::some(root),err;}var ty:u32=0;if self_.bindings[target].kind==blot_reuse_principal_interface::Kind.global || self_.bindings[target].kind==blot_reuse_principal_interface::Kind.external {let root,err=self_.globalReference(target,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=root;}else {let root,err=self_.instantiate(target,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=root;}self_.resolved[id]=target;let err=types.append(ty);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}loop {let part=parts.next(self_.pool);if !part.present {break;}if self_.editorAt(id) && !parts.peek(self_.pool).present {let result,err=self_.captureEditor(id,ty,0);return blot_support::some(result),err;}let symbol,known=self_.pool.lookup(part.value);if !known {let root,err=self_.diagnosticFresh(Code.unknown_field,id);return blot_support::some(root),err;}let operation,err=self_.scopedOperation(id,ty,symbol,0);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}if operation.present {if self_.operation_refs[id]!=0 {self_.operation_uses[self_.operation_refs[id]-1].capability_binding=target;}let list,err=self_.types.saveList(path.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_paths[id]=list;let list,err=self_.types.saveList(types.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_types[id]=list;if parts.peek(self_.pool).present {let err=self_.diagnostic(Code.effect_identity_scope,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}}return operation,blot_error::Error.none;}let projected,err=self_.projectField(ty,symbol,id,false,blot_support::none<PendingObligation>());if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}ty=projected.ty;let err=path.append(projected.projection);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=types.append(ty);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}}let list,err=self_.types.saveList(path.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_paths[id]=list;let list,err=self_.types.saveList(types.items);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.access_types[id]=list;return blot_support::some(ty),blot_error::Error.none;}
 recursive fn selectorFunction(self_:Engine&,id:u32)->u32,blot_error::Error {let saved=self_.ambient;let latent,err=self_.types.freshEffects();if err!=blot_error::Error.none {return 0,err;}self_.ambient=latent;var path=IdBuffer{..};var types=IdBuffer{..};let result,error=selectorFunctionBody(self_,id,latent,path,types);types.deinit(equation_type_ids);path.deinit(equation_type_ids);self_.ambient=saved;return result,error;}
 recursive fn selectorFunctionBody(self_:Engine&,id:u32,latent:u32,path:IdBuffer&,types:IdBuffer&)->u32,blot_error::Error {match self_.types.row(latent).tail {variable payload=>{self_.row_sources.insert(payload.value,id);},_=>{abort("fresh effects must have a variable tail");}}let input,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}if self_.editorAt(id) {let result,err=self_.captureEditor(id,input,0);if err!=blot_error::Error.none {return 0,err;}return self_.types.functionWithEffects(input,result,latent);}let binding,err=self_.addBinding(Binding{name:0,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.parameter,ty:input, ..});if err!=blot_error::Error.none {return 0,err;}self_.resolved[id]=binding;let err=types.append(input);if err!=blot_error::Error.none {return 0,err;}var current=input;var names=NameParts{name:self_.tree.node(id).a, ..};loop {let part=names.next(self_.pool);if !part.present {break;}let name,known=self_.pool.lookup(part.value);if !known {return 0,blot_error::Error.type_limit;}let projected,err=self_.projectField(current,name,id,false,blot_support::none<PendingObligation>());if err!=blot_error::Error.none {return 0,err;}let err=path.append(projected.projection);if err!=blot_error::Error.none {return 0,err;}let err=types.append(projected.ty);if err!=blot_error::Error.none {return 0,err;}current=projected.ty;}let list,err=self_.types.saveList(path.items);if err!=blot_error::Error.none {return 0,err;}self_.access_paths[id]=list;let list,err=self_.types.saveList(types.items);if err!=blot_error::Error.none {return 0,err;}self_.access_types[id]=list;return self_.types.functionWithEffects(input,current,latent);}
 reusable[] var boolean_runs:bool[>..];
@@ -3261,7 +4200,7 @@ recursive fn recordLiteral(self_:Engine&,id:u32,fields:FieldBuffer&)->u32,blot_e
 recursive fn recordConstructorFields(self_:Engine&,id:u32,constructor:u32,function:blot_check_types::Node,payload:blot_check_types::Node,supplied:bool[:])->u32,blot_error::Error {var diverges=false;let child_count:i64=self_.tree.children(id).len;for child_index in 0..child_count {let child:u32=self_.tree.children(id)[child_index];let field=self_.tree.node(child);var raw:u32=0;if field.b==0 {let root,err=self_.shorthand(child,field.a);if err!=blot_error::Error.none {return 0,err;}raw=root;}else {let root,err=self_.contextualNumericExpression(field.b,expectedRecordField(self_,payload,field.a));if err!=blot_error::Error.none {return 0,err;}raw=root;}let value,err=self_.runtimeValue(raw,child);if err!=blot_error::Error.none {return 0,err;}if !diverges {let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return 0,err;}diverges=resolved==blot_check_types::never;}self_.expr_types[child]=value;var found=false;for index in 0..payload.b {let declared=self_.types.recordField(payload,index);if declared.name==field.a {found=true;if supplied[index] {let err=self_.diagnostic(Code.duplicate_field,child);if err!=blot_error::Error.none {return 0,err;}}supplied[index]=true;self_.projections[child]=index as u32;let err=self_.constrain(value,declared.ty,child);if err!=blot_error::Error.none {return 0,err;}break;}}if !found {let err=self_.diagnostic(Code.unknown_field,child);if err!=blot_error::Error.none {return 0,err;}}}for present,index in supplied {if !present {let declared=self_.types.recordField(payload,index);if self_.constructorFieldDefault(constructor,declared.name)==0 {let err=self_.diagnostic(Code.missing_field,id);if err!=blot_error::Error.none {return 0,err;}break;}}}if diverges {return blot_check_types::never,blot_error::Error.none;}return function.b,blot_error::Error.none;}
 recursive fn typeConstructorValue(self_:Engine&,key:Qualified)->blot_support::Option<u32>,blot_error::Error {if key.namespace_!=0 && self_.lookup(key.namespace_).present {return blot_support::none<u32>(),blot_error::Error.none;}var catalog:u32=0;block {let found:u32={let scalar_lookup_64 .= self_.catalogs.nominal_names.get(key);if !scalar_lookup_64 {return blot_support::none<u32>(),blot_error::Error.none;}let scalar_value_64:u32=scalar_lookup_64;scalar_value_64};catalog=found;}let alias,err=self_.resolveAlias(catalog);if err!=blot_error::Error.none || alias!=0 {return blot_support::none<u32>(),err;}let root,err=self_.types.typeConstructor(self_.nominals[catalog].identity);return blot_support::some(root),err;}
 recursive fn shorthand(self_:Engine&,id:u32,name:u32)->u32,blot_error::Error {return self_.shorthandBefore(id,name,self_.env.len);}
-recursive fn shorthandBefore(self_:Engine&,id:u32,name:u32,limit:i64)->u32,blot_error::Error {for offset in 0..limit {let entry=self_.env[limit-offset-1];if entry.name==name {if isWithLocked(entry.binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}self_.resolved[id]=entry.binding;return self_.instantiate(entry.binding,id);}}let binding,err=self_.globalBinding(name);if err!=blot_error::Error.none {return 0,err;}if binding.present {return self_.globalReference(binding.value,id);}return self_.diagnosticFresh(Code.unknown_name,id);}
+recursive fn shorthandBefore(self_:Engine&,id:u32,name:u32,limit:i64)->u32,blot_error::Error {for offset in 0..limit {let entry=self_.env[limit-offset-1];if entry.name==name {if isWithLocked(entry.binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}let lh_rej,lh_err=self_.checkLocalHandlerOrCompositeUse(entry.binding,id);if lh_err!=blot_error::Error.none {return 0,lh_err;}if lh_rej {return self_.types.fresh();}self_.resolved[id]=entry.binding;return self_.instantiate(entry.binding,id);}}let binding,err=self_.globalBinding(name);if err!=blot_error::Error.none {return 0,err;}if binding.present {return self_.globalReference(binding.value,id);}return self_.diagnosticFresh(Code.unknown_name,id);}
 recursive fn associatedApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let outer=self_.tree.node(id);if self_.tree.node(outer.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let middle=self_.tree.node(outer.a);if self_.tree.node(middle.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let inner=self_.tree.node(middle.a);let head=self_.tree.node(inner.a);if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@type.call" {return blot_support::none<u32>(),blot_error::Error.none;}let literal=self_.tree.node(inner.b);if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let root,err=self_.diagnosticFresh(Code.call_arity,inner.b);return blot_support::some(root),err;}let left,err=self_.expression(middle.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let right,err=self_.expression(outer.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let operation=memberOperator(self_.pool.get(literal.a));let dispatched,err=self_.dispatch(left,right,literal.a,operation,id,true);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}if dispatched.present {return dispatched,blot_error::Error.none;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let signature,err=self_.invocationBinary(left,right,result);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:left, kind:blot_check_types::ObligationKind.dispatch, source:id, name:literal.a, result:result, other:right, signature:signature, operator:operation, .. }, owner:self_.current, direct:true, .. });return blot_support::some(result),err;}
 recursive fn resultApplication(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let outer=self_.tree.node(id);let inner=self_.tree.node(outer.a);if inner.tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let head=self_.tree.node(inner.a);if head.tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(head.a)!="@type.result" {return blot_support::none<u32>(),blot_error::Error.none;}var member=inner.b;while self_.tree.node(member).tag==blot_parse_ast::tag_group {member=self_.tree.node(member).a;}let literal=self_.tree.node(member);if literal.tag!=blot_parse_ast::tag_string || literal.b!=0 {let root,err=self_.diagnosticFresh(Code.literal_required,member);return blot_support::some(root),err;}let input,err=self_.expression(outer.b);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let signature,err=self_.invocation(input,result);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}let err=self_.appendPending(PendingObligation{ value:blot_check_types::Obligation{ ty:input, kind:blot_check_types::ObligationKind.result_dispatch, source:id, name:literal.a, result:result, signature:signature, .. }, owner:self_.current, direct:true, .. });return blot_support::some(result),err;}
 recursive fn productProjection(self_:Engine&,id:u32)->blot_support::Option<u32>,blot_error::Error {let node=self_.tree.node(id);if self_.tree.node(node.a).tag!=blot_parse_ast::tag_apply {return blot_support::none<u32>(),blot_error::Error.none;}let inner=self_.tree.node(node.a);if self_.tree.node(inner.a).tag!=blot_parse_ast::tag_intrinsic || self_.pool.get(self_.tree.node(inner.a).a)!="@product.get" {return blot_support::none<u32>(),blot_error::Error.none;}let index=self_.tree.node(node.b);
@@ -3946,7 +4885,7 @@ fn intrinsicArity(name:const u8[:])->blot_support::Option<i64> {
  let storage=blot_check_storage_ops::lookup(name);if storage.present {return blot_support::some(blot_check_storage_ops::arity(storage.value) as i64);}let staging,present=blot_check_typed_staging::lookup(name);if present {return blot_support::some(blot_check_typed_staging::arity(staging) as i64);}let simd_=blot_backend_simd_intrinsics::lookup(name);if simd_.present {return blot_support::some(simd_.value.arity as i64);}let collection=blot_backend_collection_ops::lookup(name);if collection.present {return blot_support::some(collection.value.arity as i64);}
  if name=="@hole" {return blot_support::some(0 as i64);}
  for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
- for candidate in ["@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
+ for candidate in ["@handle","@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
  for candidate in ["@state.reader","@state.writer","@effect.state","@array.set","@type.call"] {if name==candidate {return blot_support::some(3 as i64);}}
  for candidate in ["@effect.run","@effect.reader","@effect.writer"] {if name==candidate {return blot_support::some(4 as i64);}}return blot_support::none<i64>();
 }
@@ -4417,7 +5356,7 @@ fn unknownNameDiagnosticFresh(self_:Engine&,id:u32,symbol:u32)->u32,blot_error::
     if detail.present {self_.diagnostics[index].detail=detail;}
     return self_.types.fresh();
 }
-recursive fn nameExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) && self_.editor_marker.present && self_.editor_marker.value.kind==blot_reuse_completion_probe::Kind.expression {return self_.captureEditor(id,0,0);}if comptime_binder_len!=0 {let prop,perr=self_.comptimeNameChain(id,node.a);if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}let found=self_.lookup(node.a);if found.present {let binding=found.value;if isWithLocked(binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}self_.resolved[id]=binding;let ty,err=self_.instantiate(binding,id);if err!=blot_error::Error.none {return 0,err;}return ty,blot_error::Error.none;}let global,err=self_.globalBinding(node.a);if err!=blot_error::Error.none {return 0,err;}if global.present {return self_.globalReference(global.value,id);}let qualified,err=self_.qualifiedValue(id,node.a);if err!=blot_error::Error.none {return 0,err;}if qualified.present {return qualified.value,blot_error::Error.none;}let template,err=self_.operationTemplate(node.a);if err!=blot_error::Error.none {return 0,err;}if template.present {return self_.operationValue(id,template.value,blot_support::none<const u32[:]>());}let constructor,err=self_.typeConstructorValue(self_.catalogKey(node.a));if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}return self_.unknownNameDiagnosticFresh(id,node.a);}
+recursive fn nameExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) && self_.editor_marker.present && self_.editor_marker.value.kind==blot_reuse_completion_probe::Kind.expression {return self_.captureEditor(id,0,0);}if comptime_binder_len!=0 {let prop,perr=self_.comptimeNameChain(id,node.a);if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}let found=self_.lookup(node.a);if found.present {let binding=found.value;if isWithLocked(binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}let rejected,lherr=self_.checkLocalHandlerOrCompositeUse(binding,id);if lherr!=blot_error::Error.none {return 0,lherr;}if rejected {return self_.types.fresh();}self_.resolved[id]=binding;let ty,err=self_.instantiate(binding,id);if err!=blot_error::Error.none {return 0,err;}return ty,blot_error::Error.none;}let global,err=self_.globalBinding(node.a);if err!=blot_error::Error.none {return 0,err;}if global.present {return self_.globalReference(global.value,id);}let qualified,err=self_.qualifiedValue(id,node.a);if err!=blot_error::Error.none {return 0,err;}if qualified.present {return qualified.value,blot_error::Error.none;}let template,err=self_.operationTemplate(node.a);if err!=blot_error::Error.none {return 0,err;}if template.present {return self_.operationValue(id,template.value,blot_support::none<const u32[:]>());}let constructor,err=self_.typeConstructorValue(self_.catalogKey(node.a));if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}return self_.unknownNameDiagnosticFresh(id,node.a);}
 recursive fn fieldExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);var parent=node.a;while self_.tree.node(parent).tag==blot_parse_ast::tag_group {parent=self_.tree.node(parent).a;}let base=self_.tree.node(parent);if comptime_binder_len!=0 && base.tag==blot_parse_ast::tag_name {let prop,perr=self_.checkComptimeProp(id,base.a,self_.pool.get(node.b));if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}if base.tag==blot_parse_ast::tag_name && !self_.lookup(base.a).present {let binding,err=self_.qualifiedImportBinding(Qualified{namespace_:base.a,member:node.b, ..});if err!=blot_error::Error.none {return 0,err;}if binding.present {return self_.globalReference(binding.value,id);}let constructor,err=self_.typeConstructorValue(Qualified{namespace_:base.a,member:node.b, ..});if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}}if self_.editorAt(id) {var namespace_:u32=0;var receiver:u32=0;if base.tag==blot_parse_ast::tag_name && !self_.lookup(base.a).present && self_.isNamespace(base.a) {namespace_=base.a;}else {let ty,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}receiver=ty;}return self_.captureEditor(id,receiver,namespace_);}let receiver,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let operation,err=self_.scopedOperation(id,receiver,node.b,node.a);if err!=blot_error::Error.none {return 0,err;}if operation.present {return operation.value,blot_error::Error.none;}let projected,err=self_.projectField(receiver,node.b,id,false,blot_support::none<PendingObligation>());if err!=blot_error::Error.none {return 0,err;}self_.projection_resolved[id]=projected.projection;return projected.ty,blot_error::Error.none;}
 fn constructorExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) {return self_.captureEditor(id,0,self_.catalogKey(node.a).namespace_);}let ctor:u32={let scalar_lookup_91 .= self_.catalogs.constructor_names.get(self_.catalogKey(node.a));if !scalar_lookup_91 {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let scalar_value_91:u32=scalar_lookup_91;scalar_value_91};self_.constructor_resolved[id]=ctor;let ty,err=self_.constructorType(ctor);if err!=blot_error::Error.none {return 0,err;}return self_.types.openCovariant(ty);}
 recursive fn witnessExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);let value,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let name,present=self_.pool.lookup("Type");if !present {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let ctor:u32={let scalar_lookup_92 .= self_.catalogs.constructor_names.get(self_.catalogKey(name));if !scalar_lookup_92 {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let scalar_value_92:u32=scalar_lookup_92;scalar_value_92};self_.constructor_resolved[id]=ctor;let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let constructor,err=self_.constructorType(ctor);if err!=blot_error::Error.none {return 0,err;}let function,err=self_.types.function(value,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(constructor,function,id);return result,err;}
@@ -4429,28 +5368,37 @@ reusable[] var lambda_storage_frames:Engine_storage_frames[>..];
 struct LambdaContext {scoped_parameter:u32,scope:i64,owner:u32,target:u32,function_body:u32,function_exit_allowed:bool,function_exit_target:u32,function_result_expected:u32,ambient:u32,loops:LoopFrame[:]=default<LoopFrame[:]>(),frames:Engine_storage_frames[:]=default<Engine_storage_frames[:]>(),has_frames:bool=false,body_started:bool=false}
 fn restore(self_:LambdaContext&,engine:Engine&) {engine.scoped_parameter=self_.scoped_parameter;if self_.has_frames {engine.storage_frames.clear();engine.storage_frames.append(self_.frames);if self_.frames.len!=0 {lambda_storage_frames.free_slice(self_.frames);}}if self_.body_started {engine.env.resize(self_.scope);engine.owner=self_.owner;engine.return_target=self_.target;engine.function_body=self_.function_body;engine.function_exit_allowed=self_.function_exit_allowed;engine.function_exit_target=self_.function_exit_target;engine.function_result_expected=self_.function_result_expected;engine.loop_stack.clear();for frame in self_.loops {engine.loop_stack.push(canonicalLoop(frame));}if self_.loops.len!=0 {global_loop_runs.free_slice(self_.loops);}}engine.ambient=self_.ambient;}
 recursive fn lambdaExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let saved_ct_depth=comptime_lambda_depth;comptime_lambda_depth+=1;let saved_fork_floor=fork_ambient_floor;fork_ambient_floor=fork_outer_len;var saved=LambdaContext{scoped_parameter:self_.scoped_parameter,scope:self_.env.len,owner:self_.owner,target:self_.return_target,function_body:self_.function_body,function_exit_allowed:self_.function_exit_allowed,function_exit_target:self_.function_exit_target,function_result_expected:self_.function_result_expected,ambient:self_.ambient, ..};let result,error=lambdaExpressionBody(self_,id,saved);saved.restore(self_);fork_ambient_floor=saved_fork_floor;comptime_lambda_depth=saved_ct_depth;return result,error;}
-fn usesAsCapabilityParam(tree:const blot_parse_ast::Tree&,pool:const blot_parse_symbols::Pool&,body:u32,param_name:u32)->bool {
+fn usesAsCapabilityParam(self_:const Engine&,family_idx:u32,body:u32,param_name:u32)->bool {
  if param_name==0 { return false; }
- // Effect capability parameter detection via member access
- let pname=pool.get(param_name);
- let node_span=tree.span(body);
- for ni in 1..tree.nodes.len {
-  let sp=tree.span(ni as u32);
+ // Effect capability parameter detection via declared effect operation member access
+ let pname=self_.pool.get(param_name);
+ let node_span=self_.tree.span(body);
+ for ni in 1..self_.tree.nodes.len {
+  let sp=self_.tree.span(ni as u32);
   if sp.start<node_span.start || sp.end>node_span.end { continue; }
-  let nd=tree.node(ni as u32);
+  let nd=self_.tree.node(ni as u32);
   if nd.tag==blot_parse_ast::tag_field_access {
-   let base=tree.node(nd.a);
-   if base.tag==blot_parse_ast::tag_name && base.a==param_name { return true; }
+   let base=self_.tree.node(nd.a);
+   if base.tag==blot_parse_ast::tag_name && base.a==param_name {
+    if self_.catalogs.effect_members.contains(EffectMember{family:family_idx,member:nd.b, ..}) { return true; }
+   }
   }
   if nd.tag==blot_parse_ast::tag_name {
-   let txt=pool.get(nd.a);
-   if txt.len>pname.len && txt[pname.len]=='.' as u8 && starts_with(txt,pname) { return true; }
+   let txt=self_.pool.get(nd.a);
+   if txt.len>pname.len && txt[pname.len]=='.' as u8 && starts_with(txt,pname) {
+    let rest=txt[pname.len+1..];
+    var mend=rest.len;
+    let ndot=firstDot(rest);
+    if ndot.present { mend=ndot.value; }
+    let msym,mk=self_.pool.lookup(rest[..mend]);
+    if mk && self_.catalogs.effect_members.contains(EffectMember{family:family_idx,member:msym, ..}) { return true; }
+   }
   }
  }
  return false;
 }
 recursive fn lambdaExpressionBody(self_:Engine&,id:u32,saved:LambdaContext&)->u32,blot_error::Error {
- let node=self_.tree.node(id);let parameter=self_.tree.parameter(node.a);if parameter.where_node!=0 {let err=self_.diagnostic(Code.higher_rank_constraint,parameter.where_node);if err!=blot_error::Error.none {return 0,err;}}var expected:u32=0;if self_.expected_lambda_source==id {expected=self_.expected_lambda_type;}var required_arrow=blot_check_types::Node{tag:blot_check_types::Tag.absent, ..};if expected!=0 {let resolved,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return 0,err;}required_arrow=self_.types.node(resolved);}let contextual=expected!=0 && required_arrow.tag==blot_check_types::Tag.function;var takes=parameter.own;if contextual {let wanted,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}let wrapper=self_.types.node(wanted);if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {takes=true;required_arrow.a=wrapper.a;}}var contextual_capability=false;if contextual {let root,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}contextual_capability=self_.types.node(root).tag==blot_check_types::Tag.scoped;}let scoped=node.a==self_.scoped_parameter;if !scoped {self_.scoped_parameter=0;}var descriptor=blot_support::none<u32>();if !scoped && parameter.annotation!=0 && self_.capabilityFamilyAnnotation(parameter.annotation).present && usesAsCapabilityParam(self_.tree,self_.pool,node.b,parameter.name) {let family,err=self_.capabilityDescriptorAnnotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}descriptor=family;}let symbolic=descriptor.present || contextual_capability;var element_ty:u32=0;
+ let node=self_.tree.node(id);let parameter=self_.tree.parameter(node.a);if parameter.where_node!=0 {let err=self_.diagnostic(Code.higher_rank_constraint,parameter.where_node);if err!=blot_error::Error.none {return 0,err;}}var expected:u32=0;if self_.expected_lambda_source==id {expected=self_.expected_lambda_type;}var required_arrow=blot_check_types::Node{tag:blot_check_types::Tag.absent, ..};if expected!=0 {let resolved,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return 0,err;}required_arrow=self_.types.node(resolved);}let contextual=expected!=0 && required_arrow.tag==blot_check_types::Tag.function;var takes=parameter.own;if contextual {let wanted,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}let wrapper=self_.types.node(wanted);if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {takes=true;required_arrow.a=wrapper.a;}}var contextual_capability=false;if contextual {let root,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}contextual_capability=self_.types.node(root).tag==blot_check_types::Tag.scoped;}let scoped=node.a==self_.scoped_parameter;if !scoped {self_.scoped_parameter=0;}var descriptor=blot_support::none<u32>();let cap_family=self_.capabilityFamilyAnnotation(parameter.annotation);if !scoped && parameter.annotation!=0 && cap_family.present && self_.usesAsCapabilityParam(cap_family.value,node.b,parameter.name) {let family,err=self_.capabilityDescriptorAnnotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}descriptor=family;}let symbolic=descriptor.present || contextual_capability;var element_ty:u32=0;
  if scoped {element_ty=self_.scoped_parameter_type;}else if contextual {element_ty=required_arrow.a;}else if descriptor.present {let ty,err=self_.types.capabilityParameter(descriptor.value);if err!=blot_error::Error.none {return 0,err;}element_ty=ty;}else if parameter.is_unit {element_ty=blot_check_types::unit;}else {let ty,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}element_ty=ty;}
  if contextual {if descriptor.present {let capability,err=self_.types.capabilityParameter(descriptor.value);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element_ty,capability,node.a);if err!=blot_error::Error.none {return 0,err;}}if parameter.is_unit {let err=self_.constrain(element_ty,blot_check_types::unit,node.a);if err!=blot_error::Error.none {return 0,err;}}}if !scoped && !symbolic && parameter.annotation!=0 {let written,err=self_.annotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element_ty,written,node.a);if err!=blot_error::Error.none {return 0,err;}}
  saved.has_frames=self_.storage_frames.len!=0 && !scoped;if saved.has_frames {saved.frames=lambda_storage_frames.alloc_slice(self_.storage_frames.len);for frame,index in self_.storage_frames {saved.frames[index]=frame;}self_.storage_frames.clear();}let ambient,err=self_.types.freshEffects();if err!=blot_error::Error.none {return 0,err;}self_.ambient=ambient;let latent=self_.ambient;match self_.types.row(latent).tail {variable payload=>{self_.row_sources.insert(payload.value,id);},_=>{abort("fresh effect row must have a variable tail");},}
@@ -4555,7 +5503,7 @@ recursive fn applicationExpression(self_:Engine&,id:u32)->u32,blot_error::Error 
  var leaf=node.a;var arity:i64=1;while self_.tree.node(leaf).tag==blot_parse_ast::tag_apply {arity+=1;leaf=self_.tree.node(leaf).a;}let saved=self_.permitted_intrinsic;let result,error=applicationAfterArity(self_,id,node,leaf,arity);self_.permitted_intrinsic=saved;return result,error;
 }
 recursive fn applicationAfterArity(self_:Engine&,id:u32,node:blot_parse_ast::Node,leaf:u32,arity:i64)->u32,blot_error::Error {if self_.tree.node(leaf).tag==blot_parse_ast::tag_intrinsic {let expected=exactIntrinsicArity(self_.pool.get(self_.tree.node(leaf).a));if expected.present {if self_.permitted_intrinsic!=leaf && arity!=expected.value {return self_.diagnosticFresh(Code.call_arity,id);}self_.permitted_intrinsic=leaf;}}
- let reflection,err=self_.reflectionApplication(id);if err!=blot_error::Error.none {return 0,err;}if reflection.present {return reflection.value,blot_error::Error.none;}let state,err=self_.builtinStateApplication(id);if err!=blot_error::Error.none {return 0,err;}if state.present {return state.value,blot_error::Error.none;}let runner,err=self_.effectRunnerApplication(id);if err!=blot_error::Error.none {return 0,err;}if runner.present {return runner.value,blot_error::Error.none;}let provider,err=self_.providerApplication(id);if err!=blot_error::Error.none {return 0,err;}if provider.present {return provider.value,blot_error::Error.none;}
+ let reflection,err=self_.reflectionApplication(id);if err!=blot_error::Error.none {return 0,err;}if reflection.present {return reflection.value,blot_error::Error.none;}let handle_i,err=self_.handleIntrinsicApplication(id);if err!=blot_error::Error.none {return 0,err;}if handle_i.present {return handle_i.value,blot_error::Error.none;}let handle_r,err=self_.handleRunApplication(id,leaf);if err!=blot_error::Error.none {return 0,err;}if handle_r.present {return handle_r.value,blot_error::Error.none;}let state,err=self_.builtinStateApplication(id);if err!=blot_error::Error.none {return 0,err;}if state.present {return state.value,blot_error::Error.none;}let runner,err=self_.effectRunnerApplication(id);if err!=blot_error::Error.none {return 0,err;}if runner.present {return runner.value,blot_error::Error.none;}let provider,err=self_.providerApplication(id);if err!=blot_error::Error.none {return 0,err;}if provider.present {return provider.value,blot_error::Error.none;}
  let head=self_.tree.node(node.a);
  if head.tag==blot_parse_ast::tag_intrinsic && self_.pool.get(head.a)=="@panic" {var argument=node.b;while self_.tree.node(argument).tag==blot_parse_ast::tag_group {argument=self_.tree.node(argument).a;}if self_.tree.node(argument).tag!=blot_parse_ast::tag_string {let err=self_.diagnostic(Code.call_arity,argument);if err!=blot_error::Error.none {return 0,err;}}return blot_check_types::never,blot_error::Error.none;}
  let projection,err=self_.productProjection(id);if err!=blot_error::Error.none {return 0,err;}if projection.present {return projection.value,blot_error::Error.none;}let associated,err=self_.associatedApplication(id);if err!=blot_error::Error.none {return 0,err;}if associated.present {return associated.value,blot_error::Error.none;}let result,err=self_.resultApplication(id);if err!=blot_error::Error.none {return 0,err;}if result.present {return result.value,blot_error::Error.none;}return self_.ordinaryApplication(id,leaf);
@@ -5146,7 +6094,17 @@ fn blockComputedRequirements(self_:Engine&,start:i64,qualified:bool)->blot_error
 fn blockComputedWork(self_:Engine&,start:i64,qualified:bool,parts:IdBuffer&)->blot_error::Error {for pending in self_.pending[start..] {if pending.owner!=self_.current || pending.scope!=self_.qualification_scope || pending.solved || pending.covered || (qualified && !pending.declared) {continue;}parts.clear();let err=self_.requirementParts(pending.value,parts);if err!=blot_error::Error.none {return err;}for part in parts.items {let values,err=self_.types.freeVariables(part);if err!=blot_error::Error.none {return err;}for variable in values {if !inList(self_.computed_variables,variable) {self_.computed_variables.push(variable);}}let rows,err=self_.types.freeRowVariables(part);if err!=blot_error::Error.none {return err;}for row in rows {if !inList(self_.computed_rows,row) {self_.computed_rows.push(row);}}}}return blot_error::Error.none;}
 recursive fn definitelyPanic(self_:const Engine&,id:u32,depth:i64)->bool {if id==0 || depth>=1024 {return false;}let node=self_.tree.node(id);match node.tag {blot_parse_ast::tag_group=>{return self_.definitelyPanic(node.a,depth+1);},blot_parse_ast::tag_apply=>{return self_.tree.node(node.a).tag==blot_parse_ast::tag_intrinsic && self_.pool.get(self_.tree.node(node.a).a)=="@panic";},blot_parse_ast::tag_if_expr=>{return self_.definitelyPanic(node.a,depth+1) || (self_.definitelyPanic(node.b,depth+1) && self_.definitelyPanic(node.c,depth+1));},blot_parse_ast::tag_case_expr=>{let inputs=checkedAstRange(self_.tree,node.a,node.a+2);let ast_walk_29_source=blot_parse_ast::List{self_.tree.list(inputs)[0],self_.tree.list(inputs)[1], ..};let ast_walk_29_count=self_.tree.list(ast_walk_29_source).len;for ast_walk_29_index in 0..ast_walk_29_count {let input=self_.tree.list(ast_walk_29_source)[ast_walk_29_index];if self_.definitelyPanic(input,depth+1) {return true;}}let ast_walk_30_source=blot_parse_ast::List{node.b,node.c, ..};let ast_walk_30_count=self_.tree.list(ast_walk_30_source).len;for ast_walk_30_index in 0..ast_walk_30_count {let arm=self_.tree.list(ast_walk_30_source)[ast_walk_30_index];let metadata=checkedAstRange(self_.tree,self_.tree.node(arm).c,self_.tree.node(arm).c+2);if !self_.definitelyPanic(self_.tree.list(metadata)[1],depth+1) {return false;}}return true;},_=>{return false;},}}
 recursive fn letStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {let type_scope=self_.type_env.items.len;let row_scope=self_.row_env.items.len;let annotation_binding=self_.annotation_binding;let inherited_types=self_.inherited_types;let inherited_rows=self_.inherited_rows;let qualification=self_.qualification_scope;let computed_values=self_.computed_variables.len;let computed_rows=self_.computed_rows.len;let local_qualification=self_.local_qualification_scope;let local_requirements=self_.local_requirements_start;let result,error=letStatementBody(self_,id);self_.type_env.resize(type_scope);self_.row_env.resize(row_scope);self_.annotation_binding=annotation_binding;self_.inherited_types=inherited_types;self_.inherited_rows=inherited_rows;self_.qualification_scope=qualification;self_.computed_variables.resize(computed_values);self_.computed_rows.resize(computed_rows);self_.local_qualification_scope=local_qualification;self_.local_requirements_start=local_requirements;return result,error;}
-recursive fn letStatementBody(self_:Engine&,id:u32)->Flow,blot_error::Error {let written=self_.tree.binding(id);let computation_scope=self_.computation_annotations.len;if written.where_node!=0 {self_.qualification_scope=id;}self_.annotation_binding=id;self_.inherited_types=self_.type_env.items.len;self_.inherited_rows=self_.row_env.items.len;for source in [written.annotation,written.where_node,written.value,written.fallback] {let err=self_.collectAnnotationNames(source,0);if err!=blot_error::Error.none {return Flow{..},err;}}var required:u32=0;if written.annotation!=0 {let root,err=self_.annotation(written.annotation);if err!=blot_error::Error.none {return Flow{..},err;}required=root;}let qualification_index=self_.qualifications.len;let requirement_start=self_.pending.len;let err=self_.beginQualification(id,written.where_node,written.annotation,written.value);if err!=blot_error::Error.none {return Flow{..},err;}var contextual:u32=0;if required!=0 {if self_.contextualData(required) || self_.effectFamilyNominal(required).present || (self_.types.head(required,0)==blot_check_types::u32_type && self_.isCharLiteralNode(written.value)) {contextual=required;}}let inferred,err=self_.pureExpression(written.value,contextual);if err!=blot_error::Error.none {return Flow{..},err;}if required!=0 {let err=self_.constrain(inferred,required,id);if err!=blot_error::Error.none {return Flow{..},err;}}var value=inferred;if required!=0 {value=required;}if written.where_node!=0 {let err=self_.checkQualification(qualification_index);if err!=blot_error::Error.none {return Flow{..},err;}}if written.annotation!=0 || written.where_node!=0 {self_.computation_annotations.resize(computation_scope);}if !self_.templateValue(written.value) {
+recursive fn letStatementBody(self_:Engine&,id:u32)->Flow,blot_error::Error {let written=self_.tree.binding(id);let computation_scope=self_.computation_annotations.len;if written.where_node!=0 {self_.qualification_scope=id;}self_.annotation_binding=id;self_.inherited_types=self_.type_env.items.len;self_.inherited_rows=self_.row_env.items.len;for source in [written.annotation,written.where_node,written.value,written.fallback] {let err=self_.collectAnnotationNames(source,0);if err!=blot_error::Error.none {return Flow{..},err;}}var required:u32=0;if written.annotation!=0 {let root,err=self_.annotation(written.annotation);if err!=blot_error::Error.none {return Flow{..},err;}required=root;}let qualification_index=self_.qualifications.len;let requirement_start=self_.pending.len;let err=self_.beginQualification(id,written.where_node,written.annotation,written.value);if err!=blot_error::Error.none {return Flow{..},err;}var contextual:u32=0;if required!=0 {if self_.contextualData(required) || self_.effectFamilyNominal(required).present || (self_.types.head(required,0)==blot_check_types::u32_type && self_.isCharLiteralNode(written.value)) {contextual=required;}}
+let comp_kind,comp_left,comp_right,comp_dotted=self_.isSyntacticCompositeExpr(written.value);
+let allow_comp=comp_kind!=0 && written.fallback==0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name;
+let saved_allow_lh=allow_local_handler_ref;
+let saved_saw_lh=saw_nonpure_handler_ref;
+if allow_comp { allow_local_handler_ref+=1; saw_nonpure_handler_ref=false; }
+let inferred,err=self_.pureExpression(written.value,contextual);
+let is_nonpure_comp=allow_comp && saw_nonpure_handler_ref;
+allow_local_handler_ref=saved_allow_lh;
+saw_nonpure_handler_ref=saved_saw_lh;
+if err!=blot_error::Error.none {return Flow{..},err;}if required!=0 {let err=self_.constrain(inferred,required,id);if err!=blot_error::Error.none {return Flow{..},err;}}var value=inferred;if required!=0 {value=required;}if written.where_node!=0 {let err=self_.checkQualification(qualification_index);if err!=blot_error::Error.none {return Flow{..},err;}}if written.annotation!=0 || written.where_node!=0 {self_.computation_annotations.resize(computation_scope);}if !self_.templateValue(written.value) {
     if written.where_node==0 {
         let err=self_.inferComputedResultOperands(requirement_start,value);
         if err!=blot_error::Error.none {return Flow{..},err;}
@@ -5155,7 +6113,7 @@ recursive fn letStatementBody(self_:Engine&,id:u32)->Flow,blot_error::Error {let
     if err!=blot_error::Error.none {return Flow{..},err;}
 }let root,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;let scope=self_.env.len;self_.local_qualification_scope=0;if written.where_node!=0 {self_.local_qualification_scope=id;}self_.local_requirements_start=requirement_start;var generalize=written.fallback==0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name && self_.functionValue(written.value) && comptime_binder_len==0;if generalize {let holds,err=self_.holdsStorage(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if holds {let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if !self_.types.knownClosed(resolved) {generalize=false;}}}if !generalize && written.fallback==0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name {let ferr=self_.solveFields();if ferr!=blot_error::Error.none {return Flow{..},ferr;}}let saved=self_.let_pattern_source;self_.let_pattern_source=id;let total,error=self_.pattern(written.pattern,value,scope,[],generalize);self_.let_pattern_source=saved;if error!=blot_error::Error.none {return Flow{..},error;}
  if written.fallback!=0 {let success=global_entry_runs.alloc_slice(self_.env.len);for entry,index in self_.env {success[index]=entry;}self_.env.resize(scope);let flow,error=self_.suite(written.fallback);if error!=blot_error::Error.none {if success.len!=0 {global_entry_runs.free_slice(success);}return Flow{..},error;}if !flow.exits {let err=self_.diagnostic(Code.guard_fallthrough,id);if err!=blot_error::Error.none {if success.len!=0 {global_entry_runs.free_slice(success);}return Flow{..},err;}self_.diagnostics[self_.diagnostics.len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.env.clear();self_.env.append(success);if success.len!=0 {global_entry_runs.free_slice(success);}}
- if !total && written.fallback==0 {let err=self_.diagnostic(Code.non_exhaustive_match,id);if err!=blot_error::Error.none {return Flow{..},err;}self_.diagnostics[self_.diagnostics.len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.resolved[id]=self_.resolved[written.pattern];if self_.resolved[id]!=0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name {var source=written.value;while self_.tree.node(source).tag==blot_parse_ast::tag_group {source=self_.tree.node(source).a;}self_.bindings[self_.resolved[id]].operation_ref=self_.operation_refs[source];}self_.expr_types[id]=blot_check_types::unit;if exits {self_.expr_types[id]=blot_check_types::never;}return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;}
+ if !total && written.fallback==0 {let err=self_.diagnostic(Code.non_exhaustive_match,id);if err!=blot_error::Error.none {return Flow{..},err;}self_.diagnostics[self_.diagnostics.len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.resolved[id]=self_.resolved[written.pattern];if self_.resolved[id]!=0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name {var source=written.value;while self_.tree.node(source).tag==blot_parse_ast::tag_group {source=self_.tree.node(source).a;}self_.bindings[self_.resolved[id]].operation_ref=self_.operation_refs[source];if is_nonpure_comp && local_composites_len<1024 {local_composites[local_composites_len]=LocalComposite{binding:self_.resolved[id],kind:comp_kind,left_expr:comp_left,right_expr:comp_right,left_dotted_name:comp_dotted,consumed:false};local_composites_len+=1;self_.projections[id]=handle_composite_let_tag;}}self_.expr_types[id]=blot_check_types::unit;if exits {self_.expr_types[id]=blot_check_types::never;}return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;}
 fn deadRebindings(self_:Engine&,scope:i64,first_binding:i64,carried:i64)->blot_error::Error {for entry,offset in self_.env[scope..] {let index=scope+offset;if entry.name==self_.self_name {continue;}let binding=self_.bindings[entry.binding];if binding.predecessor==0 || binding.read {continue;}var writes_storage=false;for version in self_.bindings[first_binding..] {if version.name!=entry.name || version.declaration>=self_.rebindings.len || self_.rebindings[version.declaration].path.len==0 {continue;}let selectors=checkedTypeList(self_.types,self_.access_nodes[version.declaration]);let path_types=checkedTypeList(self_.types,self_.access_types[version.declaration]);let type_span_107=selectors;for part in 0..(type_span_107.len as i64) {let access=self_.types.list(type_span_107)[part];if self_.tree.node(access).tag!=blot_parse_ast::tag_index_access || part>=(path_types.len as i64) {continue;}let owner=self_.types.head(self_.types.list(path_types)[part],0);if self_.types.node(owner).tag==blot_check_types::Tag.array {writes_storage=true;break;}let storage=blot_check_storage_types::info(self_.types,owner);if storage.present && storage.value.kind==blot_check_storage_types::sized_array {writes_storage=true;break;}}if writes_storage {break;}}if writes_storage {continue;}var last=true;for next in self_.env[index+1..] {if next.name==entry.name {last=false;break;}}if !last {continue;}var root=binding.predecessor;var enclosing=false;for step in 0..64 {if root==0 {break;}for prior in self_.env[carried..scope] {if prior.binding==root {enclosing=true;break;}}if enclosing {break;}root=self_.bindings[root].predecessor;}if !enclosing {continue;}var read=false;for version in self_.bindings[first_binding..] {if version.name==entry.name && version.read {read=true;break;}}if !read {let err=self_.diagnostic(Code.dead_rebinding,binding.declaration);if err!=blot_error::Error.none {return err;}}}return blot_error::Error.none;}
 recursive fn rebindStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {let node=self_.tree.node(id);if self_.tree.node(node.a).tag!=blot_parse_ast::tag_name {return self_.rebindFields(id);}let name=self_.tree.node(node.a).a;let previous=self_.lookup(name);if !previous.present {let err=self_.diagnostic(Code.unknown_rebinding,id);return Flow{..},err;}if isOuterSparkBinding(self_,name) {let err=self_.diagnostic(Code.spark_capture,id);return Flow{..},err;}if isWithLocked(previous.value) {let err=self_.diagnostic(Code.borrow_conflict,id);return Flow{..},err;}let with_outer=self_.findWithOuterTarget(previous.value);let scope=self_.env.len;self_.env.push(Entry{self_.self_name,previous.value, ..});let wanted=self_.bindings[previous.value].ty;
 let value,error=self_.pureExpression(node.b,if self_.hasContextualNumeric(wanted) || (self_.types.head(wanted,0)==blot_check_types::u32_type && self_.isCharLiteralNode(node.b)) {wanted} else {0});if error!=blot_error::Error.none {self_.env.resize(scope);return Flow{..},error;}removeSelfEntry(self_,scope);if with_outer!=0 {let cerr=self_.constrain(self_.bindings[with_outer].ty,value,id);if cerr!=blot_error::Error.none {return Flow{..},cerr;}recordWithShadowed(with_outer);self_.projection_resolved[id]=with_outer;}let latest_prev=self_.latestSuccessor(previous.value);let binding,err=self_.rebound(name,value,id);if err!=blot_error::Error.none {return Flow{..},err;}self_.bindings[binding].predecessor=latest_prev;if with_outer!=0 {self_.bindings[binding].read=true;}self_.resolved[id]=binding;self_.resolved[node.a]=previous.value;self_.expr_types[node.a]=self_.bindings[previous.value].ty;let root,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=root==blot_check_types::never;self_.expr_types[id]=blot_check_types::unit;if exits {self_.expr_types[id]=blot_check_types::never;}return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;}
@@ -5259,7 +6217,7 @@ recursive fn comptimeForStatement(self_:Engine&,id:u32)->Flow,blot_error::Error 
  work.deinit();
  return Flow{exits:false,returns:flow.returns, ..},blot_error::Error.none;
 }
-recursive fn statement(self_:Engine&,id:u32)->Flow,blot_error::Error {match self_.tree.node(id).tag {blot_parse_ast::tag_let_stmt=>{return self_.letStatement(id);},blot_parse_ast::tag_rebind_stmt=>{return self_.rebindStatement(id);},blot_parse_ast::tag_return_stmt=>{return self_.returnStatement(id);},blot_parse_ast::tag_function_return_stmt=>{return self_.functionReturnStatement(id);},blot_parse_ast::tag_use_stmt,blot_parse_ast::tag_iterator_bind=>{return self_.useStatement(id);},blot_parse_ast::tag_forever_stmt,blot_parse_ast::tag_range_stmt,blot_parse_ast::tag_for_stmt=>{return self_.loopStatement(id);},blot_parse_ast::tag_break_stmt=>{return self_.breakStatement(id);},blot_parse_ast::tag_continue_stmt=>{return self_.continueStatement(id);},blot_parse_ast::tag_if_stmt,blot_parse_ast::tag_if_let_stmt,blot_parse_ast::tag_comptime_if=>{return self_.conditional(id);},blot_parse_ast::tag_with_stmt=>{return self_.withStatement(id);},blot_parse_ast::tag_comptime_for=>{return self_.comptimeForStatement(id);},blot_parse_ast::tag_case_expr=>{return self_.caseStatement(id);},_=>{let ty,err=self_.expression(id);if err!=blot_error::Error.none {return Flow{..},err;}let root,err=self_.types.resolve(ty,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;},}}
+recursive fn statement(self_:Engine&,id:u32)->Flow,blot_error::Error {match self_.tree.node(id).tag {blot_parse_ast::tag_let_stmt=>{return self_.letStatement(id);},blot_parse_ast::tag_rebind_stmt=>{return self_.rebindStatement(id);},blot_parse_ast::tag_return_stmt=>{return self_.returnStatement(id);},blot_parse_ast::tag_function_return_stmt=>{return self_.functionReturnStatement(id);},blot_parse_ast::tag_use_stmt,blot_parse_ast::tag_iterator_bind=>{return self_.useStatement(id);},blot_parse_ast::tag_forever_stmt,blot_parse_ast::tag_range_stmt,blot_parse_ast::tag_for_stmt=>{return self_.loopStatement(id);},blot_parse_ast::tag_break_stmt=>{return self_.breakStatement(id);},blot_parse_ast::tag_continue_stmt=>{return self_.continueStatement(id);},blot_parse_ast::tag_if_stmt,blot_parse_ast::tag_if_let_stmt,blot_parse_ast::tag_comptime_if=>{return self_.conditional(id);},blot_parse_ast::tag_handler_stmt=>{return self_.handlerStatement(id);},blot_parse_ast::tag_comptime_for=>{return self_.comptimeForStatement(id);},blot_parse_ast::tag_case_expr=>{return self_.caseStatement(id);},_=>{let ty,err=self_.expression(id);if err!=blot_error::Error.none {return Flow{..},err;}let root,err=self_.types.resolve(ty,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;},}}
 recursive fn caseStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {let saved=self_.statement_case;self_.statement_case=id;let ty,error=self_.expression(id);self_.statement_case=saved;if error!=blot_error::Error.none {return Flow{..},error;}let root,err=self_.types.resolve(ty,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;}
 recursive fn suite(self_:Engine&,id:u32)->Flow,blot_error::Error {var result=Flow{..};var direct_exit=false;let syntax_source_46=id;let syntax_count_46=self_.tree.children(syntax_source_46).len;for syntax_index_46 in 0..syntax_count_46 {let child=self_.tree.children(syntax_source_46)[syntax_index_46];if direct_exit {let err=self_.diagnostic(Code.unreachable_statement,child);if err!=blot_error::Error.none {return Flow{..},err;}}let flow,err=self_.statement(child);if err!=blot_error::Error.none {return Flow{..},err;}if !result.exits {result.returns=result.returns || flow.returns;result.breaks=result.breaks || flow.breaks;}result.exits=result.exits || flow.exits;let tag=self_.tree.node(child).tag;direct_exit=direct_exit || tag==blot_parse_ast::tag_return_stmt || tag==blot_parse_ast::tag_function_return_stmt || tag==blot_parse_ast::tag_break_stmt || tag==blot_parse_ast::tag_continue_stmt;}self_.expr_types[id]=blot_check_types::unit;if result.exits {self_.expr_types[id]=blot_check_types::never;}return result,blot_error::Error.none;}
 fn flowsFrom(self_:const Engine&,initial:u32,original:u32)->bool {var binding=initial;var steps:i64=0;while binding!=0 && steps<self_.bindings.len {if binding==original {return true;}binding=self_.bindings[binding].predecessor;steps+=1;}return false;}

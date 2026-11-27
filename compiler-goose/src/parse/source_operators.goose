@@ -296,8 +296,7 @@ let a_numeric_error=blot_parse_ast::tag_numeric_error;
 let a_type_binder=blot_parse_ast::tag_type_binder;
 let a_type_usage=blot_parse_ast::tag_type_usage;
 let a_fork_expr=blot_parse_ast::tag_fork_expr;
-let a_with_stmt=blot_parse_ast::tag_with_stmt;
-let a_with_entry=blot_parse_ast::tag_with_entry;
+let a_handler_stmt=blot_parse_ast::tag_handler_stmt;
 let a_comptime_for=blot_parse_ast::tag_comptime_for;
 let a_comptime_if=blot_parse_ast::tag_comptime_if;
 let a_comptime_project=blot_parse_ast::tag_comptime_project;
@@ -398,15 +397,9 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
    walk(self_,tree,pool,context,locals,n.c,depth+1);
    locals.resize(saved); self_.loops=saved_loops;
   },
-  blot_parse_ast::tag_with_stmt => {
-   let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
-   for i in 0..count {
-    let entry=tree.node(tree.list(entries)[i]);
-    if entry.c==1 { walk(self_,tree,pool,context,locals,entry.b,depth+1); }
-    else { walk(self_,tree,pool,context,locals,entry.a,depth+1); }
-    if stopped(self_,tree,pool,context,locals) { return; }
-   }
-   scope(self_,tree,pool,context,locals,0,n.c,depth+1);
+  blot_parse_ast::tag_handler_stmt => {
+   walk(self_,tree,pool,context,locals,n.c,depth+1);
+   bind(self_,tree,pool,context,locals,n.a);
   },
   blot_parse_ast::tag_comptime_for => {
    let body=tree.extra.items[n.c];

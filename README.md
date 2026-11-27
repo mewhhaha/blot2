@@ -75,9 +75,9 @@ io main (): #[U32] =>
   return encode_record p               // #[10, 7, 20, 100, 30, 1]
 ```
 
-### 3. Scoped Algebraic Effects with `with`
+### 3. Composable Scoped Effect Handlers (`handler`, `.handle`, `layer`)
 
-No ambient globals, hidden I/O, or DI boilerplate. Declare capabilities as effects and bind them inline with `with` — deterministic tests, replay, and mocking take a single block:
+No ambient globals, hidden I/O, or DI boilerplate. Declare capabilities as effects, define scoped `handler` bindings, and chain or bundle them with `.handle`, `layer`, and `.run` — deterministic tests, replay, and mocking compose like ordinary functions:
 
 ```blot
 type Rng is effect = { next: Unit -> U32 }
@@ -92,11 +92,15 @@ func roll_loot (count: U32): Unit !{ Rng, Log } =>
 io main (): U32 =>
   let seed: U32 = 42
   let total: U32 = 0
-  let step_rng = func () =>
-    seed := self * 1664525 + 1013904223
-    return seed >> 16
-  with Rng = { next: step_rng }, Log = { write: func loot => total := self + loot }:
-    use roll_loot 5
+  handler rng: Rng =>
+    next () =>
+      seed := self * 1664525 + 1013904223
+      return seed >> 16
+  handler log: Log =>
+    write loot => total := self + loot
+  roll_loot.handle rng
+    .handle log
+    .run 5
   return total
 ```
 

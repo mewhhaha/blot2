@@ -1835,7 +1835,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 if self_.in_fork != 0 { setForkTaint(self_, afters[ci], getForkTaint(self_, outers[ci])); }
             }
         }
-        return Value { exits: body_val.exits, .. };
+        return body_val;
     },
     bind => {
         let value = m.node(n.b);
@@ -2864,6 +2864,8 @@ fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdent
         identity.decl = blot_check_types::boolean;
     } else if shape.tag == blot_check_types::Tag.unit {
         identity.decl = blot_check_types::unit;
+    } else if shape.tag == blot_check_types::Tag.function {
+        identity.decl = 0xfffffffc;
     } else {
         return identity, false;
     }

@@ -808,13 +808,37 @@
         }
       },
       {
-        "rule": "with_statement",
+        "rule": "handler_statement",
         "boundary": {
           "kind": "root"
         }
       },
       {
-        "rule": "with_entry",
+        "rule": "handler_suite",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "handler_inline_body",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "handler_named_arm_line",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "handler_named_arm",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "handler_callable_arm",
         "boundary": {
           "kind": "root"
         }

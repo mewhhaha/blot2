@@ -19,6 +19,7 @@ export default grammar({
     [$.private_binding, $.identifier],
     [$.private_effect_header, $.identifier],
     [$.request_complete_header, $.identifier],
+    [$.handler_header, $.identifier],
   ],
 
   rules: {
@@ -68,6 +69,7 @@ export default grammar({
         $.ever_loop,
         $.request_effect_header,
         $.request_complete_header,
+        $.handler_header,
         $.binding_keyword,
         $.keyword,
         $.identifier,
@@ -244,6 +246,12 @@ export default grammar({
       seq(alias("private", $.private_modifier), "effect"),
 
     ever_loop: ($) => seq("for", "ever", alias(":", $.separator)),
+
+    handler_header: ($) =>
+      prec.dynamic(
+        2,
+        seq("handler", field("name", $.identifier), alias(":", $.separator)),
+      ),
 
     // Keep request clauses shallow, like function and type headers. `complete`
     // is contextual, so bindings and function parameters can still use it.
@@ -495,6 +503,7 @@ export default grammar({
         "opaque",
         "export",
         "impl",
+        "handler",
       ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) =>
@@ -516,7 +525,6 @@ export default grammar({
         "rec",
         "do",
         "fork",
-        "with",
         "own",
         "freeze",
         "seal",

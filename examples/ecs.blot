@@ -39,15 +39,23 @@ func run_scoped (world: own World) -> action =>
   let pos = positions
   let vel = velocities
   let gh = ghosts
-  let result = $Nothing
-  with State Time = { get: func () => t, set: func v => t := v }:
-    with State (Column Position) = { get: func () => pos.copy, set: func v => pos := v.copy }:
-      with State (Column Velocity) = { get: func () => vel.copy, set: func v => vel := v.copy }:
-        with State (Column Ghost) = { get: func () => gh.copy, set: func v => gh := v.copy }:
-          use value <- action ()
-          result := $Some value
-  let $Some final_result = result else:
-    @panic "ecs action did not complete"
+  handler h_time: State Time =>
+    get () => t
+    set v => t := v
+  handler h_pos: State (Column Position) =>
+    get () => pos.copy
+    set v => pos := v.copy
+  handler h_vel: State (Column Velocity) =>
+    get () => vel.copy
+    set v => vel := v.copy
+  handler h_gh: State (Column Ghost) =>
+    get () => gh.copy
+    set v => gh := v.copy
+  let final_result = action.handle h_time
+    .handle h_pos
+    .handle h_vel
+    .handle h_gh
+    .run ()
   return ($World { time: t, positions: pos, velocities: vel, ghosts: gh }, final_result)
 
 func get (witness: p -> a): a => State.get ()

@@ -184,14 +184,9 @@ recursive fn suite(self_:Collector&,body:u32,depth:i64)->Error {
    blot_parse_ast::tag_for_stmt=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}let error=self_.expressionTargets(self_.tree.extra.items[value.c],depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(self_.tree.extra.items[value.c+1],value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    blot_parse_ast::tag_range_stmt=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    blot_parse_ast::tag_forever_stmt=>{{ let propagated_error = self_.scope(value.a,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_with_stmt=>{
-    let entries=blot_parse_ast::List{value.a,value.b,..};
-    let entry_count=self_.tree.list(entries).len;
-    for entry_index in 0..entry_count {
-     let entry=self_.tree.node(self_.tree.list(entries)[entry_index]);
-     if entry.c==1 {{ let propagated_error = self_.withHandlerTargets(entry.b,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }}
-    }
-    { let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   blot_parse_ast::tag_handler_stmt=>{
+    { let propagated_error = self_.withHandlerTargets(value.c,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = self_.shadow(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } }
    },
    blot_parse_ast::tag_comptime_for=>{let error=self_.comptimeScope(value,depth+1);if error!=blot_error::Error.none {return error;}},
    blot_parse_ast::tag_comptime_if=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(value.b,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},

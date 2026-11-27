@@ -277,7 +277,7 @@ For a moved field projection in call position (`fill row.xs`), parenthesize the 
 
 ## ALIASED_UPDATE
 
-**Cause:** `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live binding borrows (secondary `-` label names the borrow holder), that arrived as a non-`own` parameter, or that is captured/aliased inside a `with` handler.
+**Cause:** `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live binding borrows (secondary `-` label names the borrow holder), that arrived as a non-`own` parameter, or that is captured/aliased inside a `handler`.
 
 ```blot
 // Before
@@ -361,9 +361,13 @@ io main (): U32 =>
 // After
 type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { now: func () => return 42 }:
+  handler clock: Clock =>
+    now () => 42
+  return (func () =>
     use t <- Clock.now ()
     return t
+  ).handle clock
+    .run ()
 ```
 
 ---
@@ -373,7 +377,7 @@ io main (): U32 =>
 **Cause:** An effectful call appears in a pure position (`let`, `const`, top-level initializer, or pure function signature) or two branches have mismatched effect rows.
 
 - Use `use x <- Effect.op arg` instead of `let x = Effect.op arg`.
-- Handle local effects with `with Effect = { ... }:` or `do provider:` before crossing a pure boundary.
+- Handle local effects with `handler h: Effect => ...` and `.handle h .run ...` (or `@handle` / `do provider:`) before crossing a pure boundary.
 
 ```blot
 // Before
@@ -396,21 +400,27 @@ func read_time (): U32 =>
 **Cause:** An effect declaration, row annotation, handler operation signature, provider, or scoped capability failed effect validation.
 
 - Match effect family names and operation signatures against `type Name is effect = { ... }`.
-- Keep scoped capabilities and resolvers inside the `with` / `do` block that provides them.
+- Keep stateful `handler` bindings and scoped effect capabilities inside the frame that installs them.
 
 ```blot
 // Before
 type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { wrong: func () => return 0 }:
-    return 0
+  handler clock: Clock =>
+    wrong () => 0
+  return (func () => return 0).handle clock
+    .run ()
 
 // After
 type Clock is effect = { now: Unit -> U32 }
 io main (): U32 =>
-  with Clock = { now: func () => return 42 }:
+  handler clock: Clock =>
+    now () => 42
+  return (func () =>
     use t <- Clock.now ()
     return t
+  ).handle clock
+    .run ()
 ```
 
 ---

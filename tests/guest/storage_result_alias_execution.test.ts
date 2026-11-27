@@ -31,17 +31,17 @@ const carry = func row -> (flag: U32) => return do:
 io const answer = func (input: U32): Array U32 => return do:
   let effects = 0
   let original = {${fields}}
-  let first = original
-  let second = original
-  let current = original
-  with Tick = { bump: func () => effects := @u32.add self 1 }:
+  handler h_tick: Tick =>
+    bump () => effects := @u32.add self 1
+  let (first, second, current) = @handle h_tick (func () =>
     use f <- carry original 0
-    first := f
     use s <- carry original 1
-    second := s
+    let cur = original
     for step in 0 .. 3:
-      use c <- carry current (@u32.rem input 2)
-      current := c
+      use c <- carry cur (@u32.rem input 2)
+      cur := c
+    return (f, s, cur)
+  )
   return #[first.${first}, first.${last}, second.${last}, current.${last}, effects]
 `;
   Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots`, async () => {

@@ -14,7 +14,7 @@ Quick, version-matched reference for humans and coding agents. Run `deno task bl
 | `xs.len` | `xs.length` | Array length property is `.length` |
 | `mut x = 1` / `var x = 1` | `let x = 1` then `x := 2` | Local rebinding uses `:=` (`x := self + 1`) |
 | `1 + 2.0` | `@u32.to_f32 1 + 2.0` | No implicit `U32` / `F32` conversion |
-| `let t = Clock.now ()` | `use t <- Clock.now ()` | Effects require `use <-` and `with` / `do` handling |
+| `let t = Clock.now ()` | `use t <- Clock.now ()` | Effects require `use <-` and `handler` + `.handle ... .run` / `@handle` |
 | Mutating a borrowed param | `func f (xs: own #[U32]): #[U32] =>` | Mark parameter `own` or copy via `let local = xs.copy` |
 
 ## 2. Scalars & Built-in Types
@@ -95,9 +95,10 @@ func step (pos: F32) -> (vel: F32): F32 =>
   return pos + vel * dt
 
 io run (): F32 =>
-  with Clock = { delta: func () => return 0.01666667 }:
-    use next <- step 10.0 6.0
-    return next
+  handler clock: Clock =>
+    delta () => 0.01666667
+  return (step 10.0).handle clock
+    .run 6.0
 ```
 
 ## 7. CLI Commands

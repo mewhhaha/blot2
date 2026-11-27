@@ -75,7 +75,6 @@ let newline: Tag = 69;
 let indent: Tag = 70;
 let dedent: Tag = 71;
 let kw_not: Tag = 72;
-let kw_with: Tag = 73;
 let kw_fork: Tag = 74;
 let semicolon: Tag = 75;
 let kw_spark: Tag = 76;
@@ -134,7 +133,6 @@ fn keyword(value: const u8[:]) -> Tag {
             if value == "type" { return kw_type; }
         },
         'u' => { if value == "use" { return kw_use; } },
-        'w' => { if value == "with" { return kw_with; } },
         _ => {},
     }
     return identifier;

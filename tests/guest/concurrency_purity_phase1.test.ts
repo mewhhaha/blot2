@@ -520,8 +520,10 @@ func call_op (): Unit ! { SetSlot } =>
   return ()
 func run_with_cell (): U32 =>
   let slot: Unit -> Unit = func () => return ()
-  with SetSlot = { set: func f => slot := f }:
-    use call_op ()
+  handler h_slot: SetSlot =>
+    set f => slot := f
+  call_op.handle h_slot
+    .run ()
   slot ()
   return pool[@u32.sub pool.length 1]
 `;
@@ -574,9 +576,13 @@ func touch_pool (): Unit =>
   @storage.push pool 55
   return ()
 func run_nested_with (): U32 =>
-  with Bump = { bump: func () => touch_pool () }:
-    with Bump = { bump: func () => use Bump.bump () }:
-      use Bump.bump ()
+  handler outer_bump: Bump =>
+    bump () => touch_pool ()
+  handler inner_bump: Bump =>
+    bump () => use Bump.bump ()
+  (func () => use Bump.bump ()).handle inner_bump
+    .handle outer_bump
+    .run ()
   return pool[@u32.sub pool.length 1]
 `;
   await compileExpectedFailure(

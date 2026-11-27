@@ -305,7 +305,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
           /\[ENTRY_TYPE\] Entry function leaves effect `Clock\.now` unhandled/,
           /in unhandled_effect\.blot › io main/,
           /unhandled effect `Clock\.now`/,
-          /fix: Handle `Clock\.now` inside the entry function with `with Clock = \{ now:/,
+          /fix: Handle `Clock\.now` inside the entry function with `handler h: Clock => now /,
           /doc: blot explain ENTRY_TYPE/,
         ],
       },
@@ -730,7 +730,7 @@ Deno.test("diagnostics: generator-backed blot check succeeds on libraries withou
   }
 });
 
-Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel effects, Text, ENTRY_TYPE, with alias)", () => {
+Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel effects, Text, ENTRY_TYPE, handler alias)", () => {
   // 1. UNKNOWN_RECORD_FIELD and missing_field must never suggest `.length`
   const recField = analyzeDiagnostic({
     filename: "r.blot",
@@ -797,29 +797,29 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
   match(entryDiag.fix ?? "", /#\[U32\]/);
   match(entryDiag.fix ?? "", /#kernel/);
 
-  // 5. ALIASED_UPDATE inside a `with` handler or origin_kind === "aliased" gives distinct advice
-  const withSrc = [
+  // 5. ALIASED_UPDATE inside a `handler` or origin_kind === "aliased" gives distinct advice
+  const handlerSrc = [
     "io main (): U32 =>",
     "  let xs = #[1, 2]",
-    "  with Eff = { step: func () =>",
-    "    xs[0] := 9",
-    "    return xs[0]",
-    "  }:",
-    "    return 0",
+    "  handler h: Eff =>",
+    "    step () =>",
+    "      xs[0] := 9",
+    "      return xs[0]",
+    "  return 0",
   ].join("\n");
-  const withStart = withSrc.indexOf("xs[0] := 9");
-  const withDiag = analyzeDiagnostic({
+  const handlerStart = handlerSrc.indexOf("xs[0] := 9");
+  const handlerDiag = analyzeDiagnostic({
     filename: "w.blot",
     code: "aliased_update",
-    start: withStart,
-    end: withStart + 10,
-    message: "This := writes through storage captured in a with handler",
+    start: handlerStart,
+    end: handlerStart + 10,
+    message: "This := writes through storage captured in a handler",
     origin_kind: "aliased",
-    subject_start: withSrc.indexOf("xs ="),
-    subject_end: withSrc.indexOf("xs =") + 2,
-  }, withSrc);
-  match(withDiag.fix ?? "", /`with`/);
-  equal(withDiag.fix?.includes("let b =") ?? false, false);
+    subject_start: handlerSrc.indexOf("xs ="),
+    subject_end: handlerSrc.indexOf("xs =") + 2,
+  }, handlerSrc);
+  match(handlerDiag.fix ?? "", /`handler`/);
+  equal(handlerDiag.fix?.includes("let b =") ?? false, false);
 });
 
 Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile cleanly", async () => {

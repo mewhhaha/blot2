@@ -96,7 +96,7 @@ io main (): U32 =>
   );
 });
 
-Deno.test("vNext 3B: scoped with handlers, linear shadowing, pre-built records, multi-entry, outer effects", async () => {
+Deno.test("vNext 3B: composable @handle, handler bindings, linear shadowing, Layer bundling, outer effects", async () => {
   await compileAndRun(
     `
 type Log is effect = { write: U32 -> Unit }
@@ -105,8 +105,14 @@ type State s is effect = {
   put: s -> Unit,
 }
 type Outer is effect = { emit: U32 -> Unit }
+type Ask is effect = { get: Unit -> U32 }
 
 const quiet: Log = { write: func _ => () }
+const fixed_ask: Ask = { get: func () => 7 }
+const quiet_outer: Outer = { emit: func _ => () }
+const quiet_env = layer quiet fixed_ask
+const triple_env = layer quiet fixed_ask
+  .layer quiet_outer
 
 func emit_pair (a: U32) -> (b: U32): Unit !{ Log } =>
   use Log.write a
@@ -114,9 +120,16 @@ func emit_pair (a: U32) -> (b: U32): Unit !{ Log } =>
   return ()
 
 func run_with_log (h: Log) -> (x: U32): U32 =>
-  with h:
-    use Log.write x
+  h.run (func () => use Log.write x)
   return x + 1
+
+func run_with_env (env: Layer [Log, Ask]) -> (x: U32): U32 =>
+  return (func v =>
+    use Log.write v
+    use k <- Ask.get ()
+    return v + k
+  ).handle env
+    .run x
 
 func bump_state (delta: U32): U32 !{ State U32, Log } =>
   use cur <- State.get ()
@@ -130,43 +143,75 @@ func push_grow (a: own #[U32]) -> (x: U32): #[U32] =>
   return a
 
 io main (): U32 =>
-  // 1. Pre-built effect record and passing Log as parameter
-  let r1 = run_with_log quiet 9
+  // 1. Pre-built effect record, passing Log/Layer as parameter, 3-layer Layer.layer, and 'with' usable as an identifier
+  let with = 9
+  let r1 = run_with_log quiet with
+  let r_env = run_with_env quiet_env 3
+  let r_triple = triple_env.run (func () =>
+    use Log.write 1
+    use Outer.emit 2
+    use k <- Ask.get ()
+    return k
+  )
 
-  // 2. Inline handler linearly shadowing outer U32 and dynamic array, plus multi-entry with
-  let total = 0
+  // 2. Local handlers linearly shadowing outer U32 and dynamic array, chained via .handle ... .run
   let log: #[U32] = #[]
   let n = 10
-  with Log = { write: func x => log := push_grow self x }, State U32 = { get: func () => n, put: func v => n := v }:
+  handler h_log: Log =>
+    write x => log := push_grow self x
+  handler h_state: State U32 =>
+    get () => n
+    put v => n := v
+  let total = (func () =>
     use a <- bump_state 5
     use b <- bump_state 7
-    total := a + b
+    return a + b
+  ).handle h_log
+    .handle h_state
+    .run ()
 
-  // 3. Handler performing an outer effect + nested with
+  // 3. Handler performing an outer effect composed via .handle chain
   let outer_sum = 0
-  with Outer = { emit: func x => outer_sum := outer_sum + x }:
-    with Log = { write: func x => use Outer.emit (x * 2) }:
-      use emit_pair 3 4
+  handler h_outer: Outer =>
+    emit x => outer_sum := outer_sum + x
+  handler h_log2: Log =>
+    write x => use Outer.emit (x * 2)
+  (func () => use emit_pair 3 4).handle h_log2
+    .handle h_outer
+    .run ()
 
-  // 4. with inside for loop with early break carrying shadowed cell out
+  // 4. handler + @handle inside for loop with early break
   let acc = 0
   for i in 0..10:
-    with Log = { write: func x => acc := acc + x }:
-      use Log.write i
-      if i == 4:
-        break
+    handler h_acc: Log =>
+      write x => acc := acc + x
+    @handle h_acc (func () => use Log.write i)
+    if i == 4:
+      break
 
-  // r1=10, total=15+22=37, n=22, log.length=2, log[0]+log[1]=37, outer_sum=14, acc=0+1+2+3+4=10
-  return r1 + total + n + log.length + log[0] + log[1] + outer_sum + acc
+  // 5. Direct argument passing to .run value + local stateful layer bundling
+  let log2: #[U32] = #[]
+  let m = 20
+  handler h_log3: Log =>
+    write x => log2 := push_grow self x
+  handler h_state2: State U32 =>
+    get () => m
+    put v => m := v
+  let local_env = layer h_log3 h_state2
+  let bumped = bump_state.handle local_env
+    .run 4
+
+  // r1=10, r_env=10, r_triple=7, total=37, n=22, log.length=2, log[0]+log[1]=37, outer_sum=14, acc=10, bumped=24, m=24, log2[0]=24
+  return r1 + r_env + r_triple + total + n + log.length + log[0] + log[1] + outer_sum + acc + bumped + m + log2[0]
 `,
     (guest) => {
-      // 10 + 37 + 22 + 2 + 15 + 22 + 14 + 10 = 132
-      equal(guest.call("main", null), 132);
+      // 10 + 10 + 7 + 37 + 22 + 2 + 15 + 22 + 14 + 10 + 24 + 24 + 24 = 221
+      equal(guest.call("main", null), 221);
     },
   );
 });
 
-Deno.test("vNext 3B: fork rolls back mutations to with-shadowed outer cell", async () => {
+Deno.test("vNext 3B: fork rolls back mutations to handler-shadowed outer cell", async () => {
   await compileAndRun(
     `
 type State s is effect = {
@@ -177,16 +222,18 @@ type State s is effect = {
 io main (): U32 =>
   let n = 10
   let dummy = #[1]
-  let preview = 0
-  let after = 0
-  with State U32 = { get: func () => n, put: func v => n := v }:
-    use p <- fork dummy:
+  handler h_state: State U32 =>
+    get () => n
+    put v => n := v
+  let (preview, after) = (func (own d) =>
+    use p <- fork d:
       use State.put 99
       use g <- State.get ()
       return g
-    preview := p
     use g2 <- State.get ()
-    after := g2
+    return (p, g2)
+  ).handle h_state
+    .run dummy
   // preview == 99, after == 10, n == 10
   return preview * 1000 + after * 10 + n
 `,
@@ -196,30 +243,73 @@ io main (): U32 =>
   );
 });
 
-Deno.test("vNext 3B: suite cannot read or rebind a local shadowed by an active with handler", async () => {
+Deno.test("vNext 3B: body cannot read or rebind a local shadowed by an active handler", async () => {
   await compileExpectedFailure(
     `
 type Log is effect = { write: U32 -> Unit }
 io main (): U32 =>
   let count = 0
-  with Log = { write: func x => count := count + x }:
+  handler h: Log =>
+    write x => count := count + x
+  (func () =>
     use Log.write 1
     let bad = count
+    return ()
+  ).handle h
+    .run ()
   return count
 `,
     "borrow_conflict",
   );
 });
 
-Deno.test("vNext 3B: with Foreign is rejected as sealed_effect", async () => {
+Deno.test("vNext 3B: stateful handler cannot escape its defining frame", async () => {
+  await compileExpectedFailure(
+    `
+type Log is effect = { write: U32 -> Unit }
+func leak (): Log =>
+  let count = 0
+  handler h: Log =>
+    write x => count := count + x
+  return h
+io main (): U32 => return 0
+`,
+    "borrow_conflict",
+  );
+});
+
+Deno.test("vNext 3B: handler Foreign is rejected as sealed_effect", async () => {
   await compileExpectedFailure(
     `
 io main (): U32 =>
-  with Foreign = { x: func () => () }:
-    let a = 1
+  handler h: Foreign =>
+    x () => ()
   return 0
 `,
     "sealed_effect",
+  );
+});
+
+Deno.test("vNext 3B: contextual generic effect inference rejects mismatched result type", async () => {
+  await compileExpectedFailure(
+    `
+type State s is effect = {
+  get: Unit -> s,
+  put: s -> Unit,
+}
+io main (): U32 =>
+  let n: U32 = 10
+  handler h_state: State U32 =>
+    get () => n
+    put v => n := v
+  let g: Bool = (func () =>
+    use x <- State.get ()
+    return x
+  ).handle h_state
+    .run ()
+  return if g then 1 else 0
+`,
+    "type_mismatch",
   );
 });
 
@@ -392,8 +482,9 @@ func encode_packet (p: Packet): Unit ! {Emit U32} =>
 io main (): U32 =>
   let total = 0
   let p = $Packet { id: 10, flag: true }
-  with Emit U32 = func v => total := total + v:
-    use encode_packet p
+  handler h_emit: Emit U32 => v => total := total + v
+  encode_packet.handle h_emit
+    .run p
   return total
 `,
     (guest) => {

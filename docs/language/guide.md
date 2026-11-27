@@ -1386,8 +1386,8 @@ through helpers use the same handler; unrelated effects remain visible. Clause
 bodies run outside the request installation, allowing forwarding to an outer
 handler or provider. Generic operation clauses name a closed instance with parentheses, as in
 `effect (Reader.ask U32) () =>`. This interface supports one reply per request,
-without an exposed continuation value. For new code, prefer inline
-`with Effect = { ... }:` scoped handlers (see [spec.md](spec.md)).
+without an exposed continuation value. For new code, prefer composable
+`handler` bindings with `.handle ... .run` / `@handle` / `layer` (see [spec.md](spec.md)).
 
 ### Effect families and scoped state
 

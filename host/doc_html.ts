@@ -89,7 +89,7 @@ export function highlightBlotHtml(code: string): string {
     "break",
     "continue",
     "ever",
-    "with",
+    "handler",
     "use",
     "do",
     "test",

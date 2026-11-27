@@ -1935,9 +1935,10 @@ function buildExampleSource(
 
   const lastIdx = execLines.length - 1;
   const lastTrim = execLines[lastIdx].trim();
-  const isStmt = /^(?:let|for|if|with|use|return|@panic|break|continue)\b/.test(
-    lastTrim,
-  ) || /:=/.test(lastTrim);
+  const isStmt =
+    /^(?:let|for|if|handler|use|return|@panic|break|continue)\b/.test(
+      lastTrim,
+    ) || /:=/.test(lastTrim);
 
   if (execLines.length === 1 && !isStmt && !options.forceUnitReturn) {
     return {

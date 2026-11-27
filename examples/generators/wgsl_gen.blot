@@ -72,7 +72,7 @@ func is_reserved_keyword (name: Text): Bool =>
     "froM", "func", "if", "impl", "import", "in", "infix", "infixl", "infixr",
     "is", "let", "not", "of", "opaque", "or", "own", "private", "return",
     "seal", "self", "spark", "test", "then", "true", "type", "use", "where",
-    "wherE", "with", "yield",
+    "wherE", "yield",
   ]
   for word in reserved:
     if text.equal name word:

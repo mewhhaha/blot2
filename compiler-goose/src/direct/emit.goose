@@ -642,6 +642,7 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
         boolean => { return NominalIdentity { 0, blot_check_types::boolean }, true; },
         unit => { return NominalIdentity { 0, blot_check_types::unit }, true; },
         array => { return NominalIdentity { 0, 0xffffffff }, true; },
+        function => { return NominalIdentity { 0, 0xfffffffc }, true; },
         // Storage capabilities are compiler-owned nominal identities.
         ref => { return NominalIdentity { 0xffffffff, blot_check_storage_types::ref }, true; },
         view => { return NominalIdentity { 0xffffffff, blot_check_storage_types::view }, true; },
