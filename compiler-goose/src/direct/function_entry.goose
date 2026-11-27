@@ -597,7 +597,266 @@ recursive fn scanScalarRecursion(g: Generator&, f: const Fn&, m: const Module&, 
 // Conservative call-graph-aware check: true when evaluating `id` cannot bump
 // `owner_top` or `stack_pointer` (allows `storage.push`/`reserve`/indexed
 // `update` on existing owners, unboxed aggregates, and recursive calls within
+// Whole-program proof: returns true if any float NaN payload or NaN sign bit
+// might be observable via `.bits`, `@flat.*`, float-bearing export/host/kernel
+// boundaries, or dynamically dispatched/untracked calls.
+recursive fn loweredTypeMentionsFloat(g: Generator&, ty: Ty, depth: i64) -> bool {
+    if depth >= 16 { return true; }
+    let n = g.types.node(ty);
+    match n.tag {
+        f32_, f64_ => { return true; },
+        unit, boolean, u8_, u32_, i32_, u64_, i64_, never => { return false; },
+        array, view, ref, link => { return loweredTypeMentionsFloat(g, n.a, depth + 1); },
+        tuple => {
+            for ci in 0..(n.b as i64) {
+                if loweredTypeMentionsFloat(g, g.types.words[n.a + ci], depth + 1) { return true; }
+            }
+            return false;
+        },
+        record => {
+            for fi in 0..(n.b as i64) {
+                if loweredTypeMentionsFloat(g, g.types.recordField(ty, fi).ty, depth + 1) { return true; }
+            }
+            return false;
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(ty);
+            if cerr != blot_direct_types::Error.none { g.dropFailure(); return true; }
+            for ci in 0..cases.len {
+                if loweredTypeMentionsFloat(g, g.types.variant_payloads[cases.payloads + ci], depth + 1) { return true; }
+            }
+            return false;
+        },
+        _ => { return true; },
+    }
+}
+fn enqueueFloatCheckTarget(
+    g: const Generator&,
+    target: BindingRef,
+    queue: BindingRef[>..<]&,
+    visited: blot_direct_map::U64Map&,
+) -> bool {
+    if target.unit == 0 || !g.hasUnit(target.unit) { return false; }
+    let key = blot_direct_emit::key64(target.unit, target.binding);
+    let _, seen = visited.get(key);
+    if seen { return true; }
+    if queue.len >= 2048 { return false; }
+    visited.put(key, 1);
+    queue.push(target);
+    return true;
+}
+fn isSafeBuiltinFloatProject(name: Chars) -> bool {
+    return name == "length" || name == "push" || name == "pop" || name == "truncate" ||
+        name == "reserve" || name == "with_capacity" || name == "extend" || name == "extend_view" ||
+        name == "view" || name == "copy" || name == "to_u8" || name == "to_u32" || name == "to_i32" ||
+        name == "to_u64" || name == "to_i64" || name == "to_f32" || name == "to_f64" || name == "to_bool" ||
+        name == "abs" || name == "neg" || name == "sqrt" || name == "floor" || name == "ceil" ||
+        name == "trunc" || name == "min" || name == "max" || name == "at";
+}
+recursive fn scanBodyObservesFloatBits(
+    g: Generator&,
+    m: const Module&,
+    id: u32,
+    queue: BindingRef[>..<]&,
+    visited: blot_direct_map::U64Map&,
+    budget: i64&,
+) -> bool {
+    if id == 0 { return false; }
+    if budget <= 0 { return true; }
+    budget -= 1;
+    let n = m.node(id);
+    if n.op == blot_check_core::Op.bits { return true; }
+    match n.tag {
+        constant, panic, type_same, type_constructor, comptime_meta => { return false; },
+        primitive_function => {
+            return m.primitive(id).op == blot_check_core::Op.bits;
+        },
+        reference => {
+            let ref = m.reference(id);
+            if ref.unit != 0 || (m.binding(ref.binding).kind != blot_reuse_principal_interface::Kind.local &&
+                m.binding(ref.binding).kind != blot_reuse_principal_interface::Kind.parameter) {
+                let target = g.resolve(m, ref);
+                if !enqueueFloatCheckTarget(g, target, queue, visited) { return true; }
+            }
+            return false;
+        },
+        suite, block_, product, record, array, array_op, storage, break_ => {
+            for ch in m.children(id) {
+                if scanBodyObservesFloatBits(g, m, ch, queue, visited, budget) { return true; }
+            }
+            return false;
+        },
+        bind, construct => {
+            return scanBodyObservesFloatBits(g, m, n.b, queue, visited, budget);
+        },
+        return_ => {
+            return scanBodyObservesFloatBits(g, m, n.a, queue, visited, budget);
+        },
+        scalar, logical, apply => {
+            return scanBodyObservesFloatBits(g, m, n.a, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, n.b, queue, visited, budget);
+        },
+        associated => {
+            if n.op == blot_check_core::Op.none { return true; }
+            return scanBodyObservesFloatBits(g, m, n.a, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, n.b, queue, visited, budget);
+        },
+        pattern_bind => {
+            return scanBodyObservesFloatBits(g, m, n.b, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, n.c, queue, visited, budget);
+        },
+        if_stmt, if_value => {
+            return scanBodyObservesFloatBits(g, m, n.a, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, n.b, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, n.c, queue, visited, budget);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if scanBodyObservesFloatBits(g, m, inp, queue, visited, budget) { return true; }
+            }
+            for arm in m.matchArms(id) {
+                if scanBodyObservesFloatBits(g, m, arm.guard_, queue, visited, budget) ||
+                    scanBodyObservesFloatBits(g, m, arm.body, queue, visited, budget) { return true; }
+            }
+            return false;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            return scanBodyObservesFloatBits(g, m, linfo.first, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, linfo.end, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, linfo.body, queue, visited, budget);
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            return scanBodyObservesFloatBits(g, m, sinfo.source, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, sinfo.end, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, sinfo.body, queue, visited, budget);
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            if scanBodyObservesFloatBits(g, m, uinfo.root, queue, visited, budget) ||
+                scanBodyObservesFloatBits(g, m, uinfo.value, queue, visited, budget) { return true; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index &&
+                    scanBodyObservesFloatBits(g, m, sel.index, queue, visited, budget) { return true; }
+            }
+            return false;
+        },
+        closure => {
+            return scanBodyObservesFloatBits(g, m, m.closure(id).body, queue, visited, budget);
+        },
+        call => {
+            let info = m.call(id);
+            for arg in info.arguments {
+                if scanBodyObservesFloatBits(g, m, arg, queue, visited, budget) { return true; }
+            }
+            let target = g.resolve(m, info.target);
+            if !enqueueFloatCheckTarget(g, target, queue, visited) { return true; }
+            return false;
+        },
+        project => {
+            if scanBodyObservesFloatBits(g, m, n.a, queue, visited, budget) { return true; }
+            if m.projectionVariants(n.b).len != 0 { return false; }
+            let rty_id = m.typeOf(n.a);
+            let rtag = m.types.node(rty_id).tag;
+            if rtag == blot_check_types::Tag.record || rtag == blot_check_types::Tag.product { return false; }
+            if rtag == blot_check_types::Tag.unsigned32 || rtag == blot_check_types::Tag.signed32 ||
+                rtag == blot_check_types::Tag.unsigned8 || rtag == blot_check_types::Tag.unsigned64 ||
+                rtag == blot_check_types::Tag.signed64 || rtag == blot_check_types::Tag.floating32 ||
+                rtag == blot_check_types::Tag.floating64 || rtag == blot_check_types::Tag.boolean ||
+                rtag == blot_check_types::Tag.array {
+                let sp = m.fieldSpelling(m.projection(n.b).field);
+                if sp.present && isSafeBuiltinFloatProject(sp.value) { return false; }
+                return true;
+            }
+            // Try resolving concrete nominal field or associated method.
+            let lowered, lerr = g.types.lower(m, rty_id, Env {});
+            if lerr != blot_direct_types::Error.none { g.dropFailure(); return true; }
+            let proj = m.projection(n.b);
+            if tagOf(g, lowered) == blot_direct_types::Tag.nominal {
+                let cases, cerr = g.types.variants(lowered);
+                if cerr == blot_direct_types::Error.none && cases.len == 1 {
+                    let payload = g.types.variant_payloads[cases.payloads];
+                    let fname, has_fn = g.types.fieldNameOf(m, proj.field, true);
+                    if has_fn && tagOf(g, payload) == blot_direct_types::Tag.record && g.types.findField(payload, fname) >= 0 {
+                        return false;
+                    }
+                } else if cerr != blot_direct_types::Error.none {
+                    g.dropFailure();
+                }
+            }
+            let identity, has_id = g.receiverIdentity(lowered);
+            if has_id {
+                let target, has_t = g.dispatchTarget(m, identity, proj.field, blot_check_types::Operator.none);
+                if has_t {
+                    if !enqueueFloatCheckTarget(g, target, queue, visited) { return true; }
+                    return false;
+                }
+            }
+            return true;
+        },
+        _ => { return true; },
+    }
+}
+fn analyzeFloatBitsObservable(g: Generator&, entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&) -> bool {
+    if pinfo.kernels.len != 0 || pinfo.processes.len != 0 || pinfo.has_fork { return true; }
+    if !g.hasUnit(entry) { return true; }
+    let m .= g.units[entry - 1];
+    var queue: BindingRef[>..<] = [];
+    var visited = blot_direct_map::U64Map {};
+    for at in 0..m.bodies.len {
+        let body .= m.bodies[at];
+        if !(body.exported || (blot_direct_writer::testModeEnabled() && body.test_kind != 0)) { continue; }
+        let lowered, lerr = g.types.lower(m, m.binding(body.binding).ty, Env {});
+        if lerr != blot_direct_types::Error.none { g.dropFailure(); return true; }
+        var cur = lowered;
+        if body.is_function {
+            if tagOf(g, cur) != blot_direct_types::Tag.function { return true; }
+            let fn_node = g.types.node(cur);
+            if loweredTypeMentionsFloat(g, fn_node.a, 0) || loweredTypeMentionsFloat(g, fn_node.b, 0) { return true; }
+        } else if tagOf(g, cur) == blot_direct_types::Tag.function {
+            let fn_node = g.types.node(cur);
+            if loweredTypeMentionsFloat(g, fn_node.a, 0) || loweredTypeMentionsFloat(g, fn_node.b, 0) { return true; }
+        } else {
+            if loweredTypeMentionsFloat(g, cur, 0) { return true; }
+        }
+        if !enqueueFloatCheckTarget(g, BindingRef { entry, body.binding }, queue, visited) { return true; }
+    }
+    var head: i64 = 0;
+    while head < queue.len {
+        let cur = queue[head];
+        head += 1;
+        let um .= g.units[cur.unit - 1];
+        let pnode, has_p = primitiveAlias(um, cur.binding);
+        if has_p {
+            if um.primitive(pnode).op == blot_check_core::Op.bits { return true; }
+            continue;
+        }
+        let body .= um.body(cur.binding);
+        if !body { continue; }
+        var budget: i64 = 4096;
+        if scanBodyObservesFloatBits(g, um, body.root, queue, visited, budget) { return true; }
+    }
+    return false;
+}
+
+// Conservative check that a function body performs no scope memory allocations
+// (all constructed/loaded values are unboxed, no array/closure creation, no
+// external allocating calls; calls inside `visited` are assumed proven along with
 // the visited SCC).
+fn isSmallScalarPackedFillExpr(m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.array_op || m.arrayOperation(id) != blot_backend_collection_ops::Op.fill { return false; }
+    let ch = m.children(id);
+    if ch.len != 2 { return false; }
+    let cn = m.node(ch[0]);
+    if cn.tag != blot_check_core::Tag.constant || cn.a == 0 || cn.a > 16 { return false; }
+    let arr_ty = m.types.node(m.typeOf(id));
+    if arr_ty.tag != blot_check_types::Tag.array { return false; }
+    let etag = m.types.node(arr_ty.a).tag;
+    return etag == blot_check_types::Tag.unsigned8 || etag == blot_check_types::Tag.boolean;
+}
 recursive fn bodyNoScopeAlloc(
     g: Generator&,
     f: const Fn&,
@@ -606,6 +865,7 @@ recursive fn bodyNoScopeAlloc(
     visited: BindingRef[16]&,
     visited_len: i64&,
     left: i64&,
+    body_root: u32 = 0,
 ) -> bool {
     if id == 0 { return true; }
     if left <= 0 { return false; }
@@ -623,36 +883,46 @@ recursive fn bodyNoScopeAlloc(
         },
         suite, block_ => {
             for child in m.children(id) {
-                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
             }
             return true;
         },
-        bind => { return n.c < 2 && bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left); },
-        return_ => { return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left); },
+        bind => {
+            if n.c >= 2 { return false; }
+            if body_root != 0 && isSmallScalarPackedFillExpr(m, n.b) {
+                var da_addr = false;
+                if isDirectLocalArrayBinding(g, f, m, body_root, n.a, da_addr) && !da_addr {
+                    let ch = m.children(n.b);
+                    return bodyNoScopeAlloc(g, f, m, ch[1], visited, visited_len, left, body_root);
+                }
+            }
+            return bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root);
+        },
+        return_ => { return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root); },
         break_ => {
             for child in m.children(id) {
-                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
             }
             return true;
         },
         if_value, if_stmt => {
-            return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, n.c, visited, visited_len, left);
+            return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, n.c, visited, visited_len, left, body_root);
         },
         match_ => {
             for inp in m.matchInputs(id) {
-                if !bodyNoScopeAlloc(g, f, m, inp, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, inp, visited, visited_len, left, body_root) { return false; }
             }
             for arm in m.matchArms(id) {
-                if !bodyNoScopeAlloc(g, f, m, arm.guard_, visited, visited_len, left) ||
-                    !bodyNoScopeAlloc(g, f, m, arm.body, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, arm.guard_, visited, visited_len, left, body_root) ||
+                    !bodyNoScopeAlloc(g, f, m, arm.body, visited, visited_len, left, body_root) { return false; }
             }
             return true;
         },
         pattern_bind => {
-            return bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, n.c, visited, visited_len, left);
+            return bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, n.c, visited, visited_len, left, body_root);
         },
         loop_ => {
             let linfo = m.loopInfo(id);
@@ -672,17 +942,17 @@ recursive fn bodyNoScopeAlloc(
             for carry in m.loopCarries(id) {
                 if !coreTypeUnboxed(g, f, m, m.binding(carry.incoming).ty) { return false; }
             }
-            return bodyNoScopeAlloc(g, f, m, linfo.first, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, linfo.end, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, linfo.body, visited, visited_len, left);
+            return bodyNoScopeAlloc(g, f, m, linfo.first, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, linfo.end, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, linfo.body, visited, visited_len, left, body_root);
         },
         construct => {
-            return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left);
+            return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root);
         },
         product, record => {
             if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
             for child in m.children(id) {
-                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
             }
             return true;
         },
@@ -691,15 +961,15 @@ recursive fn bodyNoScopeAlloc(
             let sels = m.updateSelectors(id);
             if sels.len == 0 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
             if !coreTypeUnboxed(g, f, m, m.typeOf(change.value)) { return false; }
-            if !bodyNoScopeAlloc(g, f, m, change.root, visited, visited_len, left) ||
-                !bodyNoScopeAlloc(g, f, m, change.value, visited, visited_len, left) { return false; }
+            if !bodyNoScopeAlloc(g, f, m, change.root, visited, visited_len, left, body_root) ||
+                !bodyNoScopeAlloc(g, f, m, change.value, visited, visited_len, left, body_root) { return false; }
             for sel in sels {
-                if sel.kind == blot_check_core::UpdateKind.index && !bodyNoScopeAlloc(g, f, m, sel.index, visited, visited_len, left) { return false; }
+                if sel.kind == blot_check_core::UpdateKind.index && !bodyNoScopeAlloc(g, f, m, sel.index, visited, visited_len, left, body_root) { return false; }
             }
             return true;
         },
         project => {
-            if isPureScalarProject(g, m, id) { return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left); }
+            if isPureScalarProject(g, m, id) { return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root); }
             let proj = m.projection(n.b);
             let variants = m.projectionVariants(n.b);
             let recv_tag = m.types.node(m.typeOf(n.a)).tag;
@@ -710,7 +980,7 @@ recursive fn bodyNoScopeAlloc(
                 let inner = m.node(n.a);
                 if inner.tag == blot_check_core::Tag.array_op && m.arrayOperation(n.a) == blot_backend_collection_ops::Op.get {
                     for ch in m.children(n.a) {
-                        if !bodyNoScopeAlloc(g, f, m, ch, visited, visited_len, left) { return false; }
+                        if !bodyNoScopeAlloc(g, f, m, ch, visited, visited_len, left, body_root) { return false; }
                     }
                     return true;
                 }
@@ -718,36 +988,36 @@ recursive fn bodyNoScopeAlloc(
                     let op_k, ok = blot_check_storage_ops::opFromCode(inner.c);
                     if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read {
                         for ch in m.children(n.a) {
-                            if !bodyNoScopeAlloc(g, f, m, ch, visited, visited_len, left) { return false; }
+                            if !bodyNoScopeAlloc(g, f, m, ch, visited, visited_len, left, body_root) { return false; }
                         }
                         return true;
                     }
                 }
-                return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left);
+                return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root);
             }
             let sp = m.fieldSpelling(proj.field);
             if sp.present && sp.value == "length" {
-                return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left);
+                return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root);
             }
             return false;
         },
         scalar, associated, logical => {
             if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
-            return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left) &&
-                bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left);
+            return bodyNoScopeAlloc(g, f, m, n.a, visited, visited_len, left, body_root) &&
+                bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root);
         },
         array_op => {
             match m.arrayOperation(id) {
                 length => {
                     for child in m.children(id) {
-                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
                     }
                     return true;
                 },
                 get => {
                     if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
                     for child in m.children(id) {
-                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
                     }
                     return true;
                 },
@@ -760,22 +1030,22 @@ recursive fn bodyNoScopeAlloc(
             match op_k {
                 length, view, truncate, reserve => {
                     for child in m.children(id) {
-                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
                     }
                     return true;
                 },
                 read, pop => {
                     if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
                     for child in m.children(id) {
-                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left) { return false; }
+                        if !bodyNoScopeAlloc(g, f, m, child, visited, visited_len, left, body_root) { return false; }
                     }
                     return true;
                 },
                 push => {
                     let ch = m.children(id);
                     if ch.len != 2 || !coreTypeUnboxed(g, f, m, m.typeOf(ch[1])) { return false; }
-                    return bodyNoScopeAlloc(g, f, m, ch[0], visited, visited_len, left) &&
-                        bodyNoScopeAlloc(g, f, m, ch[1], visited, visited_len, left);
+                    return bodyNoScopeAlloc(g, f, m, ch[0], visited, visited_len, left, body_root) &&
+                        bodyNoScopeAlloc(g, f, m, ch[1], visited, visited_len, left, body_root);
                 },
                 _ => { return false; },
             }
@@ -787,13 +1057,13 @@ recursive fn bodyNoScopeAlloc(
                 if sp.present && m.types.node(m.typeOf(pn.a)).tag == blot_check_types::Tag.array {
                     if sp.value == "push" {
                         return coreTypeUnboxed(g, f, m, m.typeOf(n.b)) &&
-                            bodyNoScopeAlloc(g, f, m, pn.a, visited, visited_len, left) &&
-                            bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left);
+                            bodyNoScopeAlloc(g, f, m, pn.a, visited, visited_len, left, body_root) &&
+                            bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root);
                     }
                     if sp.value == "at" {
                         return coreTypeUnboxed(g, f, m, m.typeOf(id)) &&
-                            bodyNoScopeAlloc(g, f, m, pn.a, visited, visited_len, left) &&
-                            bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left);
+                            bodyNoScopeAlloc(g, f, m, pn.a, visited, visited_len, left, body_root) &&
+                            bodyNoScopeAlloc(g, f, m, n.b, visited, visited_len, left, body_root);
                     }
                 }
             }
@@ -802,7 +1072,7 @@ recursive fn bodyNoScopeAlloc(
         call => {
             let info = m.call(id);
             for arg in info.arguments {
-                if !bodyNoScopeAlloc(g, f, m, arg, visited, visited_len, left) { return false; }
+                if !bodyNoScopeAlloc(g, f, m, arg, visited, visited_len, left, body_root) { return false; }
             }
             if scratchScalarCallee(g, m, info) { return true; }
             let target = g.resolve(m, info.target);
@@ -818,7 +1088,7 @@ recursive fn bodyNoScopeAlloc(
             visited[visited_len] = target;
             visited_len += 1;
             var nf_env = Fn { unit: target.unit, .. };
-            return bodyNoScopeAlloc(g, nf_env, tm, tbody.root, visited, visited_len, left);
+            return bodyNoScopeAlloc(g, nf_env, tm, tbody.root, visited, visited_len, left, tbody.root);
         },
         _ => { return false; },
     }
@@ -1038,7 +1308,7 @@ recursive fn scanSccParamAliases(
                     return;
                 }
             }
-            // Sole-return SCC call `p := self_or_peer ... p ...`
+            // Sole-return SCC call `p := self_or_peer ... p ...`, or sole-return inlined helper (`p := emit_uint self v`).
             if rn.tag == blot_check_core::Tag.call {
                 let info = m.call(rhs);
                 let target = g.resolve(m, info.target);
@@ -1052,6 +1322,98 @@ recursive fn scanSccParamAliases(
                         return;
                     }
                     // Otherwise handled via pattern_bind or non-returning Mode R!
+                    return;
+                }
+                if own_param && m.types.node(m.typeOf(rhs)).tag == blot_check_types::Tag.array &&
+                    g.hasUnit(target.unit) && canInlineTarget(g, target, 0) {
+                    let tm .= g.units[target.unit - 1];
+                    let tbody .= tm.body(target.binding);
+                    if tbody && tbody.is_function && !tbody.exported && tm.bodyParameters(tbody).len == info.arguments.len {
+                        let tparams = tm.bodyParameters(tbody);
+                        var matched_arg: i64 = -1;
+                        for arg, ai in info.arguments {
+                            if inBindingSet(same, same_len, localRef(m, arg)) {
+                                if matched_arg >= 0 { escaped = true; return; }
+                                matched_arg = ai;
+                            } else {
+                                scanSccParamAliases(g, m, spec, pi, pty, own_param, arg, same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                            }
+                        }
+                        if matched_arg >= 0 {
+                            if calleeReturnsParamHandle(g, tm, tbody.root, tparams[matched_arg].binding, 0) {
+                                var hbud: i64 = 256;
+                                if !noStorageResize(g, tm, tbody.root, hbud) { written = true; resized = true; }
+                                else { written = true; }
+                                if !inBindingSet(same, same_len, n.a) { addBindingSet(same, same_len, n.a); changed = true; }
+                                return;
+                            }
+                            escaped = true;
+                            return;
+                        }
+                    }
+                }
+            }
+            // Value-level `if` returning `same` or `same.push(...)` on both arms (e.g. `let p3 = if c then p2.push a else p2.push b`).
+            if rn.tag == blot_check_core::Tag.if_value && m.types.node(m.typeOf(rhs)).tag == blot_check_types::Tag.array {
+                var arm_ok = true;
+                var arm_hit = false;
+                var arm_written = false;
+                var arm_resized = false;
+                let arms: u32[2] = [rn.b, rn.c];
+                for ai in 0..2 {
+                    var cur_arm = arms[ai];
+                    for step in 0..4 {
+                        let an = m.node(cur_arm);
+                        if (an.tag == blot_check_core::Tag.block_ || an.tag == blot_check_core::Tag.suite) && an.b == 1 {
+                            cur_arm = m.children(cur_arm)[0];
+                        } else { break; }
+                    }
+                    let an = m.node(cur_arm);
+                    if an.tag == blot_check_core::Tag.reference && inBindingSet(same, same_len, localRef(m, cur_arm)) {
+                        arm_hit = true;
+                    } else if an.tag == blot_check_core::Tag.storage {
+                        let op_k, ok = blot_check_storage_ops::opFromCode(an.c);
+                        let ch = m.children(cur_arm);
+                        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.push && ch.len == 2 &&
+                            inBindingSet(same, same_len, localRef(m, ch[0])) {
+                            arm_hit = true;
+                            arm_written = true;
+                            arm_resized = true;
+                        } else { arm_ok = false; break; }
+                    } else if an.tag == blot_check_core::Tag.apply && m.node(an.a).tag == blot_check_core::Tag.project {
+                        let pn = m.node(an.a);
+                        let sp = m.fieldSpelling(m.projection(pn.b).field);
+                        if sp.present && sp.value == "push" && inBindingSet(same, same_len, localRef(m, pn.a)) {
+                            arm_hit = true;
+                            arm_written = true;
+                            arm_resized = true;
+                        } else { arm_ok = false; break; }
+                    } else {
+                        arm_ok = false;
+                        break;
+                    }
+                }
+                if arm_ok && arm_hit {
+                    scanSccParamAliases(g, m, spec, pi, pty, own_param, rn.a, same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                    for ai in 0..2 {
+                        var cur_arm = arms[ai];
+                        for step in 0..4 {
+                            let an = m.node(cur_arm);
+                            if (an.tag == blot_check_core::Tag.block_ || an.tag == blot_check_core::Tag.suite) && an.b == 1 {
+                                cur_arm = m.children(cur_arm)[0];
+                            } else { break; }
+                        }
+                        let an = m.node(cur_arm);
+                        if an.tag == blot_check_core::Tag.storage {
+                            let ch = m.children(cur_arm);
+                            scanSccParamAliases(g, m, spec, pi, pty, own_param, ch[1], same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                        } else if an.tag == blot_check_core::Tag.apply {
+                            scanSccParamAliases(g, m, spec, pi, pty, own_param, an.b, same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                        }
+                    }
+                    if arm_written { written = true; }
+                    if arm_resized { resized = true; }
+                    if !inBindingSet(same, same_len, n.a) { addBindingSet(same, same_len, n.a); changed = true; }
                     return;
                 }
             }
@@ -1544,6 +1906,23 @@ fn analyzeWorkerSCC(g: Generator&, id: u32) -> blot_direct_emit::WorkerSpec, boo
     }
     if !any_mode { return spec, false; }
 
+    // Mode 4: pack wide flat all-F32 value parameters (>= 8 and <= 32 F32s,
+    // multiple of 4, e.g. 12-field 3x3+vec3 transforms) into v128 lanes so
+    // recursive worker calls stay in XMM registers instead of spilling args.
+    for pi in 0..param_count {
+        if pi >= 8 || spec.param_modes[pi] != 0 { continue; }
+        let pty = g.s.tys[inst.parameters.start + pi];
+        let kinds, kerr = g.types.layout(pty);
+        if kerr != blot_direct_types::Error.none { g.dropFailure(); continue; }
+        if kinds.len >= 8 && kinds.len <= 32 && (kinds.len % 4) == 0 {
+            var all_f32 = true;
+            for k in kinds {
+                if k != VT_f32 { all_f32 = false; break; }
+            }
+            if all_f32 { spec.param_modes[pi] = 4; }
+        }
+    }
+
     // Check `no_scope_alloc` across the entire SCC.
     var visited: BindingRef[16] = [BindingRef { 0, 0 }; 16];
     var visited_len: i64 = 0;
@@ -1557,7 +1936,7 @@ fn analyzeWorkerSCC(g: Generator&, id: u32) -> blot_direct_emit::WorkerSpec, boo
         if !sb_body { nsa = false; break; }
         var nf_chk = Fn { unit: key.unit, .. };
         var nbud: i64 = 1024;
-        if !bodyNoScopeAlloc(g, nf_chk, m, sb_body.root, visited, visited_len, nbud) {
+        if !bodyNoScopeAlloc(g, nf_chk, m, sb_body.root, visited, visited_len, nbud, sb_body.root) {
             nsa = false;
             break;
         }
@@ -1910,6 +2289,8 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
     let inputs = g.reserveVals(parameters.len);
     var param_bindings: u32[8] = [0; 8];
     var param_tys: Ty[8] = [0; 8];
+    var pack_vstart: u32[8] = [0; 8];
+    var pack_vcount: i64[8] = [0; 8];
     var arr_mask: u32 = 0;
     for at in 0..(parameters.len as i64) {
         let pty = g.s.tys[parameters.start + at];
@@ -1934,6 +2315,18 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
             recordCheckedArray(f, base_loc, len_loc, base_loc, len_loc);
             if pmode == 2 { recordMutable(g, f, pval); }
             if at < 8 { arr_mask |= ((1 as u32) << (at as u32)); }
+        } else if pmode == 4 {
+            let kinds, kerr = g.types.layout(pty);
+            if kerr != blot_direct_types::Error.none {
+                blot_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.v128_shadows.resize(shadows_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return g.typeFailure(m, 0);
+            }
+            let nvecs = kinds.len / 4;
+            pack_vstart[at] = localCount(g, f);
+            pack_vcount[at] = nvecs;
+            for _ in 0..nvecs { let _ = local(g, f, VT_v128); }
+            g.s.vals[inputs.start + at] = neverVal();
         } else {
             let value, error = fresh(g, f, pty, 0);
             if error != blot_direct_types::Error.none {
@@ -1945,6 +2338,32 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
         }
     }
     f.parameter_words = localCount(g, f);
+    // Unpack any Mode-4 v128-packed wide F32 parameter into body scalar locals
+    // after `f.parameter_words` is frozen, and seed the packed-v128 cache.
+    for at in 0..(parameters.len as i64) {
+        if at < 8 && spec.param_modes[at] == 4 {
+            let pty = g.s.tys[parameters.start + at];
+            let unpacked, uerr = fresh(g, f, pty, 0);
+            if uerr != blot_direct_types::Error.none {
+                blot_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.v128_shadows.resize(shadows_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return uerr;
+            }
+            for vi in 0..pack_vcount[at] {
+                let vloc = pack_vstart[at] + (vi as u32);
+                let w0 = w(g, unpacked, vi * 4);
+                let w1 = w(g, unpacked, vi * 4 + 1);
+                let w2 = w(g, unpacked, vi * 4 + 2);
+                let w3 = w(g, unpacked, vi * 4 + 3);
+                lget(g, vloc); simdLaneOp(g, SIMD_f32x4_extract_lane, 0); lset(g, w0);
+                lget(g, vloc); simdLaneOp(g, SIMD_f32x4_extract_lane, 1); lset(g, w1);
+                lget(g, vloc); simdLaneOp(g, SIMD_f32x4_extract_lane, 2); lset(g, w2);
+                lget(g, vloc); simdLaneOp(g, SIMD_f32x4_extract_lane, 3); lset(g, w3);
+                recordPackedF32x4(f, w0, w1, w2, w3, vloc);
+            }
+            g.s.vals[inputs.start + at] = unpacked;
+        }
+    }
     let owner_mark = local(g, f, VT_i32);
     let stack_mark = local(g, f, VT_i32);
     let saved_esc = local(g, f, VT_i32);
@@ -2148,86 +2567,94 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
     return blot_direct_types::Error.none;
 }
 
+// Looks up or lazily registers a specialized recursive worker SCC for named instance `id`.
+fn resolveWorkerSpec(g: Generator&, id: u32) -> i64, i64 {
+    let key = g.s.instances[id].key;
+    if key.kind != blot_direct_emit::InstanceKind.named || g.s.instances[id].closure || g.s.instances[id].inferring {
+        return -1, -1;
+    }
+    let existing_w, has_w = g.s.worker_map.get(id as u64);
+    if has_w && existing_w != 0 {
+        let spec_idx = (existing_w - 1) as i64;
+        let sp = g.s.worker_specs[spec_idx];
+        for si in 0..(sp.scc_len as i64) {
+            if sp.scc_insts[si] == id { return spec_idx, si; }
+        }
+        return -1, -1;
+    }
+    let new_spec, ok_spec = analyzeWorkerSCC(g, id);
+    if !ok_spec { return -1, -1; }
+    if g.s.parallel_readonly {
+        g.s.parallel_aborted = true;
+        return -1, -1;
+    }
+    var spec = new_spec;
+    let m .= g.units[key.unit - 1];
+    var all_ok = true;
+    for si in 0..(spec.scc_len as i64) {
+        if si == 0 {
+            spec.scc_insts[0] = id;
+        } else {
+            let peer_inst, perr = g.namedWith(BindingRef { key.unit, spec.scc_bindings[si] }, key.ty, false, m, 0, 0);
+            if perr != blot_direct_types::Error.none || g.s.instances[peer_inst].inferring {
+                all_ok = false;
+                break;
+            }
+            spec.scc_insts[si] = peer_inst;
+        }
+    }
+    if !all_ok { return -1, -1; }
+    let parameters = g.s.instances[id].parameters;
+    var wparams: ValType[>..<] = [];
+    var wresults: ValType[>..<] = [];
+    for pi in 0..(parameters.len as i64) {
+        let pmode = if pi < 8 { spec.param_modes[pi] } else { 0 };
+        if pmode == 3 {
+            wparams.push(VT_i32);
+        } else if pmode == 1 || pmode == 2 {
+            wparams.push(VT_i32);
+            wparams.push(VT_i32);
+        } else if pmode == 4 {
+            let pl, plerr = g.types.layout(g.s.tys[parameters.start + pi]);
+            if plerr != blot_direct_types::Error.none || (pl.len % 4) != 0 { all_ok = false; break; }
+            for _ in 0..(pl.len / 4) { wparams.push(VT_v128); }
+        } else {
+            let pl, plerr = g.types.layout(g.s.tys[parameters.start + pi]);
+            if plerr != blot_direct_types::Error.none { all_ok = false; break; }
+            for vt in pl { wparams.push(vt); }
+        }
+    }
+    let res_ty = g.s.instances[id].result;
+    let rl, rlerr = g.types.layout(res_ty);
+    if rlerr != blot_direct_types::Error.none { all_ok = false; }
+    else {
+        let dstart = spec.drop_word_start as i64;
+        for vt, ri in rl {
+            if spec.drop_param != 0xff && (ri == dstart || ri == dstart + 1) { continue; }
+            wresults.push(vt);
+        }
+    }
+    if !all_ok { return -1, -1; }
+    let wsig = g.module.signature(wparams[..], wresults[..]);
+    for si in 0..(spec.scc_len as i64) {
+        let wfn = g.module.addFunction(wsig);
+        blot_direct_writer::setName(g.module, wfn, "worker");
+        spec.scc_fns[si] = wfn;
+    }
+    let spec_idx = g.s.worker_specs.len;
+    g.s.worker_specs.push(spec);
+    for si in 0..(spec.scc_len as i64) {
+        g.s.worker_map.put(spec.scc_insts[si] as u64, (spec_idx + 1) as u32);
+    }
+    return spec_idx, 0;
+}
+
 recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     let key = g.s.instances[id].key;
     // Check if this named instance belongs to a specialized recursive worker SCC.
     if key.kind == blot_direct_emit::InstanceKind.named && !g.s.instances[id].closure && !g.s.instances[id].inferring {
-        var spec_idx: i64 = -1;
-        var scc_idx: i64 = -1;
-        let existing_w, has_w = g.s.worker_map.get(id as u64);
-        if has_w && existing_w != 0 {
-            spec_idx = (existing_w - 1) as i64;
-            let sp = g.s.worker_specs[spec_idx];
-            for si in 0..(sp.scc_len as i64) {
-                if sp.scc_insts[si] == id { scc_idx = si; break; }
-            }
-        } else {
-            let new_spec, ok_spec = analyzeWorkerSCC(g, id);
-            if ok_spec {
-                if g.s.parallel_readonly {
-                    g.s.parallel_aborted = true;
-                    return blot_direct_types::Error.unsupported;
-                }
-                var spec = new_spec;
-                let m .= g.units[key.unit - 1];
-                // Resolve all SCC peer instances and build the shared worker signature.
-                var all_ok = true;
-                for si in 0..(spec.scc_len as i64) {
-                    if si == 0 {
-                        spec.scc_insts[0] = id;
-                    } else {
-                        let peer_inst, perr = g.namedWith(BindingRef { key.unit, spec.scc_bindings[si] }, key.ty, false, m, 0, 0);
-                        if perr != blot_direct_types::Error.none || g.s.instances[peer_inst].inferring {
-                            all_ok = false;
-                            break;
-                        }
-                        spec.scc_insts[si] = peer_inst;
-                    }
-                }
-                if all_ok {
-                    let parameters = g.s.instances[id].parameters;
-                    var wparams: ValType[>..<] = [];
-                    var wresults: ValType[>..<] = [];
-                    for pi in 0..(parameters.len as i64) {
-                        let pmode = if pi < 8 { spec.param_modes[pi] } else { 0 };
-                        if pmode == 3 {
-                            wparams.push(VT_i32);
-                        } else if pmode == 1 || pmode == 2 {
-                            wparams.push(VT_i32);
-                            wparams.push(VT_i32);
-                        } else {
-                            let pl, plerr = g.types.layout(g.s.tys[parameters.start + pi]);
-                            if plerr != blot_direct_types::Error.none { all_ok = false; break; }
-                            for vt in pl { wparams.push(vt); }
-                        }
-                    }
-                    let res_ty = g.s.instances[id].result;
-                    let rl, rlerr = g.types.layout(res_ty);
-                    if rlerr != blot_direct_types::Error.none { all_ok = false; }
-                    else {
-                        let dstart = spec.drop_word_start as i64;
-                        for vt, ri in rl {
-                            if spec.drop_param != 0xff && (ri == dstart || ri == dstart + 1) { continue; }
-                            wresults.push(vt);
-                        }
-                    }
-                    if all_ok {
-                        let wsig = g.module.signature(wparams[..], wresults[..]);
-                        for si in 0..(spec.scc_len as i64) {
-                            let wfn = g.module.addFunction(wsig);
-                            blot_direct_writer::setName(g.module, wfn, "worker");
-                            spec.scc_fns[si] = wfn;
-                        }
-                        spec_idx = g.s.worker_specs.len;
-                        g.s.worker_specs.push(spec);
-                        for si in 0..(spec.scc_len as i64) {
-                            g.s.worker_map.put(spec.scc_insts[si] as u64, (spec_idx + 1) as u32);
-                        }
-                        scc_idx = 0;
-                    }
-                }
-            }
-        }
+        let spec_idx, scc_idx = resolveWorkerSpec(g, id);
+        if g.s.parallel_aborted { return blot_direct_types::Error.unsupported; }
         if spec_idx >= 0 && scc_idx >= 0 {
             // Emit the thin validating wrapper into g.s.instances[id].function, then the worker.
             let spec = g.s.worker_specs[spec_idx];
@@ -2271,6 +2698,11 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
                     op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
                     lget(g, entry_loc);
                     op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+                } else if pmode == 4 {
+                    for vi in 0..((pval.len as i64) / 4) {
+                        let vloc = packF32x4Cached(g, wf, w(g, pval, vi * 4), w(g, pval, vi * 4 + 1), w(g, pval, vi * 4 + 2), w(g, pval, vi * 4 + 3));
+                        lget(g, vloc);
+                    }
                 } else {
                     push(g, pval);
                 }

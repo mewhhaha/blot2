@@ -39,6 +39,7 @@ fn isF64x2CoreExpr(m: const Module&, id: u32) -> bool {
     return m.types.extra[ty.a] == blot_check_types::f64_type && m.types.extra[ty.a + 1] == blot_check_types::f64_type;
 }
 fn canonicalizeF32Stack(g: Generator&, f: const Fn&) {
+    if !g.s.float_bits_observable { return; }
     let tmp = local(g, f, VT_f32);
     ltee(g, tmp);
     f32Const(g, 0x7fc00000);
@@ -120,6 +121,7 @@ fn isCoreScalar(m: const Module&, id: u32) -> bool {
 
 // A scalar literal can stay as a typed operand until its consumer needs it.
 recursive fn canonicalizeF64Stack(g: Generator&, f: const Fn&) {
+    if !g.s.float_bits_observable { return; }
     let tmp = local(g, f, VT_f64);
     ltee(g, tmp);
     f64Const(g, 0, 0x7ff80000);
@@ -797,6 +799,11 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
                 } else if ll == f.checked_range.index {
                     recordCheckedAdd(f, w(g, popped, 0), rl, ll, 0);
                 }
+            }
+        } else if machine == blot_check_core::Op.sub {
+            let rc, rk = u32OperandConstant(g, f, n.b, right);
+            if rk && rc.value == 1 && left.len == 1 {
+                recordCheckedSub1(f, w(g, popped, 0), w(g, left, 0));
             }
         }
     }

@@ -579,6 +579,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var m_e_wr_ok: bool[16] = [false; 16];
     var m_e_wm_entry: u32[16] = [0; 16];
     var m_e_wm_ok: bool[16] = [false; 16];
+    let if_locals_mark = localCount(g, f);
     let opened = open(g, f, OP_if_);
     recordCondBounds(g, f, g.units[f.unit - 1], n.a, false);
     let then, error = stmt(g, f, n.b);
@@ -700,6 +701,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if result_slot.present && (then_diverges || knownMutable(g, f, then)) && (!else_falls || else_mutable) {
         recordMutable(g, f, result_slot.value);
     }
+    propagateSlotMask(g, f, result, if_locals_mark);
     if n.c == 0 && then_diverges {
         f.checked_elems_len = saved_ce_len;
         for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
@@ -712,8 +714,20 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     for merge, at in merges {
         let slot = g.s.slots[merged + at];
         if slot.present {
-            bindPut(g, f, merge.result, slot.value);
-            if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array {
+            var bound_val = slot.value;
+            var reused_same = false;
+            if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array && !then_diverges && else_falls && at < 16 {
+                let tv, tok = bindGet(g, f, merge.then_binding);
+                let ev, eok = bindGet(g, f, merge.else_binding);
+                if tok && eok && sameWords(g, tv, ev) && tv.ty == slot.value.ty &&
+                    m_t_ca_ok[at] && m_e_ca_ok[at] && m_t_ca_base[at] == m_e_ca_base[at] && m_t_ca_len[at] == m_e_ca_len[at] {
+                    bound_val = tv;
+                    reused_same = true;
+                }
+            }
+            bindPut(g, f, merge.result, bound_val);
+            propagateSlotMask(g, f, merged + (at as u32), if_locals_mark);
+            if tagOf(g, bound_val.ty) == blot_direct_types::Tag.array {
                 var mutable_merge = true;
                 if !then_diverges {
                     let tv, tok = bindGet(g, f, merge.then_binding);
@@ -723,10 +737,10 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let ev, eok = bindGet(g, f, merge.else_binding);
                     mutable_merge = mutable_merge && eok && knownMutable(g, f, ev);
                 }
-                if mutable_merge { recordMutable(g, f, slot.value); }
-                if at < 16 {
-                    let s0 = w(g, slot.value, 0);
-                    let s1 = w(g, slot.value, 1);
+                if mutable_merge { recordMutable(g, f, bound_val); }
+                if at < 16 && !reused_same {
+                    let s0 = w(g, bound_val, 0);
+                    let s1 = w(g, bound_val, 1);
                     if !then_diverges && else_falls {
                         if m_t_ca_ok[at] && m_e_ca_ok[at] && m_t_ca_base[at] == m_e_ca_base[at] && m_t_ca_len[at] == m_e_ca_len[at] {
                             recordCheckedArray(f, s0, s1, m_t_ca_base[at], m_t_ca_len[at]);
@@ -1475,6 +1489,7 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
 recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let result = g.newSlot();
+    let block_locals_mark = localCount(g, f);
     let depth = open(g, f, OP_block);
     let s .= g.s;
     let mark = s.labels.len;
@@ -1512,7 +1527,10 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     s.labels.resize(mark);
     close(g, f);
-    if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
+    if g.s.slots[result].present {
+        propagateSlotMask(g, f, result, block_locals_mark);
+        return g.s.slots[result].value, blot_direct_types::Error.none;
+    }
     // A Unit block may fall through its end.
     if last.ty != blot_direct_types::never && m.typeOf(id) == blot_check_types::unit { return unitVal(), blot_direct_types::Error.none; }
     return neverVal(), blot_direct_types::Error.none;
@@ -2129,9 +2147,64 @@ fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error
         if error != blot_direct_types::Error.none { return error; }
         g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
     }
-    g.s.slots[slot].deliver_count += 1;
-    g.s.slots[slot].last_src = value;
+    let sl .= g.s.slots[slot];
+    let first_delivery = sl.deliver_count == 0;
+    sl.deliver_count += 1;
+    sl.last_src = value;
+    if value.len == 1 && value.ty == blot_direct_types::u32_ {
+        let cm = findCheckedMask(f, w(g, value, 0));
+        if first_delivery {
+            if cm >= 0 {
+                let me = f.checked_masks[cm];
+                sl.mask_valid = true;
+                sl.mask_local = me.max_local;
+                sl.mask_const = me.max_const;
+                sl.mask_has_const = me.has_const;
+                if me.max_local != 0xffffffff {
+                    for ci in 0..f.checked_arrays_len {
+                        let clen = f.checked_arrays[ci].length;
+                        if findCheckedBound(f, me.max_local, clen) >= 0 {
+                            sl.bound_valid = true;
+                            sl.bound_len = clen;
+                            break;
+                        }
+                    }
+                }
+            }
+        } else if sl.mask_valid {
+            if cm < 0 {
+                sl.mask_valid = false;
+                sl.bound_valid = false;
+            } else {
+                let me = f.checked_masks[cm];
+                let keep_loc = if sl.mask_local != 0xffffffff && sl.mask_local == me.max_local { sl.mask_local } else { 0xffffffff };
+                let keep_const = sl.mask_has_const && me.has_const;
+                if keep_const && me.max_const > sl.mask_const { sl.mask_const = me.max_const; }
+                sl.mask_local = keep_loc;
+                sl.mask_has_const = keep_const;
+                sl.mask_valid = (keep_loc != 0xffffffff) || keep_const;
+                if sl.bound_valid && (keep_loc == 0xffffffff || findCheckedBound(f, keep_loc, sl.bound_len) < 0) {
+                    sl.bound_valid = false;
+                }
+            }
+        }
+    } else {
+        sl.mask_valid = false;
+        sl.bound_valid = false;
+    }
     return copy(g, f, value, g.s.slots[slot].value, id);
+}
+
+fn propagateSlotMask(g: const Generator&, f: Fn&, slot: u32, locals_mark: u32) {
+    let sl = g.s.slots[slot];
+    if !sl.present || !sl.mask_valid || sl.value.len != 1 || sl.value.ty != blot_direct_types::u32_ { return; }
+    let loc_ok = sl.mask_local != 0xffffffff && sl.mask_local < locals_mark;
+    if !loc_ok && !sl.mask_has_const { return; }
+    let mloc = if loc_ok { sl.mask_local } else { 0xffffffff };
+    recordCheckedMask(f, w(g, sl.value, 0), mloc, sl.mask_const, sl.mask_has_const);
+    if loc_ok && sl.bound_valid && sl.bound_len != 0xffffffff && sl.bound_len < locals_mark {
+        recordCheckedBound(f, mloc, sl.bound_len);
+    }
 }
 
 // Locate the target once and check for scopes that release memory on exit.
@@ -7707,7 +7780,8 @@ recursive fn matchAffineIndexExpr(g: const Generator&, f: const Fn&, m: const Mo
 fn matchMaskLocal(g: const Generator&, f: const Fn&, m: const Module&, idx_node: u32) -> u32 {
     if idx_node == 0 { return 0xffffffff; }
     let n = m.node(idx_node);
-    if n.tag == blot_check_core::Tag.scalar && n.op == blot_check_core::Op.bit_and &&
+    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
+        n.op == blot_check_core::Op.bit_and &&
         m.types.node(m.typeOf(idx_node)).tag == blot_check_types::Tag.unsigned32 {
         let rb = localRef(m, n.b);
         if rb != 0 {
@@ -7715,8 +7789,195 @@ fn matchMaskLocal(g: const Generator&, f: const Fn&, m: const Module&, idx_node:
             let rv, rok = bindGet(g, f, rb);
             if !ic && rok && rv.ty == blot_direct_types::u32_ { return w(g, rv, 0); }
         }
+        let lb = localRef(m, n.a);
+        if lb != 0 {
+            let _, ic = withCellType(g, f, lb);
+            let lv, lok = bindGet(g, f, lb);
+            if !ic && lok && lv.ty == blot_direct_types::u32_ { return w(g, lv, 0); }
+        }
+    }
+    let ib = localRef(m, idx_node);
+    if ib != 0 {
+        let iv, iok = bindGet(g, f, ib);
+        if iok && iv.len == 1 && iv.ty == blot_direct_types::u32_ {
+            let cm = findCheckedMask(f, w(g, iv, 0));
+            if cm >= 0 && f.checked_masks[cm].max_local != 0xffffffff {
+                return f.checked_masks[cm].max_local;
+            }
+        }
     }
     return 0xffffffff;
+}
+
+// True when `expr_id` in `m` is `(...) & mask` where `mask` resolves to `mask_loc`.
+fn exprMaskedByLocal(g: const Generator&, f: const Fn&, m: const Module&, expr_id: u32, mask_loc: u32) -> bool {
+    if expr_id == 0 { return false; }
+    let n = m.node(expr_id);
+    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
+        n.op == blot_check_core::Op.bit_and &&
+        m.types.node(m.typeOf(expr_id)).tag == blot_check_types::Tag.unsigned32 {
+        let rb = localRef(m, n.b);
+        if rb != 0 {
+            let rv, rok = bindGet(g, f, rb);
+            if rok && rv.len == 1 && rv.ty == blot_direct_types::u32_ && w(g, rv, 0) == mask_loc { return true; }
+        }
+        let lb = localRef(m, n.a);
+        if lb != 0 {
+            let lv, lok = bindGet(g, f, lb);
+            if lok && lv.len == 1 && lv.ty == blot_direct_types::u32_ && w(g, lv, 0) == mask_loc { return true; }
+        }
+    }
+    return false;
+}
+
+// Finds the defining RHS or branch merge of `target_b` inside `id`, verifying that
+// every reaching definition of `target_b` is either in `ok_bs` or masked by `mask_loc`.
+recursive fn scanBindingMaskProof(
+    g: const Generator&,
+    f: const Fn&,
+    m: const Module&,
+    body_root: u32,
+    id: u32,
+    target_b: u32,
+    mask_loc: u32,
+    ok_bs: const u32[8]&,
+    ok_len: i64,
+    found: bool&,
+    valid: bool&,
+    depth: i64,
+) {
+    if id == 0 || !valid || depth > 16 { return; }
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for ch in m.children(id) {
+                scanBindingMaskProof(g, f, m, body_root, ch, target_b, mask_loc, ok_bs, ok_len, found, valid, depth + 1);
+            }
+        },
+        bind => {
+            if n.a == target_b {
+                found = true;
+                if n.c >= 2 { valid = false; return; }
+                if exprMaskedByLocal(g, f, m, n.b, mask_loc) { return; }
+                let rb = localRef(m, n.b);
+                if rb != 0 {
+                    for oi in 0..ok_len { if ok_bs[oi] == rb { return; } }
+                    let rv, rok = bindGet(g, f, rb);
+                    if rok && rv.len == 1 && rv.ty == blot_direct_types::u32_ {
+                        let cm = findCheckedMask(f, w(g, rv, 0));
+                        if cm >= 0 && f.checked_masks[cm].max_local == mask_loc { return; }
+                    }
+                }
+                valid = false;
+                return;
+            }
+            scanBindingMaskProof(g, f, m, body_root, n.b, target_b, mask_loc, ok_bs, ok_len, found, valid, depth + 1);
+        },
+        if_stmt, if_value => {
+            for merge in m.branchMerges(id) {
+                if merge.result == target_b {
+                    found = true;
+                    var tb_ok = false;
+                    var eb_ok = false;
+                    for oi in 0..ok_len {
+                        if ok_bs[oi] == merge.then_binding { tb_ok = true; }
+                        if ok_bs[oi] == merge.else_binding { eb_ok = true; }
+                    }
+                    if !tb_ok {
+                        var f2 = false; var v2 = true;
+                        scanBindingMaskProof(g, f, m, body_root, body_root, merge.then_binding, mask_loc, ok_bs, ok_len, f2, v2, depth + 1);
+                        tb_ok = f2 && v2;
+                    }
+                    if !eb_ok {
+                        var f3 = false; var v3 = true;
+                        scanBindingMaskProof(g, f, m, body_root, body_root, merge.else_binding, mask_loc, ok_bs, ok_len, f3, v3, depth + 1);
+                        eb_ok = f3 && v3;
+                    }
+                    if !tb_ok || !eb_ok { valid = false; }
+                    return;
+                }
+            }
+            scanBindingMaskProof(g, f, m, body_root, n.b, target_b, mask_loc, ok_bs, ok_len, found, valid, depth + 1);
+            scanBindingMaskProof(g, f, m, body_root, n.c, target_b, mask_loc, ok_bs, ok_len, found, valid, depth + 1);
+        },
+        match_ => {
+            for merge in m.branchMerges(id) {
+                if merge.result == target_b { valid = false; found = true; return; }
+            }
+            for arm in m.matchArms(id) {
+                scanBindingMaskProof(g, f, m, body_root, arm.body, target_b, mask_loc, ok_bs, ok_len, found, valid, depth + 1);
+            }
+        },
+        _ => {},
+    }
+}
+
+fn matchVarMinusConstOne(m: const Module&, expr_id: u32, var_b: u32) -> bool {
+    let n = m.node(expr_id);
+    if (n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) ||
+        n.op != blot_check_core::Op.sub { return false; }
+    return localRef(m, n.a) == var_b && m.node(n.b).tag == blot_check_core::Tag.constant && m.node(n.b).a == 1;
+}
+
+recursive fn findSingleBindRhs(m: const Module&, id: u32, target_b: u32, depth: i64) -> u32 {
+    if id == 0 || depth > 12 { return 0; }
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for ch in m.children(id) {
+                let r = findSingleBindRhs(m, ch, target_b, depth + 1);
+                if r != 0 { return r; }
+            }
+            return 0;
+        },
+        bind => {
+            if n.a == target_b && n.c < 2 { return n.b; }
+            return findSingleBindRhs(m, n.b, target_b, depth + 1);
+        },
+        _ => { return 0; },
+    }
+}
+
+// True when `arr_b` is unconditionally indexed at the entry of `body_id` before any
+// `if`, `break`, `return`, or loop (e.g. `let s = slots[idx]` or `j := ...; let s = slots[j]`).
+fn loopUnconditionallyIndexesArr(m: const Module&, body_id: u32, arr_b: u32) -> bool {
+    let bn = m.node(body_id);
+    if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false; }
+    let ch = m.children(body_id);
+    let limit = if ch.len < 3 { ch.len } else { 3 };
+    for i in 0..limit {
+        let sn = m.node(ch[i]);
+        if sn.tag == blot_check_core::Tag.bind && sn.c < 2 {
+            let rn = m.node(sn.b);
+            if rn.tag == blot_check_core::Tag.array_op && m.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+                let ach = m.children(sn.b);
+                if ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+            } else if rn.tag == blot_check_core::Tag.storage {
+                let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+                let ach = m.children(sn.b);
+                if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+            } else if rn.tag == blot_check_core::Tag.scalar || (rn.tag == blot_check_core::Tag.associated && rn.op != blot_check_core::Op.none) ||
+                rn.tag == blot_check_core::Tag.constant || rn.tag == blot_check_core::Tag.reference {
+                continue;
+            } else {
+                return false;
+            }
+        } else if sn.tag == blot_check_core::Tag.pattern_bind {
+            let rn = m.node(sn.b);
+            if rn.tag == blot_check_core::Tag.array_op && m.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+                let ach = m.children(sn.b);
+                if ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+            } else if rn.tag == blot_check_core::Tag.storage {
+                let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+                let ach = m.children(sn.b);
+                if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+            }
+            return false;
+        } else {
+            return false;
+        }
+    }
+    return false;
 }
 
 fn addAffineTriplet(
@@ -7809,6 +8070,10 @@ recursive fn collectAffineAndMaskBounds(
             for ch in m.children(id) { collectAffineAndMaskBounds(g, f, m, ch, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); }
         },
         bind, construct => { collectAffineAndMaskBounds(g, f, m, n.b, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); },
+        pattern_bind => {
+            collectAffineAndMaskBounds(g, f, m, n.b, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            collectAffineAndMaskBounds(g, f, m, n.c, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+        },
         return_, project, result_associated => { collectAffineAndMaskBounds(g, f, m, n.a, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); },
         scalar, associated, logical, apply => {
             collectAffineAndMaskBounds(g, f, m, n.a, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
@@ -7859,9 +8124,13 @@ fn collectLoopPreBounds(
     aff_c: u32[4]&,
     aff_len: u32[4]&,
     aff_count: i64&,
+    extra_bnd_a: u32[8]&,
+    extra_bnd_b: u32[8]&,
+    extra_bnd_count: i64&,
+    max_nodes: i64 = 144,
 ) {
     var nodes: i64 = 0;
-    if !countLoopBodyNodes(m, info.body, nodes, 96) { return; }
+    if !countLoopBodyNodes(m, info.body, nodes, max_nodes) { return; }
     if info.kind == blot_check_core::LoopKind.range && range.end_local != 0xffffffff && info.pattern != 0 {
         let pat = m.pattern(info.pattern);
         if pat.tag != blot_check_core::PatternTag.bind { return; }
@@ -7883,7 +8152,7 @@ fn collectLoopPreBounds(
         return;
     }
     if info.kind == blot_check_core::LoopKind.forever {
-        var abud: i64 = 128;
+        var abud: i64 = 160;
         collectAffineAndMaskBounds(g, f, m, info.body, 0, 0xffffffff, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, abud);
         let bn = m.node(info.body);
         if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return; }
@@ -7908,6 +8177,60 @@ fn collectLoopPreBounds(
                 let clen = f.checked_arrays[ca].length;
                 if clen == lim_locs[gi] || findCheckedLe(f, lim_locs[gi], clen) >= 0 { continue; }
                 addLePair(le_a, le_b, le_count, lim_locs[gi], clen);
+            }
+        }
+        // Converging 2-pointer BCE: `if lo >= hi: break; ... lo := lo + 1; hi := hi - 1`.
+        // Inside the loop `0 <= lo < hi <= hi_init`, so checking `hi_init < arr.length`
+        // once before the loop proves both `arr[lo]` and `arr[hi]` in-bounds.
+        let cn = m.node(first_n.a);
+        if (cn.tag == blot_check_core::Tag.scalar || (cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none)) &&
+            (cn.op == blot_check_core::Op.greater_equal || cn.op == blot_check_core::Op.less_equal) {
+            var lo_b: u32 = 0;
+            var hi_b: u32 = 0;
+            if cn.op == blot_check_core::Op.greater_equal { lo_b = localRef(m, cn.a); hi_b = localRef(m, cn.b); }
+            else { lo_b = localRef(m, cn.b); hi_b = localRef(m, cn.a); }
+            if lo_b != 0 && hi_b != 0 && lo_b != hi_b {
+                let carries = m.loopCarries(loop_id);
+                var lo_ci: i64 = -1;
+                var hi_ci: i64 = -1;
+                for carry, ci in carries {
+                    if carry.iteration == lo_b { lo_ci = ci; }
+                    if carry.iteration == hi_b { hi_ci = ci; }
+                }
+                if lo_ci >= 0 && hi_ci >= 0 {
+                    let lo_rhs = findSingleBindRhs(m, info.body, carries[lo_ci].backedge, 0);
+                    let hi_rhs = findSingleBindRhs(m, info.body, carries[hi_ci].backedge, 0);
+                    if lo_rhs != 0 && hi_rhs != 0 && matchVarPlusConstOne(m, lo_rhs, lo_b) && matchVarMinusConstOne(m, hi_rhs, hi_b) {
+                        let lo_v, lo_ok = bindGet(g, f, lo_b);
+                        let hi_v, hi_ok = bindGet(g, f, hi_b);
+                        if lo_ok && hi_ok && lo_v.ty == blot_direct_types::u32_ && hi_v.ty == blot_direct_types::u32_ {
+                            var arr_bs: u32[8] = [0; 8];
+                            var arr_len: i64 = 0;
+                            var bud1: i64 = 128;
+                            collectIndexedByVar(m, info.body, lo_b, arr_bs, arr_len, bud1);
+                            var bud2: i64 = 128;
+                            collectIndexedByVar(m, info.body, hi_b, arr_bs, arr_len, bud2);
+                            let lo_loc = w(g, lo_v, 0);
+                            let hi_loc = w(g, hi_v, 0);
+                            for ai in 0..arr_len {
+                                let av, aok = bindGet(g, f, arr_bs[ai]);
+                                if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+                                let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
+                                if ca < 0 { continue; }
+                                let clen = f.checked_arrays[ca].length;
+                                addLePair(lt_a, lt_b, lt_count, hi_loc, clen);
+                                if extra_bnd_count + 2 <= 8 {
+                                    extra_bnd_a[extra_bnd_count] = lo_loc;
+                                    extra_bnd_b[extra_bnd_count] = clen;
+                                    extra_bnd_count += 1;
+                                    extra_bnd_a[extra_bnd_count] = hi_loc;
+                                    extra_bnd_b[extra_bnd_count] = clen;
+                                    extra_bnd_count += 1;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -10453,6 +10776,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var outgoing = Vals {};
     var slots = Words {};
     var carry_in_place: bool[64] = [false; 64];
+    var carry_mask_ok: bool[64] = [false; 64];
+    var carry_mask_loc: u32[64] = [0xffffffff; 64];
     {
         let m .= g.units[f.unit - 1];
         let carries = m.loopCarries(id);
@@ -10534,6 +10859,46 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 var ubudget: i64 = 256;
                 if carryBackedgeIsUniqueOwned(g, f, m, id, at, carry.iteration, carry.backedge, ubudget) {
                     blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.iteration, f.loop_depth + 2);
+                }
+            }
+        }
+        // Propagate loop-invariant CheckedMask facts across U32 loop carries
+        // (e.g. open-addressed probe `idx := (idx + 1) & mask` and backward-shift `j`/`i`).
+        for pass in 0..2 {
+            var ok_bs: u32[8] = [0; 8];
+            for carry, at in carries {
+                if at >= 64 || carry_in_place[at] || carry_mask_ok[at] { continue; }
+                let inv = g.s.vals[incoming.start + at];
+                let itv = g.s.vals[iteration.start + at];
+                if inv.len != 1 || inv.ty != blot_direct_types::u32_ || itv.len != 1 { continue; }
+                let cm = findCheckedMask(f, w(g, inv, 0));
+                if cm < 0 { continue; }
+                let mloc = f.checked_masks[cm].max_local;
+                if mloc == 0xffffffff { continue; }
+                var mloc_carried = false;
+                for ci in 0..carries.len {
+                    if hasWord(g, g.s.vals[iteration.start + ci], mloc) { mloc_carried = true; break; }
+                }
+                if mloc_carried { continue; }
+                var ok_len: i64 = 0;
+                ok_bs[ok_len] = carry.iteration; ok_len += 1;
+                for ci in 0..carries.len {
+                    if ci < 64 && carry_mask_ok[ci] && carry_mask_loc[ci] == mloc && ok_len < 8 {
+                        ok_bs[ok_len] = carries[ci].iteration;
+                        ok_len += 1;
+                    }
+                }
+                var found = false;
+                var valid = true;
+                if carry.backedge == carry.iteration {
+                    found = true;
+                } else {
+                    scanBindingMaskProof(g, f, m, info.body, info.body, carry.backedge, mloc, ok_bs, ok_len, found, valid, 0);
+                }
+                if found && valid {
+                    carry_mask_ok[at] = true;
+                    carry_mask_loc[at] = mloc;
+                    recordCheckedMask(f, w(g, itv, 0), mloc, 0, false);
                 }
             }
         }
@@ -10662,6 +11027,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if findCheckedGrow(f, s0, s1) < 0 {
                     let _ = ensureCheckedGrow(g, f, iv);
                 }
+            } else if findCheckedArray(f, s0, s1) < 0 {
+                let _, _ = ensureCheckedArray(g, f, iv);
             }
         }
         if selective_resize {
@@ -10893,6 +11260,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var saved_ca_gen: u32[16] = [0; 16];
     var saved_ca_base: u32[16] = [0; 16];
     var saved_ca_len: u32[16] = [0; 16];
+    var saved_ca_depth: u32[16] = [0; 16];
     var saved_ca_count: i64 = 0;
     if selective_resize {
         for at in 0..carries.len {
@@ -10906,6 +11274,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 saved_ca_gen[saved_ca_count] = w(g, ov, 1);
                 saved_ca_base[saved_ca_count] = f.checked_arrays[ca].base;
                 saved_ca_len[saved_ca_count] = f.checked_arrays[ca].length;
+                saved_ca_depth[saved_ca_count] = f.checked_arrays[ca].depth;
                 saved_ca_count += 1;
             }
         }
@@ -11072,8 +11441,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if fm_done { emitted_loop = true; }
     }
 
-    // 4B-2: Pre-loop `CheckedLe` / masked / affine bounds hoisting for small non-resizing loops.
-    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && !copy_tail_done {
+    // 4B-2: Pre-loop `CheckedLe` / masked / affine / converging-2ptr bounds hoisting.
+    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && f.spec_loop_depth < 2 && !copy_tail_done {
         var le_a: u32[4] = [0; 4];
         var le_b: u32[4] = [0; 4];
         var le_count: i64 = 0;
@@ -11084,7 +11453,69 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         var aff_c: u32[4] = [0; 4];
         var aff_len: u32[4] = [0; 4];
         var aff_count: i64 = 0;
-        collectLoopPreBounds(g, f, g.units[f.unit - 1], id, info, range, le_a, le_b, le_count, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count);
+        var extra_bnd_a: u32[8] = [0; 8];
+        var extra_bnd_b: u32[8] = [0; 8];
+        var extra_bnd_count: i64 = 0;
+        let max_pre_nodes: i64 = if f.spec_loop_depth == 0 { 144 } else { 48 };
+        collectLoopPreBounds(g, f, g.units[f.unit - 1], id, info, range, le_a, le_b, le_count, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, extra_bnd_a, extra_bnd_b, extra_bnd_count, max_pre_nodes);
+        // Zero-duplication proof for `mask == arr.len - 1` when `arr` is unconditionally
+        // indexed at entry of a `for ever` loop: `if arr.len == 0 { trap }` proves `mask < arr.len`!
+        if info.kind == blot_check_core::LoopKind.forever && lt_count > 0 && extra_bnd_count == 0 {
+            var kept_lt: i64 = 0;
+            for li in 0..lt_count {
+                let mloc = lt_a[li];
+                let clen = lt_b[li];
+                var proved = false;
+                if findCheckedSub1(f, mloc, clen) >= 0 {
+                    // Find which array binding owns `clen` and check unconditional indexing at loop entry.
+                    for ca_i in 0..f.checked_arrays_len {
+                        let cae = f.checked_arrays[ca_i];
+                        if cae.length != clen { continue; }
+                        let mm .= g.units[f.unit - 1];
+                        // Check if any array indexed at loop entry maps to (cae.slot, cae.generation).
+                        let bn = mm.node(info.body);
+                        if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+                            let ch = mm.children(info.body);
+                            let lim = if ch.len < 3 { ch.len } else { 3 };
+                            for si in 0..lim {
+                                let sn = mm.node(ch[si]);
+                                var ab: u32 = 0;
+                                if (sn.tag == blot_check_core::Tag.bind && sn.c < 2) || sn.tag == blot_check_core::Tag.pattern_bind {
+                                    let rn = mm.node(sn.b);
+                                    if rn.tag == blot_check_core::Tag.array_op && mm.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+                                        let ach = mm.children(sn.b);
+                                        if ach.len == 2 { ab = localRef(mm, ach[0]); }
+                                    } else if rn.tag == blot_check_core::Tag.storage {
+                                        let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+                                        let ach = mm.children(sn.b);
+                                        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 { ab = localRef(mm, ach[0]); }
+                                    }
+                                }
+                                if ab != 0 && loopUnconditionallyIndexesArr(mm, info.body, ab) {
+                                    let av, aok = bindGet(g, f, ab);
+                                    if aok && tagOf(g, av.ty) == blot_direct_types::Tag.array &&
+                                        w(g, av, 0) == cae.slot && w(g, av, 1) == cae.generation {
+                                        lget(g, clen);
+                                        op(g, OP_i32_eqz);
+                                        trapBounds(g, f, id);
+                                        recordCheckedBound(f, mloc, clen);
+                                        proved = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if proved { break; }
+                    }
+                }
+                if !proved {
+                    lt_a[kept_lt] = mloc;
+                    lt_b[kept_lt] = clen;
+                    kept_lt += 1;
+                }
+            }
+            lt_count = kept_lt;
+        }
         if le_count > 0 || lt_count > 0 || aff_count > 0 {
             var cond_emitted = false;
             for li in 0..le_count {
@@ -11101,24 +11532,36 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if cond_emitted { op(g, OP_i32_and); }
                 cond_emitted = true;
             }
+            var prev_aff_clen: u32 = 0xffffffff;
+            var prev_aff_rem: u32 = 0;
             for ai in 0..aff_count {
-                // Overflow-free check: end <= clen && c <= (clen - end) && base <= (clen - end - c).
+                // Overflow-free check: end <= clen && (cv == 0 || cv <= clen - end) && base <= (clen - end - cv).
                 let clen = aff_len[ai];
                 let end_l = range.end_local;
                 let cv = aff_c[ai];
-                lget(g, end_l);
-                lget(g, clen);
-                op(g, OP_i32_le_u);
-                if cond_emitted { op(g, OP_i32_and); }
-                cond_emitted = true;
-                let rem1 = local32(g, f);
-                lget(g, clen);
-                lget(g, end_l);
-                op(g, OP_i32_sub);
-                ltee(g, rem1);
-                i32Const(g, cv);
-                op(g, OP_i32_ge_u);
-                op(g, OP_i32_and);
+                var rem1: u32 = 0;
+                if clen == prev_aff_clen {
+                    rem1 = prev_aff_rem;
+                } else {
+                    lget(g, end_l);
+                    lget(g, clen);
+                    op(g, OP_i32_le_u);
+                    if cond_emitted { op(g, OP_i32_and); }
+                    cond_emitted = true;
+                    rem1 = local32(g, f);
+                    lget(g, clen);
+                    lget(g, end_l);
+                    op(g, OP_i32_sub);
+                    lset(g, rem1);
+                    prev_aff_clen = clen;
+                    prev_aff_rem = rem1;
+                }
+                if cv != 0 {
+                    lget(g, rem1);
+                    i32Const(g, cv);
+                    op(g, OP_i32_ge_u);
+                    op(g, OP_i32_and);
+                }
                 if aff_base[ai] != 0xffffffff {
                     lget(g, aff_base[ai]);
                     lget(g, rem1);
@@ -11130,20 +11573,21 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     op(g, OP_i32_and);
                 }
             }
-            let prev_spec = f.in_specialized_loop;
-            f.in_specialized_loop = true;
+            let prev_spec_depth = f.spec_loop_depth;
+            f.spec_loop_depth = prev_spec_depth + 1;
             var end_loc: u32 = 0;
             if has_index { end_loc = w(g, end, 0); }
             let spec_if = open(g, f, OP_if_);
             for li in 0..le_count { recordCheckedLe(f, le_a[li], le_b[li]); }
             for li in 0..lt_count { recordCheckedBound(f, lt_a[li], lt_b[li]); }
+            for ei in 0..extra_bnd_count { recordCheckedBound(f, extra_bnd_a[ei], extra_bnd_b[ei]); }
             for ai in 0..aff_count { recordCheckedAffine(f, aff_base[ai], range.end_local, aff_c[ai], aff_len[ai]); }
             let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
-            if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return neverVal(), ferr; }
+            if ferr != blot_direct_types::Error.none { f.spec_loop_depth = prev_spec_depth; return neverVal(), ferr; }
             popCheckedArraysAt(f, spec_if);
             op(g, OP_else_);
             let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
-            f.in_specialized_loop = prev_spec;
+            f.spec_loop_depth = prev_spec_depth;
             if serr != blot_direct_types::Error.none { return neverVal(), serr; }
             close(g, f);
             emitted_loop = true;
@@ -11161,10 +11605,23 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
     }
     for sci in 0..saved_ca_count {
-        recordCheckedArray(f, saved_ca_slot[sci], saved_ca_gen[sci], saved_ca_base[sci], saved_ca_len[sci]);
+        recordCheckedArrayAtDepth(f, saved_ca_slot[sci], saved_ca_gen[sci], saved_ca_base[sci], saved_ca_len[sci], saved_ca_depth[sci]);
     }
     for carry, at in carries {
-        bindPut(g, f, carry.outgoing, g.s.vals[outgoing.start + at]);
+        let ov = g.s.vals[outgoing.start + at];
+        bindPut(g, f, carry.outgoing, ov);
+        if ov.len == 1 && ov.ty == blot_direct_types::u32_ {
+            if at < 64 && carry_mask_ok[at] {
+                recordCheckedMask(f, w(g, ov, 0), carry_mask_loc[at], 0, false);
+            } else {
+                let iv = g.s.vals[iteration.start + at];
+                let cm = findCheckedMask(f, w(g, iv, 0));
+                if cm >= 0 {
+                    let me = f.checked_masks[cm];
+                    recordCheckedMask(f, w(g, ov, 0), me.max_local, me.max_const, me.has_const);
+                }
+            }
+        }
         if at < 64 && carry_in_place[at] {
             let da_idx = findDirectArray(f, carry.incoming);
             if da_idx >= 0 {

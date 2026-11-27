@@ -165,6 +165,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     g.s.kernels.append(pinfo.kernels[..]);
     g.s.processes.append(pinfo.processes[..]);
     g.s.wire_word_tags.append(pinfo.word_tags[..]);
+    g.s.float_bits_observable = blot_direct_function::analyzeFloatBitsObservable(g, entry, pinfo);
     let m .= g.units[entry - 1];
     var entries: u8[>..<] = [];
     var constants: u8[>..<] = [];

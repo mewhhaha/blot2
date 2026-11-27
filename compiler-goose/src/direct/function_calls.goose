@@ -413,6 +413,7 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
         }
     }
 
+    let caller_locals_mark = localCount(g, f);
     let saved_unit = f.unit;
     let saved_env = f.env;
     let saved_bindings = f.bindings;
@@ -515,6 +516,9 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
+    if final_err == blot_direct_types::Error.none {
+        propagateSlotMask(g, f, slot, caller_locals_mark);
+    }
 
     s.labels.resize(labels_mark);
     f.inline_depth -= 1;
@@ -655,6 +659,7 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
         }
     }
 
+    let caller_locals_mark = localCount(g, f);
     let saved_unit = f.unit;
     let saved_env = f.env;
     let saved_bindings = f.bindings;
@@ -737,6 +742,9 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
+    if final_err == blot_direct_types::Error.none {
+        propagateSlotMask(g, f, slot, caller_locals_mark);
+    }
 
     s.labels.resize(labels_mark);
     f.inline_depth -= 1;
@@ -2312,57 +2320,105 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 br(g, f, OP_br, f.self_tco_loop);
                 return neverVal(), blot_direct_types::Error.none;
             }
+            var call_spec_idx: i64 = -1;
+            var call_peer_idx: i64 = -1;
+            var external_worker_call = false;
             if f.worker_spec >= 0 {
                 let spec = g.s.worker_specs[f.worker_spec];
-                var peer_idx: i64 = -1;
                 for si in 0..(spec.scc_len as i64) {
-                    if spec.scc_insts[si] == instance { peer_idx = si; break; }
+                    if spec.scc_insts[si] == instance {
+                        call_spec_idx = f.worker_spec;
+                        call_peer_idx = si;
+                        break;
+                    }
                 }
-                if peer_idx >= 0 {
-                    if f.peel_force_leaf && peer_idx == f.worker_scc_idx && spec.scc_len == 1 {
-                        let peeled, perr = emitPeelLeafCall(g, f, direct, id);
-                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
-                        value = peeled;
-                    } else {
-                        for at in 0..(direct.len as i64) {
-                            let arg_v = g.s.vals[direct.start + at];
-                            let pmode = if at < 8 { spec.param_modes[at] } else { 0 };
-                            if pmode == 3 {
-                                let entry_loc = ensureCheckedGrow(g, f, arg_v);
-                                lget(g, entry_loc);
-                            } else if pmode == 1 || pmode == 2 {
-                                let base_loc, len_loc = ensureCheckedArray(g, f, arg_v);
-                                lget(g, base_loc);
-                                lget(g, len_loc);
-                            } else {
-                                push(g, arg_v);
+            }
+            if call_peer_idx < 0 && !g.s.parallel_readonly && !(g.s.has_rt && g.s.rt.has_fork) && !g.s.instances[f.instance_id].inferring {
+                let ext_spec, ext_peer = resolveWorkerSpec(g, instance);
+                if ext_spec >= 0 && ext_peer >= 0 {
+                    let sp = g.s.worker_specs[ext_spec];
+                    var ext_ok = true;
+                    for at in 0..(direct.len as i64) {
+                        let pmode = if at < 8 { sp.param_modes[at] } else { 0 };
+                        if pmode == 1 || pmode == 2 || pmode == 3 {
+                            let av = g.s.vals[direct.start + at];
+                            if tagOf(g, av.ty) != blot_direct_types::Tag.array || findDirectArrayBySlot(f, w(g, av, 0)) >= 0 {
+                                ext_ok = false;
+                                break;
                             }
-                        }
-                        callf(g, spec.scc_fns[peer_idx]);
-                        f.checked_elems_len = 0;
-                        invalidateOwnCallArgs(g, f, tm.binding(body.binding).capability_parameters.own, direct);
-                        let res_ty = g.s.instances[instance].result;
-                        if !spec.no_scope_alloc {
-                            let holds, herr = g.holdsMemory(res_ty);
-                            if herr != blot_direct_types::Error.none { return neverVal(), herr; }
-                            if holds { noteAllocation(f); }
-                        }
-                        if spec.drop_param != 0xff {
-                            let drop_arg = g.s.vals[direct.start + (spec.drop_param as i64)];
-                            let popped, perr = popWorkerResult(g, f, res_ty, spec.drop_word_start, drop_arg, id);
-                            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
-                            if spec.param_modes[spec.drop_param] == 3 {
-                                invalidateCheckedOwner(g, f, drop_arg);
-                            }
-                            value = popped;
-                        } else {
-                            let popped, perr = pop(g, f, res_ty, id);
-                            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
-                            value = popped;
                         }
                     }
-                    has_value = true;
+                    if ext_ok {
+                        call_spec_idx = ext_spec;
+                        call_peer_idx = ext_peer;
+                        external_worker_call = true;
+                    }
                 }
+            }
+            if call_spec_idx >= 0 && call_peer_idx >= 0 {
+                let spec = g.s.worker_specs[call_spec_idx];
+                if !external_worker_call && f.peel_force_leaf && call_peer_idx == f.worker_scc_idx && spec.scc_len == 1 {
+                    let peeled, perr = emitPeelLeafCall(g, f, direct, id);
+                    if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                    value = peeled;
+                } else {
+                    for at in 0..(direct.len as i64) {
+                        let arg_v = g.s.vals[direct.start + at];
+                        let pmode = if at < 8 { spec.param_modes[at] } else { 0 };
+                        if pmode == 3 {
+                            if external_worker_call { checkMutableOwner(g, f, arg_v); }
+                            let entry_loc = ensureCheckedGrow(g, f, arg_v);
+                            lget(g, entry_loc);
+                        } else if pmode == 1 || pmode == 2 {
+                            if external_worker_call && pmode == 2 { checkMutableOwner(g, f, arg_v); }
+                            let base_loc, len_loc = ensureCheckedArray(g, f, arg_v);
+                            lget(g, base_loc);
+                            lget(g, len_loc);
+                        } else if pmode == 4 {
+                            for vi in 0..((arg_v.len as i64) / 4) {
+                                let vloc = packF32x4Cached(g, f, w(g, arg_v, vi * 4), w(g, arg_v, vi * 4 + 1), w(g, arg_v, vi * 4 + 2), w(g, arg_v, vi * 4 + 3));
+                                lget(g, vloc);
+                            }
+                        } else {
+                            push(g, arg_v);
+                        }
+                    }
+                    callf(g, spec.scc_fns[call_peer_idx]);
+                    f.checked_elems_len = 0;
+                    // Invalidate CheckedArray ONLY for potentially resized `own` args (Mode 3 or
+                    // non-worker own params); keep Mode-2 non-resizing arrays and Mode-3 CheckedGrow entries!
+                    let own_mask = tm.binding(body.binding).capability_parameters.own;
+                    for at in 0..(direct.len as i64) {
+                        let pmode = if at < 8 { spec.param_modes[at] } else { 0 };
+                        if pmode == 1 || pmode == 2 { continue; }
+                        if pmode == 3 || (own_mask != 0 && (at >= 32 || ((own_mask >> (at as u32)) & 1) != 0)) {
+                            let arg_v = g.s.vals[direct.start + at];
+                            if tagOf(g, arg_v.ty) == blot_direct_types::Tag.array {
+                                invalidateCheckedOwner(g, f, arg_v);
+                            } else {
+                                invalidateCheckedContainers(f);
+                                break;
+                            }
+                        }
+                    }
+                    let res_ty = g.s.instances[instance].result;
+                    if !spec.no_scope_alloc {
+                        let holds, herr = g.holdsMemory(res_ty);
+                        if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+                        if holds { noteAllocation(f); }
+                    }
+                    if spec.drop_param != 0xff {
+                        let drop_arg = g.s.vals[direct.start + (spec.drop_param as i64)];
+                        let popped, perr = popWorkerResult(g, f, res_ty, spec.drop_word_start, drop_arg, id);
+                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                        value = popped;
+                    } else {
+                        let popped, perr = pop(g, f, res_ty, id);
+                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                        value = popped;
+                    }
+                }
+                has_value = true;
             }
             if !has_value && is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
                 g.s.instances[instance].result == g.s.instances[f.instance_id].result &&
@@ -2525,7 +2581,9 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         },
         array_op => {
             let op = tm.arrayOperation(id);
-            if op != blot_backend_collection_ops::Op.length && op != blot_backend_collection_ops::Op.get { return false; }
+            if op == blot_backend_collection_ops::Op.fill && isSmallScalarPackedFillExpr(tm, id) {
+                if margin > 0 { margin = 0; }
+            } else if op != blot_backend_collection_ops::Op.length && op != blot_backend_collection_ops::Op.get { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -2749,6 +2807,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
 
     // Emit the callee body directly in the caller's Wasm function while keeping
     // the caller's CheckedArray/CheckedGrow/CheckedView descriptors live.
+    let caller_locals_mark = localCount(g, f);
     let saved_unit = f.unit;
     let saved_env = f.env;
     let saved_bindings = f.bindings;
@@ -2871,6 +2930,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
+    if final_err == blot_direct_types::Error.none {
+        propagateSlotMask(g, f, slot, caller_locals_mark);
+    }
 
     s.labels.resize(labels_mark);
     f.inline_depth -= 1;

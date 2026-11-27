@@ -199,6 +199,61 @@ fn storeAt(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
         at += blot_direct_writer::wordBytes(kind);
     }
 }
+// Like `storeAt`, but packs contiguous 4x F32 runs in wide aggregates into
+// cached `v128` locals so both memory stores and subsequent wide-worker calls
+// share the exact same XMM registers.
+fn storeAtPack(g: Generator&, f: Fn&, address: u32, offset: u32, value: Val) {
+    var at = offset;
+    var index: i64 = 0;
+    let total = value.len as i64;
+    while index < total {
+        if total >= 8 && index + 3 < total {
+            let w0 = g.s.words[value.start + index];
+            let w1 = g.s.words[value.start + index + 1];
+            let w2 = g.s.words[value.start + index + 2];
+            let w3 = g.s.words[value.start + index + 3];
+            if localType(g, f, w0) == VT_f32 && localType(g, f, w1) == VT_f32 &&
+                localType(g, f, w2) == VT_f32 && localType(g, f, w3) == VT_f32 {
+                let vloc = packF32x4Cached(g, f, w0, w1, w2, w3);
+                lget(g, address);
+                lget(g, vloc);
+                op(g, OP_prefix_fd);
+                uleb(g, 11);
+                uleb(g, 2);
+                uleb(g, at);
+                at += 16;
+                index += 4;
+                continue;
+            }
+        }
+        let word = g.s.words[value.start + index];
+        let kind = localType(g, f, word);
+        lget(g, address);
+        lget(g, word);
+        if kind == VT_f32 { op(g, OP_f32_store); }
+        else if kind == VT_i64 { op(g, OP_i64_store); }
+        else if kind == VT_f64 { op(g, OP_f64_store); }
+        else if kind == VT_v128 { op(g, OP_prefix_fd); uleb(g, 11); }
+        else { op(g, OP_i32_store); }
+        if kind == VT_v128 { uleb(g, 4); } else { uleb(g, 2); }
+        uleb(g, at);
+        at += blot_direct_writer::wordBytes(kind);
+        index += 1;
+    }
+}
+fn writeFlatPack(g: Generator&, f: Fn&, base: u32, offset: u32, value: Val, id: u32) -> Error {
+    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    let copied, error = copiedBox(g, f, value.ty, id);
+    if error != blot_direct_types::Error.none { return error; }
+    if copied {
+        let bytes, error = blockBytes(g, f, value.ty, id);
+        if error != blot_direct_types::Error.none { return error; }
+        memoryCopy(g, base, offset, w(g, value, 0), bytes);
+        return blot_direct_types::Error.none;
+    }
+    storeAtPack(g, f, base, offset, value);
+    return blot_direct_types::Error.none;
+}
 fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
     let value, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return value, error; }

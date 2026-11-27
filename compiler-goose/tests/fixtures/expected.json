@@ -3089,7 +3089,7 @@
     }
    ],
    "wasm_bytes": 7743,
-   "wasm_sha256": "bf0f404557916610d9867340252c02b3a6dfedb7c6941a503d1468ac4459fff9"
+   "wasm_sha256": "b46bd208707c1d907e5ee3bca6d519cf65c6b6af322a3ab1ed3fa3757f34ffc3"
   },
   "identity_join_address.blot": {
    "exit": 0,

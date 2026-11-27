@@ -197,6 +197,7 @@ fn v128Const4(g: Generator&, word: u32) {
 }
 // Canonicalize all NaN lanes of an F32x4 vector on top of the stack to 0x7fc00000.
 fn canonicalizeF32x4(g: Generator&, f: const Fn&, nan_vlocal: u32) {
+    if !g.s.float_bits_observable { return; }
     let tmp = local(g, f, VT_v128);
     ltee(g, tmp);
     if nan_vlocal != 0xffffffff {
@@ -210,6 +211,7 @@ fn canonicalizeF32x4(g: Generator&, f: const Fn&, nan_vlocal: u32) {
     simdOp(g, SIMD_v128_bitselect);
 }
 fn canonicalizeF64x2(g: Generator&, f: const Fn&) {
+    if !g.s.float_bits_observable { return; }
     let tmp = local(g, f, VT_v128);
     ltee(g, tmp);
     simdOp(g, SIMD_v128_const);

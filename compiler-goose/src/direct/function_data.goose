@@ -248,7 +248,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
             written = writeElement(g, f, target, 0, replacement, id);
         }
     } else {
-        written = writeFlat(g, f, target, offset, replacement, id);
+        written = writeFlatPack(g, f, target, offset, replacement, id);
     }
     if written != blot_direct_types::Error.none { return neverVal(), written; }
     // Any element mutation invalidates cached scalar element values.

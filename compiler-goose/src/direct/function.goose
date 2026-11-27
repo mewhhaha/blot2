@@ -179,6 +179,19 @@ struct CheckedAffineBound {
     bound: u32 = 0,
     depth: u32 = 0,
 }
+struct CheckedSub1 {
+    res: u32 = 0,
+    src: u32 = 0,
+    depth: u32 = 0,
+}
+struct PackedF32x4 {
+    w0: u32 = 0,
+    w1: u32 = 0,
+    w2: u32 = 0,
+    w3: u32 = 0,
+    vloc: u32 = 0,
+    depth: u32 = 0,
+}
 struct DirectArray {
     binding: u32 = 0,
     slot_local: u32 = 0xffffffff,
@@ -245,16 +258,20 @@ struct Fn {
     checked_views_len: i64 = 0,
     checked_elems: CheckedElem[8] = [CheckedElem {}; 8],
     checked_elems_len: i64 = 0,
-    checked_bounds: CheckedBound[8] = [CheckedBound {}; 8],
+    checked_bounds: CheckedBound[32] = [CheckedBound {}; 32],
     checked_bounds_len: i64 = 0,
-    checked_le: CheckedLeBound[8] = [CheckedLeBound {}; 8],
+    checked_le: CheckedLeBound[16] = [CheckedLeBound {}; 16],
     checked_le_len: i64 = 0,
-    checked_masks: CheckedMask[8] = [CheckedMask {}; 8],
+    checked_masks: CheckedMask[32] = [CheckedMask {}; 32],
     checked_masks_len: i64 = 0,
     checked_adds: CheckedAdd[8] = [CheckedAdd {}; 8],
     checked_adds_len: i64 = 0,
     checked_affines: CheckedAffineBound[8] = [CheckedAffineBound {}; 8],
     checked_affines_len: i64 = 0,
+    checked_sub1: CheckedSub1[16] = [CheckedSub1 {}; 16],
+    checked_sub1_len: i64 = 0,
+    packed_f32x4: PackedF32x4[16] = [PackedF32x4 {}; 16],
+    packed_f32x4_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -337,6 +354,7 @@ struct Fn {
     known_closures_len: i64 = 0,
     // Prevents recursive loop-specialization cloning.
     in_specialized_loop: bool = false,
+    spec_loop_depth: u32 = 0,
     // 6A: Local holding 1 iff the pre-scanned indirect index array is strictly increasing.
     indirect_bound_distinct_local: u32 = 0xffffffff,
     // Tail-call optimization state:
@@ -488,7 +506,7 @@ fn findExtU32U64(f: const Fn&, u64_local: u32) -> u32, bool {
     return 0, false;
 }
 fn recordCheckedMask(f: Fn&, index: u32, max_local: u32, max_const: u32, has_const: bool) {
-    if f.checked_masks_len >= 8 { return; }
+    if f.checked_masks_len >= 32 { return; }
     f.checked_masks[f.checked_masks_len] = CheckedMask { index, max_local, max_const, has_const, f.depth };
     f.checked_masks_len += 1;
 }
@@ -529,6 +547,50 @@ fn findCheckedAffine(f: const Fn&, base: u32, end_local: u32, c: u32, bound: u32
         }
     }
     return -1;
+}
+fn recordCheckedSub1(f: Fn&, res: u32, src: u32) {
+    if f.checked_sub1_len >= 16 { return; }
+    f.checked_sub1[f.checked_sub1_len] = CheckedSub1 { res, src, f.depth };
+    f.checked_sub1_len += 1;
+}
+fn findCheckedSub1(f: const Fn&, res: u32, src: u32) -> i64 {
+    var i = f.checked_sub1_len;
+    while i > 0 {
+        i -= 1;
+        let e = f.checked_sub1[i];
+        if e.res == res && e.src == src { return i; }
+    }
+    return -1;
+}
+fn findPackedF32x4(f: const Fn&, w0: u32, w1: u32, w2: u32, w3: u32) -> i64 {
+    var i = f.packed_f32x4_len;
+    while i > 0 {
+        i -= 1;
+        let e = f.packed_f32x4[i];
+        if e.w0 == w0 && e.w1 == w1 && e.w2 == w2 && e.w3 == w3 { return i; }
+    }
+    return -1;
+}
+fn recordPackedF32x4(f: Fn&, w0: u32, w1: u32, w2: u32, w3: u32, vloc: u32) {
+    if f.packed_f32x4_len >= 16 { return; }
+    f.packed_f32x4[f.packed_f32x4_len] = PackedF32x4 { w0, w1, w2, w3, vloc, f.depth };
+    f.packed_f32x4_len += 1;
+}
+fn packF32x4Cached(g: Generator&, f: Fn&, w0: u32, w1: u32, w2: u32, w3: u32) -> u32 {
+    let hit = findPackedF32x4(f, w0, w1, w2, w3);
+    if hit >= 0 { return f.packed_f32x4[hit].vloc; }
+    let vloc = local(g, f, VT_v128);
+    lget(g, w0);
+    simdOp(g, SIMD_f32x4_splat);
+    lget(g, w1);
+    simdLaneOp(g, SIMD_f32x4_replace_lane, 1);
+    lget(g, w2);
+    simdLaneOp(g, SIMD_f32x4_replace_lane, 2);
+    lget(g, w3);
+    simdLaneOp(g, SIMD_f32x4_replace_lane, 3);
+    lset(g, vloc);
+    recordPackedF32x4(f, w0, w1, w2, w3, vloc);
+    return vloc;
 }
 fn knownMutable(g: const Generator&, f: const Fn&, owner: Val) -> bool {
     if tagOf(g, owner.ty) != blot_direct_types::Tag.array { return false; }
@@ -696,6 +758,12 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth > max_depth {
         f.checked_affines_len -= 1;
     }
+    while f.checked_sub1_len > 0 && f.checked_sub1[f.checked_sub1_len - 1].depth > max_depth {
+        f.checked_sub1_len -= 1;
+    }
+    while f.packed_f32x4_len > 0 && f.packed_f32x4[f.packed_f32x4_len - 1].depth > max_depth {
+        f.packed_f32x4_len -= 1;
+    }
     while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth > max_depth {
         f.direct_arrays_len -= 1;
     }
@@ -733,6 +801,12 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth >= depth {
         f.checked_affines_len -= 1;
+    }
+    while f.checked_sub1_len > 0 && f.checked_sub1[f.checked_sub1_len - 1].depth >= depth {
+        f.checked_sub1_len -= 1;
+    }
+    while f.packed_f32x4_len > 0 && f.packed_f32x4[f.packed_f32x4_len - 1].depth >= depth {
+        f.packed_f32x4_len -= 1;
     }
     while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth >= depth {
         f.direct_arrays_len -= 1;
@@ -810,11 +884,14 @@ fn findCheckedArray(f: const Fn&, slot: u32, generation: u32) -> i64 {
     }
     return -1;
 }
-fn recordCheckedArray(f: Fn&, slot: u32, generation: u32, base: u32, length: u32) {
+fn recordCheckedArrayAtDepth(f: Fn&, slot: u32, generation: u32, base: u32, length: u32, depth: u32) {
     if findCheckedArray(f, slot, generation) >= 0 { return; }
     if f.checked_arrays_len >= 16 { return; }
-    f.checked_arrays[f.checked_arrays_len] = CheckedArray { slot: slot, generation: generation, base: base, length: length, depth: f.depth };
+    f.checked_arrays[f.checked_arrays_len] = CheckedArray { slot: slot, generation: generation, base: base, length: length, depth: depth };
     f.checked_arrays_len += 1;
+}
+fn recordCheckedArray(f: Fn&, slot: u32, generation: u32, base: u32, length: u32) {
+    recordCheckedArrayAtDepth(f, slot, generation, base, length, f.depth);
 }
 fn findCheckedGrow(f: const Fn&, slot: u32, generation: u32) -> i64 {
     var i = f.checked_grows_len;
@@ -927,7 +1004,7 @@ fn findCheckedLe(f: const Fn&, a: u32, b: u32) -> i64 {
 }
 fn recordCheckedLe(f: Fn&, a: u32, b: u32) {
     if a == b || findCheckedLe(f, a, b) >= 0 { return; }
-    if f.checked_le_len >= 8 { return; }
+    if f.checked_le_len >= 16 { return; }
     f.checked_le[f.checked_le_len] = CheckedLeBound { a: a, b: b, depth: f.depth };
     f.checked_le_len += 1;
 }
@@ -958,7 +1035,7 @@ fn recordCheckedBoundSized(f: Fn&, index: u32, bound: u32, sized_len_ty: TId) {
         let entry = f.checked_bounds[i];
         if entry.index == index && entry.bound == bound && entry.sized_len_ty == sized_len_ty { return; }
     }
-    if f.checked_bounds_len >= 8 { return; }
+    if f.checked_bounds_len >= 32 { return; }
     f.checked_bounds[f.checked_bounds_len] = CheckedBound { index: index, bound: bound, sized_len_ty: sized_len_ty, depth: f.depth };
     f.checked_bounds_len += 1;
 }
@@ -1164,6 +1241,32 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             if !hit { f.checked_affines[out] = entry; out += 1; }
         }
         f.checked_affines_len = out;
+    }
+    if f.checked_sub1_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_sub1_len {
+            let entry = f.checked_sub1[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let lid = g.s.words[value.start + at];
+                if lid == entry.res || lid == entry.src { hit = true; break; }
+            }
+            if !hit { f.checked_sub1[out] = entry; out += 1; }
+        }
+        f.checked_sub1_len = out;
+    }
+    if f.packed_f32x4_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.packed_f32x4_len {
+            let entry = f.packed_f32x4[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let lid = g.s.words[value.start + at];
+                if lid == entry.w0 || lid == entry.w1 || lid == entry.w2 || lid == entry.w3 || lid == entry.vloc { hit = true; break; }
+            }
+            if !hit { f.packed_f32x4[out] = entry; out += 1; }
+        }
+        f.packed_f32x4_len = out;
     }
 }
 fn br(g: Generator&, f: const Fn&, value: u8, depth: u32) { opIndex(g, value, f.depth - depth); }

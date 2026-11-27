@@ -56,7 +56,18 @@ struct Tys { start: u32 = 0, len: u32 = 0 }
 struct Words { start: u32 = 0, len: u32 = 0 }
 // Zig's `?Val` behind a pointer: a label's result, allocated by the first
 // value that reaches it.
-struct Slot { present: bool = false, value: Val = Val {}, deliver_count: u32 = 0, last_src: Val = Val {} }
+struct Slot {
+    present: bool = false,
+    value: Val = Val {},
+    deliver_count: u32 = 0,
+    last_src: Val = Val {},
+    mask_valid: bool = false,
+    mask_local: u32 = 0xffffffff,
+    mask_const: u32 = 0,
+    mask_has_const: bool = false,
+    bound_valid: bool = false,
+    bound_len: u32 = 0xffffffff,
+}
 
 // named: a function or constant binding; lambda: a closure node of the
 // `parent` instance; partial: a named function applied to its first
@@ -177,7 +188,8 @@ struct RodataEntry {
 }
 // Specialized recursive worker descriptor for a 1..4 function SCC.
 // param_modes[i]: 0 = normal, 1 = Mode R read-only (base, len),
-// 2 = Mode R mutable own non-resizing (base, len), 3 = Mode M own resizing (entry).
+// 2 = Mode R mutable own non-resizing (base, len), 3 = Mode M own resizing (entry),
+// 4 = wide all-F32 aggregate packed into v128 lanes (N/4 x v128).
 struct WorkerSpec {
     unit: u32 = 0,
     scc_len: u32 = 0,
@@ -317,6 +329,9 @@ root struct State {
     // Specialized recursive worker specs: instance_id -> 1-based index into worker_specs.
     worker_map: U64Map = U64Map {},
     worker_specs: WorkerSpec[>..] = [],
+    // Whole-program proof: false iff no NaN payload or NaN sign bit is observable
+    // (no F32/F64/v128 `.bits`, no `@flat.*`, no float-bearing export/host/kernel ABI).
+    float_bits_observable: bool = true,
     // Speculative parallel wave emission flags (never serialized).
     parallel_readonly: bool = false,
     parallel_aborted: bool = false,
