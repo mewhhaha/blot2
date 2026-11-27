@@ -75,13 +75,30 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let prev_reuse_ty = f.reuse_ty;
     if !g.runtime_().has_fork {
         let root_binding = localRef(m, info.root);
-        if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && uses(g, f, root_binding) == 1 && !bindingCaptured(g, f, root_binding) {
-            let boxed, berr = isBoxed(g, f, root.ty, id);
-            if berr == blot_direct_types::Error.none && boxed && root.len == 1 {
-                f.reuse_nodes = [id, 0, 0, 0];
-                f.reuse_nodes_len = 1;
-                f.reuse_block = w(g, root, 0);
-                f.reuse_ty = root.ty;
+        if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && !bindingCaptured(g, f, root_binding) {
+            let ucnt = uses(g, f, root_binding);
+            var can_reuse = ucnt == 1;
+            if !can_reuse && ucnt > 1 && ucnt <= 32 {
+                let base = ensureLocalRefs(g, m);
+                var cur = g.s.local_refs_head[(base as i64) + (root_binding as i64)];
+                can_reuse = true;
+                while cur != 0 {
+                    let rnode = g.s.local_refs_node[(cur - 1) as i64];
+                    cur = g.s.local_refs_next[(cur - 1) as i64];
+                    if rnode != info.root {
+                        let _, ok = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed_safe_refs, rnode);
+                        if !ok { can_reuse = false; break; }
+                    }
+                }
+            }
+            if can_reuse {
+                let boxed, berr = isBoxed(g, f, root.ty, id);
+                if berr == blot_direct_types::Error.none && boxed && root.len == 1 {
+                    f.reuse_nodes = [id, 0, 0, 0];
+                    f.reuse_nodes_len = 1;
+                    f.reuse_block = w(g, root, 0);
+                    f.reuse_ty = root.ty;
+                }
             }
         }
     }
@@ -408,6 +425,16 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
     let steps = max(selectors.len, path.len);
     if at == steps {
         bindPut(g, f, info.self_binding, value);
+        if at == 0 && info.self_binding != 0 && !g.runtime_().has_fork && !bindingCaptured(g, f, info.self_binding) {
+            if f.reuse_block != 0 && value.len == 1 && f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
+                f.reuse_block = 0;
+                blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, info.self_binding, f.loop_depth + 1);
+            }
+            let rb = localRef(m, info.root);
+            if rb != 0 && isUniqueOwned(g, f, rb) && ownedTotalUses(g, f, rb) == 1 && !bindingCaptured(g, f, rb) {
+                blot_support_zigmap::put(g.s.map_pool, f.unique_owned, info.self_binding, f.loop_depth + 1);
+            }
+        }
         let replacement, error = stmt(g, f, info.value);
         if error != blot_direct_types::Error.none || replacement.ty == blot_direct_types::never { return replacement, error; }
         if replacement.ty != value.ty && reflectiveUpdate(selectors) {
@@ -952,6 +979,15 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
     if variants.len == 1 && projection.nominal.decl == 0 && g.types.node(value.ty).tag == blot_direct_types::Tag.tuple {
         if variants[0].field >= g.types.tupleItems(value.ty).len { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "tuple projection out of range"); }
         let field_val, error = tupleItem(g, f, value, variants[0].field, id);
+        if error == blot_direct_types::Error.none {
+            let ref_b = localRef(m, n.a);
+            if ref_b != 0 && isUniqueBoxed(g, f, ref_b) {
+                let is_cb, cberr = copiedBox(g, f, field_val.ty, id);
+                if cberr == blot_direct_types::Error.none && !is_cb {
+                    blot_support_zigmap::put(g.s.map_pool, f.unique_boxed_safe_refs, n.a, 1);
+                }
+            }
+        }
         return field_val, BindingRef { 0, 0 }, false, error;
     }
     let nominal_field = variants.len != 0 && projection.nominal.decl != 0;
@@ -1020,6 +1056,15 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
     let position = g.types.findField(record.ty, name);
     if position >= 0 {
         let field_val, error = recordField(g, f, record, position, id);
+        if error == blot_direct_types::Error.none {
+            let ref_b = localRef(m, n.a);
+            if ref_b != 0 && isUniqueBoxed(g, f, ref_b) {
+                let is_cb, cberr = copiedBox(g, f, field_val.ty, id);
+                if cberr == blot_direct_types::Error.none && !is_cb {
+                    blot_support_zigmap::put(g.s.map_pool, f.unique_boxed_safe_refs, n.a, 1);
+                }
+            }
+        }
         return field_val, BindingRef { 0, 0 }, false, error;
     }
     if nominal_field { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field missing"); }

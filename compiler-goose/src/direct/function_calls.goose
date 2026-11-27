@@ -312,7 +312,7 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
                 g.dropFailure();
             }
         } else if kc.kind == 2 {
-            let inlined, did_inline, ierr = tryInlineKnownLambda(g, f, kc, eval_args, id, is_tail);
+            let inlined, did_inline, ierr = tryInlineKnownLambda(g, f, kc, eval_args, chain_args, chain_len, id, is_tail);
             if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
             if did_inline { return inlined, blot_direct_types::Error.none; }
         }
@@ -337,7 +337,7 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
     return current, blot_direct_types::Error.none;
 }
 
-recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_args: Vals, id: u32, is_tail: bool) -> Val, bool, Error {
+recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_args: Vals, chain_args: const u32[8]&, chain_len: i64, id: u32, is_tail: bool) -> Val, bool, Error {
     if f.inline_depth >= 4 || f.evidence_context != 0 {
         return neverVal(), false, blot_direct_types::Error.none;
     }
@@ -385,14 +385,14 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
             }
             is_partial_closure = true;
         } else {
-            var budget: i64 = 128;
+            var budget: i64 = 192;
             if !canInlineBody(g, lm, final_body, BindingRef { 0, 0 }, budget) {
                 return neverVal(), false, blot_direct_types::Error.none;
             }
         }
     }
-    let boxed_ret, berr = g.types.boxed(after_ty);
-    if berr != blot_direct_types::Error.none || boxed_ret {
+    let _, berr = g.types.boxed(after_ty);
+    if berr != blot_direct_types::Error.none {
         return neverVal(), false, blot_direct_types::Error.none;
     }
     var env = kc.lambda_env;
@@ -413,13 +413,48 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
         }
     }
 
+    var unique_arg_mask: u32 = 0;
+    var unique_boxed_mask: u32 = 0;
+    if !g.runtime_().has_fork && peeled <= 8 && chain_len >= peeled {
+        let cm .= g.units[f.unit - 1];
+        var arg_bs: u32[8] = [0; 8];
+        for pi in 0..peeled { arg_bs[pi] = localRef(cm, chain_args[chain_len - 1 - pi]); }
+        for pi in 0..peeled {
+            let ab = arg_bs[pi];
+            if ab == 0 { continue; }
+            let aval = g.s.vals[eval_args.start + pi];
+            var dup = false;
+            for pj in 0..peeled {
+                if pj != pi && arg_bs[pj] == ab { dup = true; break; }
+            }
+            if !dup {
+                for ci in 0..(kc.cap_count as i64) {
+                    if sameWords(g, aval, kc.caps[ci]) { dup = true; break; }
+                }
+            }
+            if dup || bindingCaptured(g, f, ab) { continue; }
+            if isUniqueOwned(g, f, ab) && ownedTotalUses(g, f, ab) == 1 {
+                unique_arg_mask |= ((1 as u32) << (pi as u32));
+            }
+            if isUniqueBoxed(g, f, ab) && uses(g, f, ab) == 1 {
+                unique_boxed_mask |= ((1 as u32) << (pi as u32));
+            }
+        }
+    }
+
     let caller_locals_mark = localCount(g, f);
     let saved_unit = f.unit;
     let saved_env = f.env;
     let saved_bindings = f.bindings;
     let saved_with_cells = f.with_cells;
     let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_boxed_safe_refs = f.unique_boxed_safe_refs;
     let saved_unique_owned = f.unique_owned;
+    let saved_reuse_nodes = f.reuse_nodes;
+    let saved_reuse_nodes_len = f.reuse_nodes_len;
+    let saved_reuse_block = f.reuse_block;
+    let saved_reuse_ty = f.reuse_ty;
+    let saved_boxed_noop_alias = f.boxed_noop_alias;
     let saved_loop_depth = f.loop_depth;
     let saved_indirect_b = f.indirect_bound_binding;
     let saved_indirect_l = f.indirect_bound_len;
@@ -468,7 +503,13 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.bindings = blot_support_zigmap::Map {};
     f.with_cells = blot_support_zigmap::Map {};
     f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
     f.unique_owned = blot_support_zigmap::Map {};
+    f.reuse_nodes = [0; 4];
+    f.reuse_nodes_len = 0;
+    f.reuse_block = 0;
+    f.reuse_ty = 0;
+    f.boxed_noop_alias = false;
     f.loop_depth = 0;
     f.indirect_bound_binding = 0;
     f.indirect_bound_len = 0;
@@ -504,6 +545,12 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     }
     for pi in 0..peeled {
         bindPut(g, f, param_bs[pi], g.s.vals[eval_args.start + pi]);
+        if (unique_arg_mask & ((1 as u32) << (pi as u32))) != 0 {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bs[pi], 1);
+        }
+        if (unique_boxed_mask & ((1 as u32) << (pi as u32))) != 0 {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bs[pi], 1);
+        }
     }
     let body_val, b_err = stmt(g, f, final_body);
     var final_err = b_err;
@@ -527,7 +574,13 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.bindings = saved_bindings;
     f.with_cells = saved_with_cells;
     f.unique_boxed = saved_unique_boxed;
+    f.unique_boxed_safe_refs = saved_unique_boxed_safe_refs;
     f.unique_owned = saved_unique_owned;
+    f.reuse_nodes = saved_reuse_nodes;
+    f.reuse_nodes_len = saved_reuse_nodes_len;
+    f.reuse_block = saved_reuse_block;
+    f.reuse_ty = saved_reuse_ty;
+    f.boxed_noop_alias = saved_boxed_noop_alias;
     f.loop_depth = saved_loop_depth;
     f.indirect_bound_binding = saved_indirect_b;
     f.indirect_bound_len = saved_indirect_l;
@@ -665,6 +718,7 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
     let saved_bindings = f.bindings;
     let saved_with_cells = f.with_cells;
     let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_boxed_safe_refs = f.unique_boxed_safe_refs;
     let saved_unique_owned = f.unique_owned;
     let saved_loop_depth = f.loop_depth;
     let saved_fn_ret_block = f.fn_return_block;
@@ -707,6 +761,7 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
     f.bindings = blot_support_zigmap::Map {};
     f.with_cells = blot_support_zigmap::Map {};
     f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
     f.unique_owned = blot_support_zigmap::Map {};
     f.loop_depth = 0;
     f.fn_return_block = 0;
@@ -753,6 +808,7 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
     f.bindings = saved_bindings;
     f.with_cells = saved_with_cells;
     f.unique_boxed = saved_unique_boxed;
+    f.unique_boxed_safe_refs = saved_unique_boxed_safe_refs;
     f.unique_owned = saved_unique_owned;
     f.loop_depth = saved_loop_depth;
     f.fn_return_block = saved_fn_ret_block;
@@ -2724,8 +2780,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
             return neverVal(), false, blot_direct_types::Error.none;
         }
     }
-    let boxed_ret, berr = g.types.boxed(after);
-    if berr != blot_direct_types::Error.none || boxed_ret {
+    let _, berr = g.types.boxed(after);
+    if berr != blot_direct_types::Error.none {
         return neverVal(), false, blot_direct_types::Error.none;
     }
     var body_root: u32 = 0;
@@ -2782,6 +2838,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     // inlined callee so `spark` inside inlined helpers (e.g. `integrate_particles`)
     // can reuse the caller's uniquely-owned buffer in place!
     var unique_arg_mask: u32 = 0;
+    var unique_boxed_mask: u32 = 0;
     if id != 0 && param_count <= 16 {
         let cm .= g.units[f.unit - 1];
         if cm.node(id).tag == blot_check_core::Tag.call {
@@ -2796,9 +2853,12 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
                     for aj in 0..param_count {
                         if aj != ai && arg_bs[aj] == ab { dup = true; break; }
                     }
-                    if dup { continue; }
-                    if isUniqueOwned(g, f, ab) && ownedTotalUses(g, f, ab) == 1 && !bindingCaptured(g, f, ab) {
+                    if dup || bindingCaptured(g, f, ab) { continue; }
+                    if isUniqueOwned(g, f, ab) && ownedTotalUses(g, f, ab) == 1 {
                         unique_arg_mask |= ((1 as u32) << (ai as u32));
+                    }
+                    if !g.runtime_().has_fork && isUniqueBoxed(g, f, ab) && uses(g, f, ab) == 1 {
+                        unique_boxed_mask |= ((1 as u32) << (ai as u32));
                     }
                 }
             }
@@ -2813,7 +2873,13 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_bindings = f.bindings;
     let saved_with_cells = f.with_cells;
     let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_boxed_safe_refs = f.unique_boxed_safe_refs;
     let saved_unique_owned = f.unique_owned;
+    let saved_reuse_nodes = f.reuse_nodes;
+    let saved_reuse_nodes_len = f.reuse_nodes_len;
+    let saved_reuse_block = f.reuse_block;
+    let saved_reuse_ty = f.reuse_ty;
+    let saved_boxed_noop_alias = f.boxed_noop_alias;
     let saved_loop_depth = f.loop_depth;
     let saved_indirect_b = f.indirect_bound_binding;
     let saved_indirect_l = f.indirect_bound_len;
@@ -2862,7 +2928,13 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.bindings = blot_support_zigmap::Map {};
     f.with_cells = blot_support_zigmap::Map {};
     f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
     f.unique_owned = blot_support_zigmap::Map {};
+    f.reuse_nodes = [0; 4];
+    f.reuse_nodes_len = 0;
+    f.reuse_block = 0;
+    f.reuse_ty = 0;
+    f.boxed_noop_alias = false;
     f.loop_depth = 0;
     f.indirect_bound_binding = 0;
     f.indirect_bound_len = 0;
@@ -2914,6 +2986,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         if (unique_arg_mask & ((1 as u32) << (at as u32))) != 0 {
             blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
+        if (unique_boxed_mask & ((1 as u32) << (at as u32))) != 0 {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1);
+        }
         if at < 32 && ((own_param_mask >> (at as u32)) & 1) != 0 {
             blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
@@ -2941,7 +3016,13 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.bindings = saved_bindings;
     f.with_cells = saved_with_cells;
     f.unique_boxed = saved_unique_boxed;
+    f.unique_boxed_safe_refs = saved_unique_boxed_safe_refs;
     f.unique_owned = saved_unique_owned;
+    f.reuse_nodes = saved_reuse_nodes;
+    f.reuse_nodes_len = saved_reuse_nodes_len;
+    f.reuse_block = saved_reuse_block;
+    f.reuse_ty = saved_reuse_ty;
+    f.boxed_noop_alias = saved_boxed_noop_alias;
     f.loop_depth = saved_loop_depth;
     f.indirect_bound_binding = saved_indirect_b;
     f.indirect_bound_len = saved_indirect_l;

@@ -279,6 +279,8 @@ struct Fn {
     scratch_cut: ScratchCut = ScratchCut {},
     // Uniquely-owned boxed bindings eligible for FBIP same-shape reuse.
     unique_boxed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    // Non-escaping, non-boxed field projection references already emitted on unique_boxed bindings.
+    unique_boxed_safe_refs: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     // Uniquely-owned local/own-param array/container bindings eligible for in-place spark reuse.
     unique_owned: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     loop_depth: u32 = 0,

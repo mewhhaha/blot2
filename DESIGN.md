@@ -17,13 +17,15 @@ compiler pruning and vNext implementation plan.
 1. **Pure shadowing (`let` / `:=` + `self`) + static linearity.** Every value is
    logically immutable. `let` always binds new names; `:=` evolves existing
    bindings, disjoint record paths, and loop/branch carries while reusing linear
-   memory in place—including typestate transitions (`seal`, `freeze`) and
-   same-shape sum-type reuse (FBIP).
+   memory in place—including zero-copy `freeze` transitions and same-shape
+   sum-type reuse (FBIP).
 2. **Intrinsics are symbols; user types are names.**
-   - Arrays encode length-stability and bounds-check guarantees directly in
-     symbols: `#[T]` (fixed), `#[+T]` (grow-only; indices never invalidate),
-     `#[~T]` (resizable), and `#[n; T]` (linked lengths across fields and
-     parameters). Borrowed read-only `#[T]` accepts all array modes.
+   - Arrays use two unified symbols: `#[T]` (dynamic contiguous `Array T`, with
+     `push`/`pop`/`truncate`/`reserve`/`extend` gated by unique `own` ownership)
+     and `#[n; T]` (fixed/linked lengths across fields and parameters for
+     zero-cost bounds-check elimination). Borrowed read-only `#[T]` accepts
+     `#[T]`, `#[n; T]`, and `*#[T]`. (`%[T]` is reserved for future packed
+     sequential arrays, and `~[T]` for a future list-like sequence structure.)
    - Frozen/shared values use `*T` (`O(1)` `freeze`, freely aliasable; explicit
      `copy` to obtain a linear editable clone; zero refcount overhead on linear
      code).
@@ -40,9 +42,9 @@ compiler pruning and vNext implementation plan.
 5. **Simple, visible effects and zero-macro metaprogramming.**
    - `use x <- call` / `use call` / `return use call` keep pure regions visually
      distinct and reorderable. Templated downward callbacks eliminate open
-     effect-row variables (`! {| e}`). Scoped `with` handlers may capture locals,
-     forward `Foreign`, and linearly shadow outer locals—replacing built-in
-     `State`.
+     effect-row variables (`! {| e}`). Composable `handler` bindings (installed
+     via `.handle ... .run`, `@handle`, and `layer`) may capture locals, forward
+     `Foreign`, and linearly shadow outer locals—replacing built-in `State`.
    - Traits are compile-time nominal records (`type X is trait`, `const T.Trait`,
      no `impl`, no runtime dictionaries).
    - `#run expr` evaluates pure compile-time values and declared build inputs;

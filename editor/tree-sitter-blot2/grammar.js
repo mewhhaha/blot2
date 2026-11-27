@@ -519,7 +519,6 @@ export default grammar({
         "fork",
         "own",
         "freeze",
-        "seal",
         "copy",
         "panic",
         "return",

@@ -23,9 +23,6 @@ workload.
 `prefix_sums` scans in input order into one independent destination. Array
 `indices`, `filter` and `filter_map` append into a local `Array` and return it
 directly. `concat` and `flatten` preserve ordering and length-overflow checks.
-Lists are distinct from arrays; general runtime List support is not promised by
-the owned profile. Keep grammar and compile-time semantics separate from
-backend support.
 
 ## Effects and numerical behavior
 

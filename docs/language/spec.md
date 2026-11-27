@@ -21,15 +21,15 @@ WebAssembly. Every design rule below is an invariant:
    `self`) always evolves an existing binding, nested path, or loop/branch
    carry. No code can ever observe another name mutating a value it holds.
 2. **Intrinsics are symbols; user types are names.** Built-in type constructors
-   and modes use compact symbols (`#[T]`, `#[+T]`, `#[~T]`, `#[n; T]`, `*T`,
-   `->`, `*(A -> B)`). User-defined and standard-library types use `PascalCase`
-   names.
+   and modes use compact symbols (`#[T]`, `#[n; T]`, `*T`, `->`, `*(A -> B)`).
+   User-defined and standard-library types use `PascalCase` names.
 3. **No borrow-checker lifetimes, no hidden copies.** Read borrows are lexical
    and non-escaping. Ownership transfers explicitly via `own`. The compiler
    reuses linear memory in place and never inserts an implicit `O(n)` copy:
    diverging timelines explicitly choose `copy`, `freeze` (`*T`), or `fork`.
-4. **A module parses without knowing any declaration.** The operator table is
-   fixed, name casing decides syntactic class, and no declaration alters parsing.
+4. **A module parses without knowing any declaration.** Operator precedence and
+   associativity are derived lexically, name casing decides syntactic class, and
+   no declaration alters parsing.
 5. **A module's interface is known after parsing.** Every module-level
    declaration writes its full name and type. Compile-time evaluation (`#run`)
    and typed reflection (`#for` / `#if`) run inside bodies only and never
@@ -142,10 +142,9 @@ Escape   = '\"' | "\\" | "\n" | "\r" | "\t"
 | `=>` | function / arm body | | arm body |
 | `<-` | comprehension generator; `use` bind | | |
 | `$` | constructor (`$Some`) | | constructor |
-| `#[` | array literal / comprehension | array type (`#[T]`, `#[+T]`, `#[~T]`, `#[n; T]`) | |
+| `#[` | array literal / comprehension | array type (`#[T]`, `#[n; T]`) | |
 | `*` | multiplication | frozen / shared (`*T`, `*(A -> B)`) | |
-| `+` | addition | grow-only array (`#[+T]`) | |
-| `~` | | resizable array (`#[~T]`) | |
+| `+` | addition | | |
 | `;` | | length separator (`#[n; T]`) | |
 | `&` | bitwise and | | |
 | `^` | bitwise xor | | pin existing value (`^name`) |
@@ -268,9 +267,9 @@ DataField   = Tag* LowerName ":" Type ("=" Expression)?
   fields (Section 6.2), proving equal length across parallel arrays:
   ```blot
   type Robots is data = $Robots {
-    pos: #[+n; Vec2],
-    vel: #[+n; Vec2],
-    hp:  #[+n; F32],
+    pos: #[n; Vec2],
+    vel: #[n; Vec2],
+    hp:  #[n; F32],
   }
   ```
 
@@ -309,7 +308,7 @@ func square (x: a): a where { Mul a { right: a, out: a } } => x * x
 - **Read-only lift to `*T`**: Any trait whose operations only borrow `a`
   (no `own a` parameter) automatically applies to `*a` as well.
 - **Array traits**: Implementing a read-only trait for `#[a]` automatically
-  covers `#[+a]`, `#[~a]`, `#[n; a]`, and `*#[a]` (Section 6.2).
+  covers `#[n; a]` and `*#[a]` (Section 6.2).
 
 ### 5.5 Effects
 
@@ -357,7 +356,7 @@ TypeAtom    = TypePath
             | "(" Type ")"
             | "(" Type "," Type,+ ")"
             | RecordType
-ArrayType   = "#[" ("+" | "~")? (LengthExpr ";")? Type "]"
+ArrayType   = "#[" (LengthExpr ";")? Type "]"
 LengthExpr  = LowerName | Integer
 TypePath    = (LowerName ".")? UpperName ("." UpperName)*
 RecordType  = "{" FieldType,* "}"
@@ -376,30 +375,25 @@ EffectLabel = TypePath TypeArg?
 - No implicit numeric conversions; conversions are explicit member calls
   (`count.to_f32`).
 
-### 6.2 Intrinsic Array Symbols (`#[T]`, `#[+T]`, `#[~T]`, `#[n; T]`)
+### 6.2 Intrinsic Array Symbols (`#[T]`, `#[n; T]`)
 
-Array modes encode length-stability guarantees directly in the type symbol:
+Blot uses two unified array type symbols, with length mutations gated by unique
+ownership (`own`) rather than separate grow/resize types:
 
 | Symbol | Mode | Length / Bounds Guarantee |
 | --- | --- | --- |
-| `#[T]` | Fixed | Length never changes; every checked index remains valid forever |
-| `#[+T]` | Grow-only | Length only increases (`push`); existing indices never invalidate |
-| `#[~T]` | Resizable | Length may grow or shrink (`push`, `pop`, `truncate`); shrinking invalidates prior indices |
-| `#[n; T]` / `#[+n; T]` / `#[~n; T]` | Length-linked | Shares symbolic or literal length `n` across fields or parameters; proves equal length at zero runtime cost and eliminates redundant bounds checks |
+| `#[T]` | Dynamic (`Array T`) | Contiguous array; supports in-place element writes and `push` / `pop` / `truncate` / `reserve` / `extend` whenever uniquely owned (`own`), and read-only indexing/iteration when borrowed or frozen (`*#[T]`) |
+| `#[n; T]` | Fixed / length-linked | Statically fixed length (symbolic variable `n` or literal integer); shares length across fields or parameters, proves equal length at zero runtime cost, forbids length mutation, and eliminates redundant bounds checks |
 
 - **Read-only borrow coercion:** A borrowed (non-`own`) parameter of type `#[T]`
-  (or `#[n; T]`) accepts `#[T]`, `#[+T]`, `#[~T]`, and `*#[T]`. Inside the
-  callee the array cannot grow or shrink, so its length is fixed for the call.
-- **Zero-copy mode narrowing:**
-  - `seal`: `own #[+T] -> #[T]` (and `own #[~T] -> #[T]`) removes growth/shrink
-    authority in place, reusing the exact allocation.
-  - `freeze`: `own T -> *T` converts any linear value (including any array mode)
-    into an immutable, `O(1)`-shareable `*T` (for arrays, yielding `*#[T]`) in
-    place with zero copy.
-- **Linked-length updates:** When a record binds a length variable `n` across
-  multiple `#[+n; ...]` fields, growing all linked fields together when
-  constructing the successor record advances `n` to `n + 1` in lockstep; leaving
-  one field behind is a compile error.
+  accepts `#[T]`, `#[n; T]`, and `*#[T]`. Inside the callee the array cannot
+  grow or shrink, so its length stays fixed for the call.
+- **Zero-copy freezing:** `freeze`: `own T -> *T` converts any linear value
+  (including `#[T]` or `#[n; T]`) into an immutable, `O(1)`-shareable `*T` in
+  place with zero copy.
+- **Linked-length fields:** When a record binds a length variable `n` across
+  multiple `#[n; ...]` fields, every parallel column is statically proved to
+  have the same length.
 
 ### 6.3 Frozen / Shared Values (`*T`)
 
@@ -407,7 +401,7 @@ Array modes encode length-stability guarantees directly in the type symbol:
 - Creating `*T` via `freeze` is `O(1)` and consumes the linear input (same
   memory, no copy).
 - Aliasing, storing in history buffers, or capturing `*T` in closures is `O(1)`.
-- Linear types (`#[T]`, `#[+T]`, `#[~T]`, structs containing them) pay **zero**
+- Linear types (`#[T]`, `#[n; T]`, structs containing them) pay **zero**
   reference-counting overhead. Only `*T` carries shared lifetime management.
 - To evolve a `*T` in place again, take an explicit `copy` (yielding linear `T`).
 
@@ -519,8 +513,8 @@ Range       = Expression ".." Expression
 ```
 
 - Arguments evaluate eagerly left-to-right.
-- `#[1, 2, 3]` builds `#[T]`, `#[+T]`, or `#[~T]` according to the expected type
-  (defaulting to `#[T]`). Empty `#[]` requires an expected type.
+- `#[1, 2, 3]` builds `#[T]` (or `#[n; T]` when a fixed-length type is expected).
+  Empty `#[]` requires an expected type.
 - Comprehensions accept arrays, ranges (`#[i * 2 | i <- 0..n]`), and any
   `Collection` trait implementation.
 - `spark #[body | pat <- source]` is a synchronous, pure (`! {}`), ordered
@@ -577,7 +571,7 @@ ForkExpr = "fork" LowerName,+ ":" Suite
 
 ```
 Statement = LetStmt | UseStmt | Rebind | IfStmt | CaseExpr | ForStmt
-          | WithStmt | ComptimeFor | ComptimeIf
+          | HandlerStmt | ComptimeFor | ComptimeIf
           | "return" "use"? Expression
           | "break"
           | "continue"
@@ -610,8 +604,8 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
   old leaf value. The root and all index expressions evaluate once, left to
   right.
 - **Type-changing shadowing:** `name := expr` (on a whole local, outside a loop
-  carry or branch join) may change `name`'s type (e.g., `xs := seal self`,
-  `xs := freeze self`), reusing the underlying allocation in place.
+  carry or branch join) may change `name`'s type (e.g., `xs := freeze self`),
+  reusing the underlying allocation in place.
 - **In-place reuse & FBIP:** Updating an array path (`rows[i] := ...`) or
   reconstructing a matching data variant on a linear local reuses storage in
   place with zero allocation. If the compiler cannot prove linearity at an array
@@ -659,8 +653,8 @@ let score = fork world:
 ```
 
 - `fork x:` takes one or more linear locals, allows shadowing them freely inside
-  the suite (including passing them `own` to helpers and updating arrays/pushing
-  to `#[+T]`), and produces the suite's returned value.
+  the suite (including passing them `own` to helpers and updating or pushing to
+  `#[T]`), and produces the suite's returned value.
 - **Semantics:** Identical to copying each listed local before the suite and
   discarding the copy on exit.
 - **Cost:** `O(edits)` via a scratch undo journal recording overwritten words
@@ -751,7 +745,7 @@ ComptimeIf  = "#if" Expression ":" Suite ("#else" ":" Suite)?
 ```
 
 ```blot
-func derive_encode (own out: #[+U8]) -> (val: t): #[+U8] =>
+func derive_encode (own out: #[U8]) -> (val: t): #[U8] =>
   #for field in #fields t:
     #if not (field.has_tag Codec.Skip):
       out := Encode.encode self val.(field)
@@ -774,7 +768,7 @@ func derive_encode (own out: #[+U8]) -> (val: t): #[+U8] =>
 
 The following conditions trap the current Wasm invocation (uncatchable):
 - Array index or slice range out of bounds (when not statically eliminated by
-  `#[T]`, `#[+T]`, or `#[n; T]`).
+  `#[T]` or `#[n; T]`).
 - Integer division or remainder by zero, or `MIN / -1` on signed integers.
 - Explicit `panic "message"`.
 - Appending beyond planned/available linear memory, or stack exhaustion.
@@ -788,8 +782,8 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 
 | Retired | vNext Replacement |
 | --- | --- |
-| `Array T`, `GrowArray T`, `ResizeArray T` | `#[T]`, `#[+T]`, `#[~T]`, `#[n; T]` |
-| `List T`, `[...]`, `[head \| tail]`, `std/list` | `#[T]` / `#[+T]` |
+| `GrowArray T`, `ResizeArray T`, `#[+T]`, `#[~T]`, `seal` | Unified dynamic `#[T]` (`Array T`, ownership-gated `push`/`pop`/`truncate`) and fixed `#[n; T]` |
+| `List T`, `[...]`, `[head \| tail]`, `std/list`, `std/iter`, `@cursor` | `#[T]` (see Annex B for reserved `%[T]` / `~[T]` prefixes) |
 | `&T`, `&[T]`, `^T`, `Ref`, `View`, `Link` | Lexical read borrows, `#[T]`, `*T`, typed indices |
 | `=` mutable store, `lent` functions, `@storage.write` | `:=` on `own` values + `let (a, w) = ...; x := w` |
 | First-class escaping capturing closures | 2A templated downward closures, `A -> B` fn ptrs, `*(A -> B)` frozen closures |
@@ -811,9 +805,13 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 1. **`*T` reclamation policy:** Linear values pay zero refcounting. For
    long-lived `*T` (e.g., 64-frame history buffers), choose between opt-in
    per-allocation refcounting on `*T` only vs. explicit region/arena ownership.
-2. **Length-variable binder syntax:** Confirm whether `#[+n; T]` binds `n`
+2. **Length-variable binder syntax:** Confirm whether `#[n; T]` binds `n`
    implicitly inside a `data` declaration / `func` header (like lowercase type
    variables `a`) or takes an explicit binder.
 3. **Host ABI transition:** Expanding numeric widths (`U8..U64`, `I8..I64`,
    `F64`) and UTF-8 `Text` (`#[U8]`) coordinates with guest ABI 8 / save schema
    26 migration timing across `Pen`, `Ink`, and `Gdev`.
+4. **Reserved collection prefixes (`%[...]`, `~[...]`):** `%[...]` / `%[T]` is
+   reserved for packed non-indexable sequential arrays (such as split-stream
+   packed sum types and compact iteration storage), and `~[...]` / `~[T]` is
+   reserved for a future list-like sequence structure.

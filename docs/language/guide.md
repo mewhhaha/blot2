@@ -21,11 +21,12 @@ qualification.
   - `#[T]` (unified owned dynamic array, equivalent to `Array T`),
   - `#[n; T]` (equal-length-checked fixed array family),
   - `&[T]` (read-only borrowed view, equivalent to `View T`),
-  - `*T` (shared immutable handle via `freeze` / `seal`),
+  - `*T` (shared immutable handle via `freeze`),
   - `*(A -> B)` (frozen closure value).
-- **Scoped effect handlers:** `with Effect = { op: func arg => body }:` handles
-  an effect inline over an indented suite without separate `@effect.provider`
-  wiring.
+- **Composable effect handlers:** `handler name: Effect => ...` declares a local
+  handler (which may capture or linearly shadow outer locals) and installs it
+  with `.handle ... .run`, `@handle`, or `layer` without separate
+  `@effect.provider` wiring.
 - **Speculative undo scopes:** `fork x:` borrows linear `x` mutably inside an
   indented suite, logs writes, and restores `x` on exit (rejecting `Foreign`
   effects inside `fork`).
@@ -1826,21 +1827,11 @@ references keep reading the earlier value). `@storage.copy` (`values.copy`)
 makes an independent copy. `freeze value` creates a read-only `*T` shared
 handle; `@simd.store` likewise requires unique ownership.
 
-`@storage.reserve owner 1048576` requests a minimum planned capacity in elements
-for one owned `#[T]` array. The count must be a U32 integer literal
-(parentheses are permitted); runtime values and constant-name aliases are
-rejected. `Ref`, `View`, and `Link` values cannot reserve. This marker returns
-`Unit` and changes no data, logical length, identity or borrow epoch. It
-remains planning metadata even when its result is unused.
-
-An explicit request replaces that owner's fallback `growerBytes` requirement; it
-does not impose a logical-length limit or increase every pool of that type.
-Repeated requests for an owner take their maximum, including requests through
-aliases. Zero requests only the header and known initial literal contents. The
-planner preserves initial contents, checks row-size/header/alignment overflow,
-and sizes shared slots for every owner that can use them. Alignment or slot
-sharing can provide extra physical capacity, which is not promised. Owners
-without a request continue to use the configured default budget.
+`Array.with_capacity n` (`@storage.with_capacity n`) allocates an empty owned
+`#[T]` array with room for at least `n` elements, and `values.reserve extra`
+(`@storage.reserve values extra`) ensures capacity for `extra` additional
+elements on a uniquely owned `#[T]` array and returns the updated owner. `Ref`,
+`View`, `Link`, and `*T` values cannot reserve or mutate capacity.
 
 These features select a data-stack backend with checked scalar and aggregate
 layouts, generic helpers, known callbacks and lexical storage reuse. Named

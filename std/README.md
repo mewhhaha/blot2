@@ -336,70 +336,31 @@ Host scalar exports use actual Wasm `f32` parameters/results and return normal
 JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 [the ABI and lifetime boundary](../host/README.md#evaluation-and-wasm-representation).
 
-## Lists and arrays
+## Arrays
 
-In the compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
-`Array U32` (dynamic array, supporting `@storage.push`, `@storage.pop`, and
-`@storage.truncate` when uniquely owned). A fixed-length type annotation
-`#[N; T]` selects a statically sized array. Lists and arrays are separate
-types, with `List.from_array` and `Array.from_list` for explicit conversion.
-Both expose `length` and `is_empty`. Only arrays support indexing, indexed
-updates, `get`, and `set`. Numeric arrays remain the collection type accepted by
-the host ABI.
+In the compiler, `#[1, 2]` has type `#[U32]` (`Array U32`, a unified contiguous
+dynamic array supporting `push`, `pop`, `truncate`, `reserve`, and `extend` when
+uniquely owned). A fixed-length type annotation `#[N; T]` selects a statically
+sized array whose length cannot change. Arrays support indexing (`xs[i]`),
+views (`&xs[start..end]`), `length`, `is_empty`, `get`, `set`, `copy`, and
+`freeze` (`*#[T]`). Numeric arrays are the collection type accepted by the host
+ABI.
 
-Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
-`fold_left`, `any`, `all`, `append`, `prepend`, `concat`, `slice`, `split_at`,
-`take`, `drop`, `splice` and `splice_many`, plus length and conversion helpers.
-`fold_left`, `filter`, `any`, and `all` propagate callback effects; `any`/`all`
-stop early and return false/true respectively on an empty list. `generate` and
-`map` require pure callbacks. Spreads express prepend (`[value, ...values]`) and
-append (`[...values, value]`); use `#[...]` to construct an array instead.
-Comprehensions and `for` loops traverse either input collection. The opening
-bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]` is
-a list. Convert a list to an array when indexed access is needed.
+Import [array.blot](array.blot) for `map`, `filter`, `filter_map`, `fold_left`,
+`any`, `all`, `concat`, `flatten`, `indices`, `prefix_sums`, and related
+helpers. `fold_left`, `filter`, `any`, and `all` propagate callback effects;
+`any`/`all` stop early and return `false`/`true` respectively on an empty array.
+Comprehensions (`#[x * x | x <- values, x > 0]`) and `for` loops traverse arrays
+and integer ranges (`0..n`).
 
-`list.splice start delete_count replacement values` replaces one checked range.
-`list.splice_many edits values` accepts a list of
-`{start, delete_count, replacement}` records in original-list coordinates. Edits
-must be ordered, nonoverlapping and in bounds; insertions at the same position
-retain their written order. Both are ordinary source functions that share
-unchanged subtrees and preserve snapshots. For example:
-
-```blot
-list.splice 1 2 [20, 30, 40] [1, 2, 3, 4] // [1, 20, 30, 40, 4]
-list.splice_many [
-  {start: 1, delete_count: 1, replacement: [20, 21]},
-  {start: 3, delete_count: 0, replacement: [30]}
-] [1, 2, 3, 4] // [1, 20, 21, 3, 30, 4]
-```
-
-List operations retain their value semantics; runtime List support depends on
-the selected backend. Arrays use contiguous checked rows. Helpers such as
-`Array.push` take `own Array a -> a -> Array a` to append in place and return
-the updated owner. Access records and views retain aliases, so copy explicitly
-for an independent version. See
-[the list example](../examples/lists.blot) and
+Arrays use contiguous checked rows (`#[U8]` and `#[Bool]` are 1-byte packed;
+other scalars and unboxed aggregates are stored flat inline). Helpers such as
+`Array.push` take `own #[a] -> a -> #[a]` to append in place and return the
+updated owner. Views and shared handles (`*#[T]`) are read-only; use `copy`
+when an independent mutable snapshot is needed. See
 [collection and ownership contracts](../docs/language/guide.md#lists-arrays-and-libraries).
 
-### Iterators and SIMD
-
-`values.iter` provides sequential cursors. In the owned profile an Array cursor
-reads its owner rather than taking an independent payload snapshot.
-`cursor.next` returns the ordinary `$Some (value, next_cursor)` or `$Nothing`.
-User-defined types can provide the same associated `iter`/`next` functions and
-work in `for` and comprehensions, including effectful traversal and early exit.
-Independent cursor copies retain their own positions.
-
-Import [iter.blot](iter.blot) for source-defined `range`, `zip`, `zip_strict`,
-`enumerate`, `windows`, `take`, `take_while`, `drop`, `map`, `filter`,
-`fold_left`, `any`, `all`, `find`, `position`, `collect_list` and
-`collect_array`. Adapters are lazy; collection is explicit. `find` and
-`position` stop at the first match and return Maybe. `windows` requires
-positive width and returns complete List
-windows. `zip` polls left before right and stops at either end; `zip_strict`
-traps if lengths differ.
-[The protocol and examples](../docs/language/guide.md#lists-arrays-and-libraries)
-describe pull order, aliasing and copy requirements.
+### Rolling reductions, summaries, and SIMD
 
 [rolling.blot](rolling.blot) provides complete overlapping reductions.
 `fold step initial width values` reduces each window in order, including
