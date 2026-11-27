@@ -1,9 +1,10 @@
-// PLB lru: open-addressed hash table + parallel doubly-linked circular list.
+// PLB lru: open-addressed hash table + single 16-byte/node doubly-linked arena.
 import * as buf from "./buf"
 
 const NONE: U32 = 0xFFFFFFFF
 
 type Slot is data = $Slot { key: U32, node: U32 }
+type Node is data = $Node { key: U32, val: U32, prev: U32, next: U32 }
 
 func find_slot (slots: #[Slot]) -> (mask: U32) -> (shift: U32) -> (key: U32): U32 =>
   let i = (key * 2654435769) >> shift
@@ -45,11 +46,8 @@ io bench (inp: #[U32]): #[U32] =>
   let shift = 32 - bits
   let slots = @array.fill nslots ($Slot { key: 0, node: NONE })
 
-  // Sentinel head = 0; pool capacity = size + 1.
-  let nkey = @array.fill (size + 1) 0
-  let nval = @array.fill (size + 1) 0
-  let nprev = @array.fill (size + 1) 0
-  let nnext = @array.fill (size + 1) 0
+  // Sentinel head = 0; pool capacity = size + 1 (16 bytes/node).
+  let nodes = @array.fill (size + 1) ($Node { key: 0, val: 0, prev: 0, next: 0 })
   let pool_used: U32 = 1
   let count: U32 = 0
 
@@ -65,43 +63,33 @@ io bench (inp: #[U32]): #[U32] =>
     let at = find_slot slots mask shift k0
     let f = slots[at].node
     if f != NONE:
-      nval[f] := k0
-      let p = nprev[f]
-      let q = nnext[f]
-      nnext[p] := q
-      nprev[q] := p
-      let hp = nprev[0]
-      nprev[f] := hp
-      nnext[f] := 0
-      nnext[hp] := f
-      nprev[0] := f
+      let nd = nodes[f]
+      nodes[nd.prev].next := nd.next
+      nodes[nd.next].prev := nd.prev
+      let hp = nodes[0].prev
+      nodes[f] := $Node { key: nd.key, val: k0, prev: hp, next: 0 }
+      nodes[hp].next := f
+      nodes[0].prev := f
     else:
       if count == size:
-        let lru = nnext[0]
-        let old = find_slot slots mask shift nkey[lru]
-        nkey[lru] := k0
-        nval[lru] := k0
-        let lp = nprev[lru]
-        let lq = nnext[lru]
-        nnext[lp] := lq
-        nprev[lq] := lp
-        let hp = nprev[0]
-        nprev[lru] := hp
-        nnext[lru] := 0
-        nnext[hp] := lru
-        nprev[0] := lru
+        let lru = nodes[0].next
+        let lnd = nodes[lru]
+        let old = find_slot slots mask shift lnd.key
+        nodes[lnd.prev].next := lnd.next
+        nodes[lnd.next].prev := lnd.prev
+        let hp = nodes[0].prev
+        nodes[lru] := $Node { key: k0, val: k0, prev: hp, next: 0 }
+        nodes[hp].next := lru
+        nodes[0].prev := lru
         slots[at] := $Slot { key: k0, node: lru }
         slots := remove_at self mask shift old
       else:
         let e = pool_used
         pool_used := self + 1
-        nkey[e] := k0
-        nval[e] := k0
-        let hp = nprev[0]
-        nprev[e] := hp
-        nnext[e] := 0
-        nnext[hp] := e
-        nprev[0] := e
+        let hp = nodes[0].prev
+        nodes[e] := $Node { key: k0, val: k0, prev: hp, next: 0 }
+        nodes[hp].next := e
+        nodes[0].prev := e
         slots[at] := $Slot { key: k0, node: e }
         count := self + 1
 
@@ -109,15 +97,13 @@ io bench (inp: #[U32]): #[U32] =>
     let k1 = s1 % modular
     let g = slots[find_slot slots mask shift k1].node
     if g != NONE:
-      let p = nprev[g]
-      let q = nnext[g]
-      nnext[p] := q
-      nprev[q] := p
-      let hp = nprev[0]
-      nprev[g] := hp
-      nnext[g] := 0
-      nnext[hp] := g
-      nprev[0] := g
+      let nd = nodes[g]
+      nodes[nd.prev].next := nd.next
+      nodes[nd.next].prev := nd.prev
+      let hp = nodes[0].prev
+      nodes[g] := $Node { key: nd.key, val: nd.val, prev: hp, next: 0 }
+      nodes[hp].next := g
+      nodes[0].prev := g
       hit := self + 1
     else:
       missed := self + 1

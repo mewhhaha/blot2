@@ -1,5 +1,5 @@
-// Benchmarks Game binary-trees: build, check, and discard a fresh pre-sized
-// local arena per tree (reclaimed on function exit, reusing tiny traversal stacks).
+// Benchmarks Game binary-trees: direct recursion over a fresh pre-sized
+// stack-backed arena per tree (reclaimed in one store on function exit).
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 17 // BENCH_N
@@ -8,128 +8,34 @@ const NONE: U32 = 0xFFFFFFFF
 
 type TNode is data = $TNode { l: U32, r: U32 }
 
-func tree_check (depth: U32) -> (st_d: own #[U32]) -> (st_stage: own #[U32]) -> (st_left: own #[U32]) -> (chk_st: own #[U32]): (U32, #[U32], #[U32], #[U32], #[U32]) =>
+func build_tree (pool: own #[TNode]) -> (d: U32): (#[TNode], U32) =>
+  if d == 0:
+    let idx = pool.length
+    pool := self.push ($TNode { l: NONE, r: NONE })
+    return (pool, idx)
+  let (p1, l) = build_tree pool (d - 1)
+  let (p2, r) = build_tree p1 (d - 1)
+  let idx = p2.length
+  let p3 = p2.push ($TNode { l, r })
+  return (p3, idx)
+
+func check_tree (pool: #[TNode]) -> (idx: U32): U32 =>
+  let nd = pool[idx]
+  if nd.l == NONE:
+    return 1
+  return 1 + check_tree pool nd.l + check_tree pool nd.r
+
+func tree_check (depth: U32): U32 =>
   let pool: #[TNode] = Array.with_capacity ((1 << (depth + 1)) - 1)
-  st_d[0] := depth
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let last_idx: U32 = 0
-
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_d[top]
-    let stage = st_stage[top]
-    if d == 0:
-      pool := self.push ($TNode { l: NONE, r: NONE })
-      last_idx := pool.length - 1
-      sp := self - 1
-    else:
-      case stage of
-        0 =>
-          st_stage[top] := 1
-          st_d[sp] := d - 1
-          st_stage[sp] := 0
-          sp := self + 1
-        1 =>
-          st_left[top] := last_idx
-          st_stage[top] := 2
-          st_d[sp] := d - 1
-          st_stage[sp] := 0
-          sp := self + 1
-        _ =>
-          pool := self.push ($TNode { l: st_left[top], r: last_idx })
-          last_idx := pool.length - 1
-          sp := self - 1
-
-  chk_st[0] := last_idx
-  let csp: U32 = 1
-  let count: U32 = 0
-  for ever:
-    if csp == 0:
-      break
-    csp := self - 1
-    let nd = pool[chk_st[csp]]
-    count := self + 1
-    if nd.l != NONE and nd.r != NONE:
-      chk_st[csp] := nd.r
-      csp := self + 1
-      chk_st[csp] := nd.l
-      csp := self + 1
-  return (count, st_d, st_stage, st_left, chk_st)
-
-func make_long (depth: U32) -> (st_d: own #[U32]) -> (st_stage: own #[U32]) -> (st_left: own #[U32]): (#[TNode], #[U32], #[U32], #[U32]) =>
-  let pool: #[TNode] = Array.with_capacity ((1 << (depth + 1)) - 1)
-  st_d[0] := depth
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let last_idx: U32 = 0
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_d[top]
-    let stage = st_stage[top]
-    if d == 0:
-      pool := self.push ($TNode { l: NONE, r: NONE })
-      last_idx := pool.length - 1
-      sp := self - 1
-    else:
-      case stage of
-        0 =>
-          st_stage[top] := 1
-          st_d[sp] := d - 1
-          st_stage[sp] := 0
-          sp := self + 1
-        1 =>
-          st_left[top] := last_idx
-          st_stage[top] := 2
-          st_d[sp] := d - 1
-          st_stage[sp] := 0
-          sp := self + 1
-        _ =>
-          pool := self.push ($TNode { l: st_left[top], r: last_idx })
-          last_idx := pool.length - 1
-          sp := self - 1
-  return (pool, st_d, st_stage, st_left)
-
-func check_long (pool: #[TNode]) -> (root: U32) -> (chk_st: own #[U32]): U32 =>
-  chk_st[0] := root
-  let csp: U32 = 1
-  let count: U32 = 0
-  for ever:
-    if csp == 0:
-      break
-    csp := self - 1
-    let nd = pool[chk_st[csp]]
-    count := self + 1
-    if nd.l != NONE and nd.r != NONE:
-      chk_st[csp] := nd.r
-      csp := self + 1
-      chk_st[csp] := nd.l
-      csp := self + 1
-  return count
+  let (p, root) = build_tree pool depth
+  return check_tree p root
 
 io bench (): #[U32] =>
-  let st_d = @array.fill 24 0
-  let st_stage = @array.fill 24 0
-  let st_left = @array.fill 24 0
-  let chk_st = @array.fill 24 0
-
   let out: #[U32] = #[]
-  let (stretch, sd0, ss0, sl0, cs0) = tree_check (BENCH_N + 1) st_d st_stage st_left chk_st
-  st_d := sd0
-  st_stage := ss0
-  st_left := sl0
-  chk_st := cs0
-  out := rng.emit_u32 self stretch
+  out := rng.emit_u32 self (tree_check (BENCH_N + 1))
 
-  let (long_pool, sd1, ss1, sl1) = make_long BENCH_N st_d st_stage st_left
-  st_d := sd1
-  st_stage := ss1
-  st_left := sl1
-  let lroot = long_pool.length - 1
+  let long_cap = (1 << (BENCH_N + 1)) - 1
+  let (long_pool, lroot) = build_tree (Array.with_capacity long_cap) BENCH_N
 
   let d: U32 = MINDEPTH
   for ever:
@@ -138,16 +44,11 @@ io bench (): #[U32] =>
     let iters: U32 = 1 << (BENCH_N - d + MINDEPTH)
     let sum: U32 = 0
     for _ in 0 .. iters:
-      let (c, sd, ss, sl, cs) = tree_check d st_d st_stage st_left chk_st
-      st_d := sd
-      st_stage := ss
-      st_left := sl
-      chk_st := cs
-      sum := self + c
+      sum := self + tree_check d
     out := rng.emit_u32 self iters
     out := rng.emit_u32 self d
     out := rng.emit_u32 self sum
     d := self + 2
 
-  out := rng.emit_u32 self (check_long long_pool lroot chk_st)
+  out := rng.emit_u32 self (check_tree long_pool lroot)
   return out

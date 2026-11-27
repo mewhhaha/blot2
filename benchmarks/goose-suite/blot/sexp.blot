@@ -43,79 +43,56 @@ func emit_uint (text: own #[U8]) -> (v: U32): #[U8] =>
     text := self.push digits[n]
   return text
 
+func gen_form (text: own #[U8]) -> (d: U32) -> (seed: U64): (#[U8], U64) =>
+  let s = rng.xs_next seed
+  if d == 0 or (s & 3u64) == 0u64:
+    if ((s >> 8u64) & 1u64) == 0u64:
+      text := emit_sym self s
+    else:
+      text := emit_uint self (((s >> 16u64) % 100000u64).to_u32)
+    text := self.push ' '
+    return (text, s)
+  text := self.push '('
+  let rem = 2 + ((s >> 24u64) & 3u64).to_u32
+  let cur_seed = s
+  for _ in 0 .. rem:
+    let (t1, s1) = gen_form text (d - 1) cur_seed
+    text := t1
+    cur_seed := s1
+  text := self.push ')'
+  text := self.push ' '
+  return (text, cur_seed)
+
 func build_text (): #[U8] =>
   let text: #[U8] = Array.with_capacity (BENCH_N * 496)
   let seed: U64 = 12345u64
-
-  let st_depth = @array.fill 16 0
-  let st_rem = @array.fill 16 0
-  let st_active = @array.fill 16 0
-
   for _ in 0 .. BENCH_N:
-    st_depth[0] := DEPTH
-    st_rem[0] := 0
-    st_active[0] := 0
-    let sp: U32 = 1
-    for ever:
-      if sp == 0:
-        break
-      let top = sp - 1
-      if st_active[top] == 0:
-        seed := rng.xs_next self
-        let d = st_depth[top]
-        if d == 0 or (seed & 3u64) == 0u64:
-          if ((seed >> 8u64) & 1u64) == 0u64:
-            text := emit_sym self seed
-          else:
-            text := emit_uint self (((seed >> 16u64) % 100000u64).to_u32)
-          text := self.push ' '
-          sp := self - 1
-        else:
-          text := self.push '('
-          st_rem[top] := 2 + ((seed >> 24u64) & 3u64).to_u32
-          st_active[top] := 1
-      else:
-        let rem = st_rem[top]
-        if rem > 0:
-          st_rem[top] := rem - 1
-          st_depth[sp] := st_depth[top] - 1
-          st_active[sp] := 0
-          sp := self + 1
-        else:
-          text := self.push ')'
-          text := self.push ' '
-          sp := self - 1
-
+    let (t1, s1) = gen_form text DEPTH seed
+    text := t1
+    seed := s1
   return text
 
-func walk_root (pool: #[Sexp]) -> (buf: #[U8]) -> (root: U32) -> (p: U32) -> (stack: own #[U32]): (U32, #[U32]) =>
-  stack[0] := root
-  let sp: U32 = 1
+func walk_list (pool: #[Sexp]) -> (buf: #[U8]) -> (head: U32) -> (p: U32): U32 =>
+  let cur = head
   let acc: U32 = 0
   for ever:
-    if sp == 0:
+    if cur == NONE_IDX:
       break
-    sp := self - 1
-    let cur = stack[sp]
-    for ever:
-      if cur == NONE_IDX:
-        break
-      let $Sexp { a, b } = pool[cur]
-      let tag = b & 3
-      case tag of
-        0 =>
-          let start = a >> 4
-          let slen = a & 15
-          acc := self + slen + buf[start].to_u32 + p
-        1 =>
-          acc := self + (a ^ p)
-        _ =>
-          acc := self + 1
-          if a != NONE_IDX:
-            stack[sp] := a
-            sp := self + 1
-      cur := b >> 2
-  return (acc, stack)
+    let $Sexp { a, b } = pool[cur]
+    let tag = b & 3
+    case tag of
+      0 =>
+        let start = a >> 4
+        let slen = a & 15
+        acc := self + slen + buf[start].to_u32 + p
+      1 =>
+        acc := self + (a ^ p)
+      _ =>
+        acc := self + 1
+        if a != NONE_IDX:
+          acc := self + walk_list pool buf a p
+    cur := b >> 2
+  return acc
 
 io bench (): #[U32] =>
   let text = build_text ()
@@ -191,12 +168,9 @@ io bench (): #[U32] =>
           st_chain[sp] := idx
 
   let total: I64 = 0i64
-  let walk_stack = @array.fill 16 0
   for p in 0 .. PASSES:
     for ri in 0 .. roots.length:
-      let (wsum, ws1) = walk_root pool text roots[ri] p walk_stack
-      walk_stack := ws1
-      total := self + wsum.to_i64
+      total := self + (walk_list pool text roots[ri] p).to_i64
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self text_len

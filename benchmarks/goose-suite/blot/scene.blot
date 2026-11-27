@@ -1,10 +1,9 @@
 // Scene graph: arena of nodes with unboxed 12-field 3x3 F32 rotation + vec3
-// translation and direct in-place subfield updates, animated for 16 frames.
+// translation and direct recursive build & transform propagation.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 13 // BENCH_N
 const FRAMES: U32 = 16
-const MAXKIDS: U32 = 4
 
 type Xf is data = $Xf { m0: F32, m1: F32, m2: F32, m3: F32, m4: F32, m5: F32, m6: F32, m7: F32, m8: F32, tx: F32, ty: F32, tz: F32 }
 type SNode is data = $SNode { id: U32, local: Xf, world: Xf, klen: U32, k0: U32, k1: U32, k2: U32, k3: U32 }
@@ -22,76 +21,38 @@ func make_rotation (seed: U64) -> (tx: F32) -> (ty: F32) -> (tz: F32): Xf =>
     return $Xf { m0: c, m1: 0.0, m2: s, m3: 0.0, m4: 1.0, m5: 0.0, m6: 0.0 - s, m7: 0.0, m8: c, tx, ty, tz }
   return $Xf { m0: c, m1: 0.0 - s, m2: 0.0, m3: s, m4: c, m5: 0.0, m6: 0.0, m7: 0.0, m8: 1.0, tx, ty, tz }
 
-func build_scene (max_depth: U32) -> (init_seed: U64): #[SNode] =>
-  let pool: #[SNode] = Array.with_capacity 65536
-  let cap: U32 = 24
-  let st_depth = @array.fill cap 0
-  let st_seed = @array.fill cap 0u64
-  let st_idx = @array.fill cap 0
-  let st_n = @array.fill cap 0
-  let st_i = @array.fill cap 0
-  let st_stage = @array.fill cap 0
-  let st_k0 = @array.fill cap 0
-  let st_k1 = @array.fill cap 0
-  let st_k2 = @array.fill cap 0
-  let st_k3 = @array.fill cap 0
-
-  st_depth[0] := max_depth
-  st_seed[0] := init_seed
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let ident = ident_xf ()
-
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_depth[top]
-    if st_stage[top] == 0:
-      let r = rng.xs_next st_seed[top]
-      let idx = pool.length
-      let tx = U32.to_f32 (((r >> 16u64) % 9u64).to_u32)
-      let ty = U32.to_f32 (((r >> 24u64) % 9u64).to_u32)
-      let tz = U32.to_f32 (((r >> 32u64) % 9u64).to_u32)
-      let loc = make_rotation r tx ty tz
-      pool := self.push ($SNode { id: idx, local: loc, world: ident, klen: 0, k0: 0, k1: 0, k2: 0, k3: 0 })
-      if d == 0:
-        sp := self - 1
-      else:
-        st_seed[top] := r
-        st_idx[top] := idx
-        st_n[top] := 1 + ((r >> 40u64) & 3u64).to_u32
-        st_i[top] := 0
-        st_stage[top] := 1
-    else:
-      let ci = st_i[top]
-      let cn = st_n[top]
-      if ci < cn:
-        let cidx = pool.length
-        case ci of
-          0 =>
-            st_k0[top] := cidx
-          1 =>
-            st_k1[top] := cidx
-          2 =>
-            st_k2[top] := cidx
-          _ =>
-            st_k3[top] := cidx
-        st_i[top] := ci + 1
-        let r = st_seed[top]
-        let child_seed = rng.xs_next (r + ci.to_u64)
-        st_depth[sp] := d - 1
-        st_seed[sp] := child_seed
-        st_stage[sp] := 0
-        sp := self + 1
-      else:
-        let idx = st_idx[top]
-        pool[idx].klen := cn
-        pool[idx].k0 := st_k0[top]
-        pool[idx].k1 := st_k1[top]
-        pool[idx].k2 := st_k2[top]
-        pool[idx].k3 := st_k3[top]
-        sp := self - 1
+func build_rec (pool: own #[SNode]) -> (d: U32) -> (seed: U64) -> (ident: Xf): #[SNode] =>
+  let r = rng.xs_next seed
+  let idx = pool.length
+  let tx = U32.to_f32 (((r >> 16u64) % 9u64).to_u32)
+  let ty = U32.to_f32 (((r >> 24u64) % 9u64).to_u32)
+  let tz = U32.to_f32 (((r >> 32u64) % 9u64).to_u32)
+  let loc = make_rotation r tx ty tz
+  pool := self.push ($SNode { id: idx, local: loc, world: ident, klen: 0, k0: 0, k1: 0, k2: 0, k3: 0 })
+  if d == 0:
+    return pool
+  let cn = 1 + ((r >> 40u64) & 3u64).to_u32
+  let k0: U32 = 0
+  let k1: U32 = 0
+  let k2: U32 = 0
+  let k3: U32 = 0
+  for ci in 0 .. cn:
+    let cidx = pool.length
+    case ci of
+      0 =>
+        k0 := cidx
+      1 =>
+        k1 := cidx
+      2 =>
+        k2 := cidx
+      _ =>
+        k3 := cidx
+    pool := build_rec self (d - 1) (rng.xs_next (r + ci.to_u64)) ident
+  pool[idx].klen := cn
+  pool[idx].k0 := k0
+  pool[idx].k1 := k1
+  pool[idx].k2 := k2
+  pool[idx].k3 := k3
   return pool
 
 func compose (p: Xf) -> (l: Xf): Xf => $Xf {
@@ -109,43 +70,24 @@ func compose (p: Xf) -> (l: Xf): Xf => $Xf {
   tz: p.m6 * l.tx + p.m7 * l.ty + p.m8 * l.tz + p.tz,
 }
 
-func update_all (pool: own #[SNode]) -> (ident: Xf): #[SNode] =>
-  let st_idx = @array.fill 80 0
-  let st_parent = @array.fill 80 ident
-  st_idx[0] := 0
-  st_parent[0] := ident
-  let sp: U32 = 1
-  for ever:
-    if sp == 0:
-      break
-    sp := self - 1
-    let idx = st_idx[sp]
-    let parent = st_parent[sp]
-    let w = compose parent pool[idx].local
-    pool[idx].world := w
-    let kl = pool[idx].klen
-    if kl > 3:
-      st_idx[sp] := pool[idx].k3
-      st_parent[sp] := w
-      sp := self + 1
-    if kl > 2:
-      st_idx[sp] := pool[idx].k2
-      st_parent[sp] := w
-      sp := self + 1
-    if kl > 1:
-      st_idx[sp] := pool[idx].k1
-      st_parent[sp] := w
-      sp := self + 1
-    if kl > 0:
-      st_idx[sp] := pool[idx].k0
-      st_parent[sp] := w
-      sp := self + 1
+func update_rec (pool: own #[SNode]) -> (idx: U32) -> (parent: Xf): #[SNode] =>
+  let w = compose parent pool[idx].local
+  pool[idx].world := w
+  let kl = pool[idx].klen
+  if kl > 0:
+    pool := update_rec self pool[idx].k0 w
+  if kl > 1:
+    pool := update_rec self pool[idx].k1 w
+  if kl > 2:
+    pool := update_rec self pool[idx].k2 w
+  if kl > 3:
+    pool := update_rec self pool[idx].k3 w
   return pool
 
 io bench (): #[U32] =>
-  let pool = build_scene BENCH_N 12345u64
-  let total: I64 = 0i64
   let ident = ident_xf ()
+  let pool = build_rec (Array.with_capacity 65536) BENCH_N 12345u64 ident
+  let total: I64 = 0i64
   for f in 0 .. FRAMES:
     let step = U32.to_f32 (f % 5)
     let fmod = f % 7
@@ -153,7 +95,7 @@ io bench (): #[U32] =>
       if (pool[i].id % 7) == fmod:
         pool[i].local.tx := step
         pool[i].local.tz := 8.0 - step
-    pool := update_all self ident
+    pool := update_rec self 0 ident
     for i in 0 .. pool.length:
       let w = pool[i].world
       total := self + (w.tx + w.ty + w.tz).to_i64

@@ -466,6 +466,7 @@ def build_blot(
             "x64",
             "--target-cpu",
             "native",
+            "--guard-pages",
             "--blot-cdylib",
             str(wasm),
             "-o",

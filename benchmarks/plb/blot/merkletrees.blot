@@ -1,207 +1,89 @@
-// PLB merkletrees: per-node freelist allocation and recursive per-node free
-// (respecting PLB's no-arena rule), computing Merkle hashes and checks.
+// PLB merkletrees: per-node freelist allocation and direct recursive
+// make_tree / cal_hash / check_tree / free_tree over a single 20B node pool.
 import * as buf from "./buf"
 
 const MIN_DEPTH: U32 = 4
 const NONE: U32 = 0xFFFFFFFF
 
-// Parallel arrays + freelist stack (every node individually allocated & freed).
-// Flags byte packs: bit 0 = has_hash, bit 1 = has_value.
+// flags: bit 0 = has_hash, bit 1 = has_value.
+type MNode is data = $MNode { hash: U32, val: U32, l: U32, r: U32, flags: U32 }
 
-func alloc_node (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U8]) -> (freelist: own #[U32]) -> (flen: U32) -> (val: U32) -> (l: U32) -> (r: U32) -> (flags: U8): (U32, #[U32], #[U32], #[U32], #[U32], #[U8], #[U32], U32) =>
+func alloc_node (nodes: own #[MNode]) -> (freelist: own #[U32]) -> (flen: U32) -> (val: U32) -> (l: U32) -> (r: U32) -> (flags: U32): (U32, #[MNode], #[U32], U32) =>
+  let nd = $MNode { hash: 0, val, l, r, flags }
   if flen > 0:
     let nflen = flen - 1
     let idx = freelist[nflen]
-    nhash[idx] := 0
-    nval[idx] := val
-    nl[idx] := l
-    nr[idx] := r
-    nflags[idx] := flags
-    return (idx, nhash, nval, nl, nr, nflags, freelist, nflen)
-  let idx = nhash.length
-  nhash := self.push 0
-  nval := self.push val
-  nl := self.push l
-  nr := self.push r
-  nflags := self.push flags
-  return (idx, nhash, nval, nl, nr, nflags, freelist, flen)
+    nodes[idx] := nd
+    return (idx, nodes, freelist, nflen)
+  let idx = nodes.length
+  nodes := self.push nd
+  return (idx, nodes, freelist, flen)
 
-func make_tree (depth: U32) -> (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U8]) -> (freelist: own #[U32]) -> (flen: U32) -> (st_d: own #[U32]) -> (st_s: own #[U32]) -> (st_l: own #[U32]): (U32, #[U32], #[U32], #[U32], #[U32], #[U8], #[U32], U32, #[U32], #[U32], #[U32]) =>
-  st_d[0] := depth
-  st_s[0] := 0
-  let sp: U32 = 1
-  let last: U32 = NONE
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_d[top]
-    let stage = st_s[top]
-    if d == 0:
-      let (idx, h1, v1, l1, r1, f1, fl1, fn1) = alloc_node nhash nval nl nr nflags freelist flen 1 NONE NONE 2
-      nhash := h1
-      nval := v1
-      nl := l1
-      nr := r1
-      nflags := f1
-      freelist := fl1
-      flen := fn1
-      last := idx
-      sp := self - 1
-    else:
-      if stage == 0:
-        st_s[top] := 1
-        st_d[sp] := d - 1
-        st_s[sp] := 0
-        sp := self + 1
-      else:
-        if stage == 1:
-          st_l[top] := last
-          st_s[top] := 2
-          st_d[sp] := d - 1
-          st_s[sp] := 0
-          sp := self + 1
-        else:
-          let (idx, h1, v1, l1, r1, f1, fl1, fn1) = alloc_node nhash nval nl nr nflags freelist flen 0 st_l[top] last 0
-          nhash := h1
-          nval := v1
-          nl := l1
-          nr := r1
-          nflags := f1
-          freelist := fl1
-          flen := fn1
-          last := idx
-          sp := self - 1
-  return (last, nhash, nval, nl, nr, nflags, freelist, flen, st_d, st_s, st_l)
+func make_tree (depth: U32) -> (nodes: own #[MNode]) -> (freelist: own #[U32]) -> (flen: U32): (U32, #[MNode], #[U32], U32) =>
+  if depth == 0:
+    return alloc_node nodes freelist flen 1 NONE NONE 2
+  let (l, n1, fl1, fn1) = make_tree (depth - 1) nodes freelist flen
+  let (r, n2, fl2, fn2) = make_tree (depth - 1) n1 fl1 fn1
+  return alloc_node n2 fl2 fn2 0 l r 0
 
-func cal_hash (root: U32) -> (nhash: own #[U32]) -> (nval: #[U32]) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: own #[U8]) -> (st_i: own #[U32]) -> (st_s: own #[U32]): (#[U32], #[U8], #[U32], #[U32]) =>
-  st_i[0] := root
-  st_s[0] := 0
-  let sp: U32 = 1
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let idx = st_i[top]
-    let fl = nflags[idx]
-    if (fl & 1) != 0:
-      sp := self - 1
-    else:
-      if (fl & 2) != 0:
-        nhash[idx] := nval[idx]
-        nflags[idx] := fl | 1
-        sp := self - 1
-      else:
-        let stage = st_s[top]
-        let l = nl[idx]
-        let r = nr[idx]
-        if stage == 0:
-          if l == NONE or r == NONE:
-            sp := self - 1
-          else:
-            st_s[top] := 1
-            st_i[sp] := l
-            st_s[sp] := 0
-            sp := self + 1
-        else:
-          if stage == 1:
-            st_s[top] := 2
-            st_i[sp] := r
-            st_s[sp] := 0
-            sp := self + 1
-          else:
-            nhash[idx] := nhash[l] + nhash[r]
-            nflags[idx] := fl | 1
-            sp := self - 1
-  return (nhash, nflags, st_i, st_s)
+func cal_hash (idx: U32) -> (nodes: own #[MNode]): #[MNode] =>
+  let nd = nodes[idx]
+  if (nd.flags & 1) != 0:
+    return nodes
+  if (nd.flags & 2) != 0:
+    nodes[idx] := $MNode { hash: nd.val, val: nd.val, l: nd.l, r: nd.r, flags: nd.flags | 1 }
+    return nodes
+  if nd.l == NONE or nd.r == NONE:
+    return nodes
+  nodes := cal_hash nd.l self
+  nodes := cal_hash nd.r self
+  let h = nodes[nd.l].hash + nodes[nd.r].hash
+  nodes[idx] := $MNode { hash: h, val: nd.val, l: nd.l, r: nd.r, flags: nd.flags | 1 }
+  return nodes
 
-func check_tree (root: U32) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: #[U8]) -> (st: own #[U32]): (Bool, #[U32]) =>
-  st[0] := root
-  let sp: U32 = 1
-  let ok = true
-  for ever:
-    if sp == 0:
-      break
-    sp := self - 1
-    let idx = st[sp]
-    let fl = nflags[idx]
-    if (fl & 1) == 0:
-      ok := false
-      break
-    if (fl & 2) == 0:
-      let l = nl[idx]
-      let r = nr[idx]
-      if l == NONE or r == NONE:
-        ok := false
-        break
-      st[sp] := r
-      sp := self + 1
-      st[sp] := l
-      sp := self + 1
-  return (ok, st)
+func check_tree (idx: U32) -> (nodes: #[MNode]): Bool =>
+  let nd = nodes[idx]
+  if (nd.flags & 1) == 0:
+    return false
+  if (nd.flags & 2) != 0:
+    return true
+  if nd.l == NONE or nd.r == NONE:
+    return false
+  return check_tree nd.l nodes and check_tree nd.r nodes
 
-func free_tree (root: U32) -> (nl: #[U32]) -> (nr: #[U32]) -> (freelist: own #[U32]) -> (flen: U32) -> (st: own #[U32]): (#[U32], U32, #[U32]) =>
-  st[0] := root
-  let sp: U32 = 1
-  for ever:
-    if sp == 0:
-      break
-    sp := self - 1
-    let idx = st[sp]
-    let l = nl[idx]
-    let r = nr[idx]
-    if r != NONE:
-      st[sp] := r
-      sp := self + 1
-    if l != NONE:
-      st[sp] := l
-      sp := self + 1
-    if flen < freelist.length:
-      freelist[flen] := idx
-    else:
-      freelist := self.push idx
-    flen := self + 1
-  return (freelist, flen, st)
+func free_tree (idx: U32) -> (nodes: #[MNode]) -> (freelist: own #[U32]) -> (flen: U32): (#[U32], U32) =>
+  let nd = nodes[idx]
+  if nd.l != NONE:
+    let (fl1, fn1) = free_tree nd.l nodes freelist flen
+    freelist := fl1
+    flen := fn1
+  if nd.r != NONE:
+    let (fl2, fn2) = free_tree nd.r nodes freelist flen
+    freelist := fl2
+    flen := fn2
+  if flen < freelist.length:
+    freelist[flen] := idx
+  else:
+    freelist := self.push idx
+  return (freelist, flen + 1)
 
 io bench (inp: #[U32]): #[U32] =>
   let n = inp[0]
   let max_depth = if n < MIN_DEPTH + 2 then MIN_DEPTH + 2 else n
-  let nhash: #[U32] = #[]
-  let nval: #[U32] = #[]
-  let nl: #[U32] = #[]
-  let nr: #[U32] = #[]
-  let nflags: #[U8] = #[]
-  let freelist: #[U32] = #[]
+  let init_cap = (1 << (max_depth + 2))
+  let nodes: #[MNode] = Array.with_capacity init_cap
+  let freelist: #[U32] = Array.with_capacity init_cap
   let flen: U32 = 0
-  let st_d = @array.fill 24 0
-  let st_s = @array.fill 24 0
-  let st_l = @array.fill 24 0
   let (w, l, c) = buf.new_buf ()
 
   // Stretch tree
-  let (sroot, h0, v0, l0, r0, f0, fl0, fn0, sd0, ss0, sl0) = make_tree (max_depth + 1) nhash nval nl nr nflags freelist flen st_d st_s st_l
-  nhash := h0
-  nval := v0
-  nl := l0
-  nr := r0
-  nflags := f0
-  freelist := fl0
-  flen := fn0
-  st_d := sd0
-  st_s := ss0
-  st_l := sl0
-  let (hc0, fc0, sd1, ss1) = cal_hash sroot nhash nval nl nr nflags st_d st_s
-  nhash := hc0
-  nflags := fc0
-  st_d := sd1
-  st_s := ss1
-  let (sok, sd2) = check_tree sroot nl nr nflags st_d
-  st_d := sd2
-  let shash = nhash[sroot]
-  let (fl1, fn1, sd3) = free_tree sroot nl nr freelist flen st_d
+  let (sroot, n0, fl0, fn0) = make_tree (max_depth + 1) nodes freelist flen
+  nodes := cal_hash sroot n0
+  let sok = check_tree sroot nodes
+  let shash = nodes[sroot].hash
+  let (fl1, fn1) = free_tree sroot nodes fl0 fn0
   freelist := fl1
   flen := fn1
-  st_d := sd3
 
   let (w1, l1, c1) = buf.push_text w l c "stretch tree of depth "
   let (w2, l2, c2) = buf.push_u32 w1 l1 c1 (max_depth + 1)
@@ -213,17 +95,10 @@ io bench (inp: #[U32]): #[U32] =>
   c := c5
 
   // Long-lived tree
-  let (lroot, h1, v1, nl1, nr1, f1, fl2, fn2, sd4, ss2, sl1) = make_tree max_depth nhash nval nl nr nflags freelist flen st_d st_s st_l
-  nhash := h1
-  nval := v1
-  nl := nl1
-  nr := nr1
-  nflags := f1
+  let (lroot, n1, fl2, fn2) = make_tree max_depth nodes freelist flen
+  nodes := n1
   freelist := fl2
   flen := fn2
-  st_d := sd4
-  st_s := ss2
-  st_l := sl1
 
   let d: U32 = MIN_DEPTH
   for ever:
@@ -232,27 +107,12 @@ io bench (inp: #[U32]): #[U32] =>
     let iters: U32 = 1 << (max_depth - d + MIN_DEPTH)
     let sum: U32 = 0
     for _ in 0 .. iters:
-      let (t, ha, va, la, ra, fa, fla, fna, sda, ssa, sla) = make_tree d nhash nval nl nr nflags freelist flen st_d st_s st_l
-      nhash := ha
-      nval := va
-      nl := la
-      nr := ra
-      nflags := fa
-      freelist := fla
-      flen := fna
-      st_d := sda
-      st_s := ssa
-      st_l := sla
-      let (hb, fb, sdb, ssb) = cal_hash t nhash nval nl nr nflags st_d st_s
-      nhash := hb
-      nflags := fb
-      st_d := sdb
-      st_s := ssb
-      sum := self + nhash[t]
-      let (flc, fnc, sdc) = free_tree t nl nr freelist flen st_d
-      freelist := flc
-      flen := fnc
-      st_d := sdc
+      let (t, na, fla, fna) = make_tree d nodes freelist flen
+      nodes := cal_hash t na
+      sum := self + nodes[t].hash
+      let (flb, fnb) = free_tree t nodes fla fna
+      freelist := flb
+      flen := fnb
     let (wa, la, ca) = buf.push_u32 w l c iters
     let (wb, lb, cb) = buf.push_text wa la ca "\t trees of depth "
     let (wc, lc, cc) = buf.push_u32 wb lb cb d
@@ -264,15 +124,11 @@ io bench (inp: #[U32]): #[U32] =>
     c := cf
     d := self + 2
 
-  let (hl, fl_final, sdl, ssl) = cal_hash lroot nhash nval nl nr nflags st_d st_s
-  nhash := hl
-  nflags := fl_final
-  st_d := sdl
-  st_s := ssl
-  let (lok, _) = check_tree lroot nl nr nflags st_d
+  nodes := cal_hash lroot self
+  let lok = check_tree lroot nodes
   let (wa, la, ca) = buf.push_text w l c "long lived tree of depth "
   let (wb, lb, cb) = buf.push_u32 wa la ca max_depth
   let (wc, lc, cc) = buf.push_text wb lb cb "\t root hash: "
-  let (wd, ld, cd) = buf.push_u32 wc lc cc nhash[lroot]
+  let (wd, ld, cd) = buf.push_u32 wc lc cc nodes[lroot].hash
   let (we, le, ce) = buf.push_text wd ld cd (if lok then " check: true\n" else " check: false\n")
   return buf.finish_buf we le ce

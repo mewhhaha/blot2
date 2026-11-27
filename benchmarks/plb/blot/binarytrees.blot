@@ -1,4 +1,5 @@
-// PLB binarytrees: fresh local arena per tree (reusing only the 24-word stack).
+// PLB binarytrees: direct recursion over a fresh pre-sized stack-backed arena
+// per tree (reclaimed in one store on function exit).
 import * as buf from "./buf"
 
 const MIN_DEPTH: U32 = 4
@@ -6,77 +7,34 @@ const NONE: U32 = 0xFFFFFFFF
 
 type Node is data = $Node { l: U32, r: U32 }
 
-func make_tree (depth: U32) -> (st_d: own #[U32]) -> (st_stage: own #[U32]) -> (st_left: own #[U32]): (#[Node], #[U32], #[U32], #[U32]) =>
-  let pool: #[Node] = #[]
-  st_d[0] := depth
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let last_idx: U32 = 0
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_d[top]
-    let stage = st_stage[top]
-    if d == 0:
-      pool := self.push ($Node { l: NONE, r: NONE })
-      last_idx := pool.length - 1
-      sp := self - 1
-    else:
-      if stage == 0:
-        st_stage[top] := 1
-        st_d[sp] := d - 1
-        st_stage[sp] := 0
-        sp := self + 1
-      else:
-        if stage == 1:
-          st_left[top] := last_idx
-          st_stage[top] := 2
-          st_d[sp] := d - 1
-          st_stage[sp] := 0
-          sp := self + 1
-        else:
-          pool := self.push ($Node { l: st_left[top], r: last_idx })
-          last_idx := pool.length - 1
-          sp := self - 1
-  return (pool, st_d, st_stage, st_left)
+func build_tree (pool: own #[Node]) -> (d: U32): (#[Node], U32) =>
+  if d == 0:
+    let idx = pool.length
+    pool := self.push ($Node { l: NONE, r: NONE })
+    return (pool, idx)
+  let (p1, l) = build_tree pool (d - 1)
+  let (p2, r) = build_tree p1 (d - 1)
+  let idx = p2.length
+  let p3 = p2.push ($Node { l, r })
+  return (p3, idx)
 
-func check_tree (pool: #[Node]) -> (root: U32) -> (chk_st: own #[U32]): (U32, #[U32]) =>
-  chk_st[0] := root
-  let sp: U32 = 1
-  let count: U32 = 0
-  for ever:
-    if sp == 0:
-      break
-    sp := self - 1
-    let nd = pool[chk_st[sp]]
-    count := self + 1
-    if nd.l != NONE and nd.r != NONE:
-      chk_st[sp] := nd.r
-      sp := self + 1
-      chk_st[sp] := nd.l
-      sp := self + 1
-  return (count, chk_st)
+func check_tree (pool: #[Node]) -> (idx: U32): U32 =>
+  let nd = pool[idx]
+  if nd.l == NONE:
+    return 1
+  return 1 + check_tree pool nd.l + check_tree pool nd.r
 
-func tree_check (depth: U32) -> (sd: own #[U32]) -> (ss: own #[U32]) -> (sl: own #[U32]) -> (cs: own #[U32]): (U32, #[U32], #[U32], #[U32], #[U32]) =>
-  let (pool, sd1, ss1, sl1) = make_tree depth sd ss sl
-  let (cnt, cs1) = check_tree pool (pool.length - 1) cs
-  return (cnt, sd1, ss1, sl1, cs1)
+func tree_check (depth: U32): U32 =>
+  let pool: #[Node] = Array.with_capacity ((1 << (depth + 1)) - 1)
+  let (p, root) = build_tree pool depth
+  return check_tree p root
 
 io bench (inp: #[U32]): #[U32] =>
   let n = inp[0]
   let max_depth = if n < MIN_DEPTH + 2 then MIN_DEPTH + 2 else n
-  let sd = @array.fill 24 0
-  let ss = @array.fill 24 0
-  let sl = @array.fill 24 0
-  let cs = @array.fill 24 0
   let (w, l, c) = buf.new_buf ()
 
-  let (stretch, sd0, ss0, sl0, cs0) = tree_check (max_depth + 1) sd ss sl cs
-  sd := sd0
-  ss := ss0
-  sl := sl0
-  cs := cs0
+  let stretch = tree_check (max_depth + 1)
   let (w1, l1, c1) = buf.push_text w l c "stretch tree of depth "
   let (w2, l2, c2) = buf.push_u32 w1 l1 c1 (max_depth + 1)
   let (w3, l3, c3) = buf.push_text w2 l2 c2 "\t check: "
@@ -86,11 +44,8 @@ io bench (inp: #[U32]): #[U32] =>
   l := l5
   c := c5
 
-  let (long_pool, sd1, ss1, sl1) = make_tree max_depth sd ss sl
-  sd := sd1
-  ss := ss1
-  sl := sl1
-  let lroot = long_pool.length - 1
+  let long_cap = (1 << (max_depth + 1)) - 1
+  let (long_pool, lroot) = build_tree (Array.with_capacity long_cap) max_depth
 
   let d: U32 = MIN_DEPTH
   for ever:
@@ -99,12 +54,7 @@ io bench (inp: #[U32]): #[U32] =>
     let iters: U32 = 1 << (max_depth - d + MIN_DEPTH)
     let chk: U32 = 0
     for _ in 0 .. iters:
-      let (cnt, sd2, ss2, sl2, cs2) = tree_check d sd ss sl cs
-      sd := sd2
-      ss := ss2
-      sl := sl2
-      cs := cs2
-      chk := self + cnt
+      chk := self + tree_check d
     let (wa, la, ca) = buf.push_u32 w l c iters
     let (wb, lb, cb) = buf.push_text wa la ca "\t trees of depth "
     let (wc, lc, cc) = buf.push_u32 wb lb cb d
@@ -116,7 +66,7 @@ io bench (inp: #[U32]): #[U32] =>
     c := cf
     d := self + 2
 
-  let (lchk, _) = check_tree long_pool lroot cs
+  let lchk = check_tree long_pool lroot
   let (wa, la, ca) = buf.push_text w l c "long lived tree of depth "
   let (wb, lb, cb) = buf.push_u32 wa la ca max_depth
   let (wc, lc, cc) = buf.push_text wb lb cb "\t check: "

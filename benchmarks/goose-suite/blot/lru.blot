@@ -1,11 +1,12 @@
 // LRU cache: open-addressed hash map with backward-shift deletion + doubly-linked
-// recency list in parallel U32 node arrays with an explicit freelist.
+// recency list in a single 16-byte/node arena with an explicit freelist.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 8000000 // BENCH_N
 const NONE: U32 = 0xFFFFFFFF
 
 type Slot is data = $Slot { key: U32, node: U32 }
+type Node is data = $Node { key: U32, val: U32, prev: U32, next: U32 }
 
 func next_pow2 (v: U32): U32 =>
   let p: U32 = 16
@@ -49,14 +50,11 @@ io bench (): #[U32] =>
   let mask = nslots - 1
   let slots = @array.fill nslots ($Slot { key: 0, node: NONE })
 
-  // Sentinel head (0) and tail (1), parallel arrays (16 bytes/node total).
-  let nkey = @array.fill (cap + 2) NONE
-  let nval = @array.fill (cap + 2) 0
-  let nprev = @array.fill (cap + 2) NONE
-  let nnext = @array.fill (cap + 2) NONE
+  // Sentinel head (0) and tail (1) in a single 16-byte/node arena.
+  let nodes = @array.fill (cap + 2) ($Node { key: NONE, val: 0, prev: NONE, next: NONE })
   let pool_used: U32 = 2
-  nnext[0] := 1
-  nprev[1] := 0
+  nodes[0].next := 1
+  nodes[1].prev := 0
 
   let free_stack = @array.fill cap 0
   let free_len: U32 = 0
@@ -78,10 +76,10 @@ io bench (): #[U32] =>
     let hi = (r >> 32).to_u32
     if ((hi >> 8) & 15) == 0:
       if f != NONE:
-        let p = nprev[f]
-        let q = nnext[f]
-        nnext[p] := q
-        nprev[q] := p
+        let p = nodes[f].prev
+        let q = nodes[f].next
+        nodes[p].next := q
+        nodes[q].prev := p
         slots := map_remove self mask at
         free_stack[free_len] := f
         free_len := self + 1
@@ -89,28 +87,25 @@ io bench (): #[U32] =>
         removes := self + 1
     else:
       if f != NONE:
-        nval[f] := self + 1
-        let p = nprev[f]
-        let q = nnext[f]
-        nnext[p] := q
-        nprev[q] := p
-        let fq = nnext[0]
-        nprev[f] := 0
-        nnext[f] := fq
-        nprev[fq] := f
-        nnext[0] := f
+        let nd = nodes[f]
+        let p = nd.prev
+        let q = nd.next
+        nodes[p].next := q
+        nodes[q].prev := p
+        let fq = nodes[0].next
+        nodes[f] := $Node { key: nd.key, val: nd.val + 1, prev: 0, next: fq }
+        nodes[fq].prev := f
+        nodes[0].next := f
         hits := self + 1
       else:
         misses := self + 1
         let ins = at
         if count == cap:
-          let lru = nprev[1]
-          let lru_key = nkey[lru]
-          let lp = nprev[lru]
-          let lq = nnext[lru]
-          nnext[lp] := lq
-          nprev[lq] := lp
-          let lat = find_slot slots mask lru_key
+          let lru = nodes[1].prev
+          let lnd = nodes[lru]
+          nodes[lnd.prev].next := lnd.next
+          nodes[lnd.next].prev := lnd.prev
+          let lat = find_slot slots mask lnd.key
           slots := map_remove self mask lat
           free_stack[free_len] := lru
           free_len := self + 1
@@ -123,25 +118,23 @@ io bench (): #[U32] =>
         else:
           ni := pool_used
           pool_used := self + 1
-        nkey[ni] := key
-        nval[ni] := key % 1000
+        let fq = nodes[0].next
+        nodes[ni] := $Node { key, val: key % 1000, prev: 0, next: fq }
         slots[ins] := $Slot { key, node: ni }
-        let fq = nnext[0]
-        nprev[ni] := 0
-        nnext[ni] := fq
-        nprev[fq] := ni
-        nnext[0] := ni
+        nodes[fq].prev := ni
+        nodes[0].next := ni
         count := self + 1
 
   let walk: U64 = 0
   let vals: I64 = 0
-  let cur = nnext[0]
+  let cur = nodes[0].next
   for ever:
     if cur == NONE or cur == 1:
       break
-    walk := self * 31 + nkey[cur].to_u64
-    vals := self + nval[cur].to_i64
-    cur := nnext[cur]
+    let nd = nodes[cur]
+    walk := self * 31 + nd.key.to_u64
+    vals := self + nd.val.to_i64
+    cur := nd.next
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self hits

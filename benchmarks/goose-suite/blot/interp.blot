@@ -1,4 +1,4 @@
-// Expression-tree evaluation over a sum-type AST arena.
+// Expression-tree evaluation over a sum-type AST arena with direct recursion.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 20 // BENCH_N
@@ -7,139 +7,35 @@ const MOD: U32 = 1000003
 
 type Expr is data = $Num { v: U32 } | $Add { l: U32, r: U32 } | $Mul { l: U32, r: U32 } | $Neg { inner: U32 }
 
-func build_expr (max_depth: U32) -> (init_seed: U64): #[Expr] =>
-  let pool: #[Expr] = Array.with_capacity (1 << max_depth)
-  let cap: U32 = 32
-  let st_depth = @array.fill cap 0
-  let st_seed = @array.fill cap 0u64
-  let st_k = @array.fill cap 0
-  let st_stage = @array.fill cap 0
-  let st_left = @array.fill cap 0
+func build_rec (pool: own #[Expr]) -> (d: U32) -> (seed: U64): (#[Expr], U32) =>
+  let s = rng.xs_next seed
+  if d == 0:
+    let idx = pool.length
+    pool := self.push ($Num { v: (s % 1000u64).to_u32 })
+    return (pool, idx)
+  let k = (s & 7u64).to_u32
+  let (p1, l) = build_rec pool (d - 1) s
+  if k < 1:
+    let idx = p1.length
+    let p2 = p1.push ($Neg { inner: l })
+    return (p2, idx)
+  let (p2, r) = build_rec p1 (d - 1) (rng.xs_next s)
+  let idx = p2.length
+  let p3 = if k < 5 then p2.push ($Add { l, r }) else p2.push ($Mul { l, r })
+  return (p3, idx)
 
-  st_depth[0] := max_depth
-  st_seed[0] := init_seed
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let last_idx: U32 = 0
-
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let d = st_depth[top]
-    let stage = st_stage[top]
-    case stage of
-      0 =>
-        let s = rng.xs_next st_seed[top]
-        if d == 0:
-          let v1000 = (s % 1000u64).to_u32
-          pool := self.push ($Num { v: v1000 })
-          last_idx := pool.length - 1
-          sp := self - 1
-        else:
-          let k = (s & 7u64).to_u32
-          st_seed[top] := s
-          st_k[top] := k
-          st_stage[top] := 1
-          st_depth[sp] := d - 1
-          st_seed[sp] := s
-          st_stage[sp] := 0
-          sp := self + 1
-      1 =>
-        let k = st_k[top]
-        if k < 1:
-          pool := self.push ($Neg { inner: last_idx })
-          last_idx := pool.length - 1
-          sp := self - 1
-        else:
-          st_left[top] := last_idx
-          st_stage[top] := 2
-          let s2 = rng.xs_next st_seed[top]
-          st_depth[sp] := d - 1
-          st_seed[sp] := s2
-          st_stage[sp] := 0
-          sp := self + 1
-      _ =>
-        let l = st_left[top]
-        let r = last_idx
-        if st_k[top] < 5:
-          pool := self.push ($Add { l, r })
-        else:
-          pool := self.push ($Mul { l, r })
-        last_idx := pool.length - 1
-        sp := self - 1
-  return pool
-
-func eval_pass (pool: #[Expr]) -> (root: U32) -> (p: U32): U32 =>
-  let cap: U32 = 32
-  let st_idx = @array.fill cap 0
-  let st_stage = @array.fill cap 0
-  let st_val = @array.fill cap 0
-  st_idx[0] := root
-  st_stage[0] := 0
-  let sp: U32 = 1
-  let res: U32 = 0
-
-  for ever:
-    if sp == 0:
-      break
-    let top = sp - 1
-    let idx = st_idx[top]
-    let stage = st_stage[top]
-    case pool[idx] of
-      $Num { v } => do:
-        res := (v + p) % MOD
-        sp := self - 1
-      $Neg { inner } => do:
-        if stage == 0:
-          st_stage[top] := 1
-          st_idx[sp] := inner
-          st_stage[sp] := 0
-          sp := self + 1
-        else:
-          res := (MOD - res) % MOD
-          sp := self - 1
-      $Add { l, r } => do:
-        if stage == 0:
-          st_stage[top] := 1
-          st_idx[sp] := l
-          st_stage[sp] := 0
-          sp := self + 1
-        else:
-          if stage == 1:
-            st_val[top] := res
-            st_stage[top] := 2
-            st_idx[sp] := r
-            st_stage[sp] := 0
-            sp := self + 1
-          else:
-            res := (st_val[top] + res) % MOD
-            sp := self - 1
-      $Mul { l, r } => do:
-        if stage == 0:
-          st_stage[top] := 1
-          st_idx[sp] := l
-          st_stage[sp] := 0
-          sp := self + 1
-        else:
-          if stage == 1:
-            st_val[top] := res
-            st_stage[top] := 2
-            st_idx[sp] := r
-            st_stage[sp] := 0
-            sp := self + 1
-          else:
-            let prod = st_val[top].to_u64 * res.to_u64
-            res := (prod % 1000003u64).to_u32
-            sp := self - 1
-  return res
+func eval_rec (pool: #[Expr]) -> (idx: U32) -> (p: U32): U32 =>
+  case pool[idx] of
+    $Num { v } => (v + p) % MOD
+    $Neg { inner } => (MOD - eval_rec pool inner p) % MOD
+    $Add { l, r } => (eval_rec pool l p + eval_rec pool r p) % MOD
+    $Mul { l, r } => ((eval_rec pool l p).to_u64 * (eval_rec pool r p).to_u64 % 1000003u64).to_u32
 
 io bench (): #[U32] =>
-  let pool = build_expr BENCH_N 12345u64
-  let root = pool.length - 1
+  let (pool, root) = build_rec (Array.with_capacity (1 << BENCH_N)) BENCH_N 12345u64
   let total: U32 = 0
   for p in 0 .. PASSES:
-    total := (self + eval_pass pool root p) % MOD
+    total := (self + eval_rec pool root p) % MOD
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self pool.length

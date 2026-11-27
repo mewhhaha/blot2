@@ -266,7 +266,7 @@ def build_all(wtime: Path, selected: set[str] | None) -> tuple[Path, Path, dict[
         run_cmd([str(BLOTC), "build", str(BLOT_DIR / prob["blot_file"]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT), *extra_flags])
         blotc_ms = (time.perf_counter() - t0) * 1000.0
         t1 = time.perf_counter()
-        run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--blot-cdylib", str(wasm), "-o", str(so)])
+        run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--guard-pages", "--blot-cdylib", str(wasm), "-o", str(so)])
         aot_ms = (time.perf_counter() - t1) * 1000.0
         bins[name]["blot"] = {
             "argv": [str(runner_bin), prob["blot_mode"], str(so)],
