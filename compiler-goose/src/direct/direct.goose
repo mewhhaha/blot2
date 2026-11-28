@@ -211,6 +211,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const squid_check_wire_sc
     let emitted = g.emitAll();
     r_emit.exitWithItems(0, g.module.functions.len);
     if emitted != squid_direct_types::Error.none { return emitted; }
+    if g.s.seq_rt_ready { squid_direct_function::patchSeqReleaseEntries(g, inits[..]); }
     var starts: u32[>..<] = [];
     var pools: u32[>..<] = [];
     for pool_id in g.s.pool_order { pools.push(pool_id); }

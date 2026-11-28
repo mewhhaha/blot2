@@ -7080,27 +7080,43 @@ recursive fn tyHasF32(m: const Module&, tid: TId, depth: i64 = 0) -> bool {
         _ => { return false; },
     }
 }
-recursive fn tyHasU32(m: const Module&, tid: TId, depth: i64) -> bool {
+recursive fn tyHasU32(g: const Generator&, m: const Module&, tid: TId, depth: i64, var_is_u32: bool = true) -> bool {
     if tid == 0 || depth > 16 { return true; }
     let tn = m.types.node(tid);
     match tn.tag {
         unsigned32 => { return true; },
-        floating32, boolean, unit, never => { return false; },
-        usage, forall => { return tyHasU32(m, tn.a, depth + 1); },
-        array => { return tyHasU32(m, tn.a, depth + 1); },
+        floating32, floating64, unsigned8, signed32, unsigned64, signed64, boolean, unit, never => { return false; },
+        variable, rigid, bound => { return var_is_u32; },
+        usage, forall => { return tyHasU32(g, m, tn.a, depth + 1, var_is_u32); },
+        array => { return tyHasU32(g, m, tn.a, depth + 1, var_is_u32); },
         product => {
             for child in m.types.list(squid_check_types::List { tn.a, tn.b }) {
-                if tyHasU32(m, child, depth + 1) { return true; }
+                if tyHasU32(g, m, child, depth + 1, var_is_u32) { return true; }
             }
             return false;
         },
         record => {
             for fi in 0..(tn.b as i64) {
-                if tyHasU32(m, m.types.recordField(tn, fi).ty, depth + 1) { return true; }
+                if tyHasU32(g, m, m.types.recordField(tn, fi).ty, depth + 1, var_is_u32) { return true; }
             }
             return false;
         },
-        nominal => { return true; },
+        nominal => {
+            let ident = squid_check_types::NominalIdentity { tn.a, tn.b };
+            if !g.hasUnit(ident.unit) { return true; }
+            let dm .= g.units[ident.unit - 1];
+            let nidx = findNominalDeclInUnit(dm, ident);
+            if nidx < 0 || dm.nominals[nidx].is_opaque { return true; }
+            for arg in m.types.nominalArguments(tn) {
+                if tyHasU32(g, m, arg, depth + 1, var_is_u32) { return true; }
+            }
+            let ctors = dm.nominalConstructors(nidx as u32);
+            for ci in ctors {
+                let ctor = dm.constructor(ci);
+                if ctor.payload != 0 && tyHasU32(g, dm, ctor.payload, depth + 1, false) { return true; }
+            }
+            return false;
+        },
         _ => { return true; },
     }
 }
@@ -7137,7 +7153,32 @@ fn deferIsOuterImmutableBinding(ctx: const DeferLoopContext&, b: u32) -> bool {
     let _, is_loc = deferFindLocalRhs(ctx, b);
     return !is_loc;
 }
-recursive fn scanDeferLoopDefs(m: const Module&, id: u32, ctx: DeferLoopContext&, budget: i64&) -> bool {
+recursive fn registerDeferPatternBindings(m: const Module&, pat_id: u32, rhs_id: u32, ctx: DeferLoopContext&) -> bool {
+    if pat_id == 0 { return true; }
+    let p = m.pattern(pat_id);
+    match p.tag {
+        wildcard => { return true; },
+        bind => {
+            if p.a == 0 { return true; }
+            if ctx.local_len >= 64 { return false; }
+            ctx.local_b[ctx.local_len] = p.a;
+            ctx.local_rhs[ctx.local_len] = rhs_id;
+            ctx.local_len += 1;
+            return true;
+        },
+        constructor, record_payload => {
+            return registerDeferPatternBindings(m, p.b, rhs_id, ctx);
+        },
+        product => {
+            for ch in m.patternChildren(pat_id) {
+                if !registerDeferPatternBindings(m, ch, rhs_id, ctx) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn scanDeferLoopDefs(g: const Generator&, m: const Module&, id: u32, ctx: DeferLoopContext&, budget: i64&) -> bool {
     if id == 0 { return true; }
     if budget <= 0 { return false; }
     budget -= 1;
@@ -7145,7 +7186,7 @@ recursive fn scanDeferLoopDefs(m: const Module&, id: u32, ctx: DeferLoopContext&
     match n.tag {
         constant, reference => { return true; },
         suite, block_, product, record, array_op, storage => {
-            for ch in m.children(id) { if !scanDeferLoopDefs(m, ch, ctx, budget) { return false; } }
+            for ch in m.children(id) { if !scanDeferLoopDefs(g, m, ch, ctx, budget) { return false; } }
             return true;
         },
         bind => {
@@ -7154,31 +7195,49 @@ recursive fn scanDeferLoopDefs(m: const Module&, id: u32, ctx: DeferLoopContext&
             ctx.local_b[ctx.local_len] = n.a;
             ctx.local_rhs[ctx.local_len] = n.b;
             ctx.local_len += 1;
-            return scanDeferLoopDefs(m, n.b, ctx, budget);
+            return scanDeferLoopDefs(g, m, n.b, ctx, budget);
         },
-        construct => { return scanDeferLoopDefs(m, n.b, ctx, budget); },
-        project, return_ => { return scanDeferLoopDefs(m, n.a, ctx, budget); },
+        pattern_bind => {
+            if n.c != 0 { return false; }
+            if !registerDeferPatternBindings(m, n.a, n.b, ctx) { return false; }
+            return scanDeferLoopDefs(g, m, n.b, ctx, budget);
+        },
+        construct => { return scanDeferLoopDefs(g, m, n.b, ctx, budget); },
+        project, return_ => { return scanDeferLoopDefs(g, m, n.a, ctx, budget); },
         scalar, associated, apply => {
-            return scanDeferLoopDefs(m, n.a, ctx, budget) && scanDeferLoopDefs(m, n.b, ctx, budget);
+            return scanDeferLoopDefs(g, m, n.a, ctx, budget) && scanDeferLoopDefs(g, m, n.b, ctx, budget);
         },
         spark => {
             let sinfo = m.sparkInfo(id);
-            return scanDeferLoopDefs(m, sinfo.source, ctx, budget) &&
-                scanDeferLoopDefs(m, sinfo.end, ctx, budget) &&
-                scanDeferLoopDefs(m, sinfo.body, ctx, budget);
+            return scanDeferLoopDefs(g, m, sinfo.source, ctx, budget) &&
+                scanDeferLoopDefs(g, m, sinfo.end, ctx, budget) &&
+                scanDeferLoopDefs(g, m, sinfo.body, ctx, budget);
         },
         update => {
             let uinfo = m.updateInfo(id);
-            if tyHasU32(m, m.typeOf(uinfo.value), 0) { ctx.mutates_u32 = true; }
-            if !scanDeferLoopDefs(m, uinfo.root, ctx, budget) || !scanDeferLoopDefs(m, uinfo.value, ctx, budget) { return false; }
+            if tyHasU32(g, m, m.typeOf(uinfo.value), 0) { ctx.mutates_u32 = true; }
+            if !scanDeferLoopDefs(g, m, uinfo.root, ctx, budget) || !scanDeferLoopDefs(g, m, uinfo.value, ctx, budget) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == squid_check_core::UpdateKind.index && !scanDeferLoopDefs(m, sel.index, ctx, budget) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !scanDeferLoopDefs(g, m, sel.index, ctx, budget) { return false; }
             }
             return true;
         },
         loop_ => {
             let linfo = m.loopInfo(id);
-            if linfo.kind != squid_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
+            if linfo.kind != squid_check_core::LoopKind.range { return false; }
+            if linfo.carries.len != 0 {
+                let icarries = m.loopCarries(id);
+                for ic, ci in icarries {
+                    if !isCheckMutableContainer(m, m.binding(ic.incoming).ty) { return false; }
+                    if !(deferIsOuterCarry(ctx, ic.incoming) || deferIsOuterImmutableBinding(ctx, ic.incoming)) { return false; }
+                    var cbud: i64 = 512;
+                    if !carryStaysInPlace(g, m, id, ci, ic.iteration, ic.backedge, cbud) { return false; }
+                    if ctx.outer_carries_len >= 16 { return false; }
+                    ctx.outer_carries[ctx.outer_carries_len] = ic.iteration;
+                    ctx.outer_carry_backs[ctx.outer_carries_len] = ic.backedge;
+                    ctx.outer_carries_len += 1;
+                }
+            }
             if linfo.pattern != 0 {
                 let pat = m.pattern(linfo.pattern);
                 if pat.tag == squid_check_core::PatternTag.bind && pat.a != 0 {
@@ -7189,19 +7248,19 @@ recursive fn scanDeferLoopDefs(m: const Module&, id: u32, ctx: DeferLoopContext&
                     return false;
                 }
             }
-            return scanDeferLoopDefs(m, linfo.first, ctx, budget) &&
-                scanDeferLoopDefs(m, linfo.end, ctx, budget) &&
-                scanDeferLoopDefs(m, linfo.body, ctx, budget);
+            return scanDeferLoopDefs(g, m, linfo.first, ctx, budget) &&
+                scanDeferLoopDefs(g, m, linfo.end, ctx, budget) &&
+                scanDeferLoopDefs(g, m, linfo.body, ctx, budget);
         },
         match_ => {
-            for inp in m.matchInputs(id) { if !scanDeferLoopDefs(m, inp, ctx, budget) { return false; } }
+            for inp in m.matchInputs(id) { if !scanDeferLoopDefs(g, m, inp, ctx, budget) { return false; } }
             for arm in m.matchArms(id) {
-                if !scanDeferLoopDefs(m, arm.body, ctx, budget) { return false; }
+                if !scanDeferLoopDefs(g, m, arm.body, ctx, budget) { return false; }
             }
             return true;
         },
         call => {
-            for arg in m.call(id).arguments { if !scanDeferLoopDefs(m, arg, ctx, budget) { return false; } }
+            for arg in m.call(id).arguments { if !scanDeferLoopDefs(g, m, arg, ctx, budget) { return false; } }
             return true;
         },
         _ => { return false; },
@@ -7367,6 +7426,10 @@ recursive fn bodyValidDeferF32Nan(
             let carry_spark_ok = top_level && required_ctor == 0xffffffff && deferIsOuterCarryBack(ctx, n.a);
             return bodyValidDeferF32Nan(g, m, ctx, n.b, required_ctor, carry_spark_ok, false, has_f32_write, budget, inline_depth);
         },
+        pattern_bind => {
+            if n.c != 0 { return false; }
+            return bodyValidDeferF32Nan(g, m, ctx, n.b, required_ctor, false, false, has_f32_write, budget, inline_depth);
+        },
         construct => {
             return bodyValidDeferF32Nan(g, m, ctx, n.b, required_ctor, false, false, has_f32_write, budget, inline_depth);
         },
@@ -7465,7 +7528,12 @@ recursive fn bodyValidDeferF32Nan(
         },
         loop_ => {
             let linfo = m.loopInfo(id);
-            if linfo.kind != squid_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
+            if linfo.kind != squid_check_core::LoopKind.range { return false; }
+            if linfo.carries.len != 0 {
+                for ic in m.loopCarries(id) {
+                    if !deferIsOuterCarry(ctx, ic.iteration) { return false; }
+                }
+            }
             if !isDeferInvariantIndex(m, ctx, linfo.first, 0) || !isDeferInvariantIndex(m, ctx, linfo.end, 0) { return false; }
             return bodyValidDeferF32Nan(g, m, ctx, linfo.first, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
                 bodyValidDeferF32Nan(g, m, ctx, linfo.end, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
@@ -7652,7 +7720,7 @@ fn canDeferLoopF32Nan(g: const Generator&, f: const Fn&, m: const Module&, loop_
         ctx.outer_carries_len += 1;
     }
     var scan_budget: i64 = 160;
-    if !scanDeferLoopDefs(m, info.body, ctx, scan_budget) { return false; }
+    if !scanDeferLoopDefs(g, m, info.body, ctx, scan_budget) { return false; }
     var has_f32_write = false;
     var budget: i64 = 160;
     if !bodyValidDeferF32Nan(g, m, ctx, info.body, 0xffffffff, false, true, has_f32_write, budget, 0) { return false; }
@@ -7747,6 +7815,10 @@ recursive fn collectIndexedByVar(m: const Module&, id: u32, idx_b: u32, out: u32
             for ch in m.children(id) { collectIndexedByVar(m, ch, idx_b, out, len, left); }
         },
         bind, construct => { collectIndexedByVar(m, n.b, idx_b, out, len, left); },
+        pattern_bind => {
+            collectIndexedByVar(m, n.b, idx_b, out, len, left);
+            collectIndexedByVar(m, n.c, idx_b, out, len, left);
+        },
         return_, project, result_associated => { collectIndexedByVar(m, n.a, idx_b, out, len, left); },
         scalar, associated, logical => {
             collectIndexedByVar(m, n.a, idx_b, out, len, left);
@@ -8943,7 +9015,32 @@ fn tryMatchIndirectIndexScan(
     target_lens: u32[4]&,
     target_len_count: i64&,
 ) -> bool, u32, u32, u32 {
-    let inner_id = unwrapSingleBody(m, outer_body);
+    var inner_id = unwrapSingleBody(m, outer_body);
+    if inner_id != 0 && m.node(inner_id).tag != squid_check_core::Tag.loop_ {
+        let on = m.node(inner_id);
+        if on.tag == squid_check_core::Tag.suite || on.tag == squid_check_core::Tag.block_ {
+            let och = m.children(inner_id);
+            if och.len >= 2 && m.node(och[0]).tag == squid_check_core::Tag.loop_ {
+                let cand = och[0];
+                let ccarries = m.loopCarries(cand);
+                var tail_ok = true;
+                for oi in 1..och.len {
+                    let tn = m.node(och[oi]);
+                    if tn.tag == squid_check_core::Tag.constant { continue; }
+                    if tn.tag != squid_check_core::Tag.bind || tn.c >= 2 { tail_ok = false; break; }
+                    let rb = localRef(m, tn.b);
+                    var is_out = false;
+                    for cc in ccarries { if cc.outgoing == rb { is_out = true; break; } }
+                    if !is_out { tail_ok = false; break; }
+                }
+                if tail_ok { inner_id = cand; } else { inner_id = 0; }
+            } else {
+                inner_id = 0;
+            }
+        } else {
+            inner_id = 0;
+        }
+    }
     if inner_id == 0 || m.node(inner_id).tag != squid_check_core::Tag.loop_ { return false, 0, 0, 0; }
     let inner = m.loopInfo(inner_id);
     if inner.kind != squid_check_core::LoopKind.range || inner.pattern == 0 || inner.body == 0 { return false, 0, 0, 0; }
@@ -10663,6 +10760,10 @@ recursive fn emitLoopCore(
     if has_source && tagOf(g, source.ty) == squid_direct_types::Tag.seq {
         return emitSeqLoopCore(g, f, id, info, iteration, outgoing, slots, index, end_loc, source);
     }
+    if has_source && has_index && tagOf(g, source.ty) == squid_direct_types::Tag.array && source_view_base == 0xffffffff && !g.runtime_().has_fork {
+        let fir_err = tryEmitForInArrayReduction(g, f, id, info, iteration, slots, index, end_loc, source);
+        if fir_err != squid_direct_types::Error.none { return fir_err; }
+    }
     let carries = m.loopCarries(id);
     var range = range_in;
     if has_index { range.end_local = end_loc; }
@@ -11336,6 +11437,10 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if esc_err != squid_direct_types::Error.none { return neverVal(), esc_err; }
         let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
         if aff_err != squid_direct_types::Error.none { return neverVal(), aff_err; }
+    }
+    if !body_no_resize && selective_resize && info.kind == squid_check_core::LoopKind.range && !g.runtime_().has_fork {
+        let fp_err = tryEmitFastPushRangeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+        if fp_err != squid_direct_types::Error.none { return neverVal(), fp_err; }
     }
     var copy_tail_done = false;
     if body_no_resize && info.kind == squid_check_core::LoopKind.forever {

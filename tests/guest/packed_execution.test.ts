@@ -989,3 +989,222 @@ io test_soa_cached_lifecycle (): #[U32] =>
     },
   );
 });
+
+Deno.test("Packed %[]: SIMD integer reductions, fast range-push, header-cached split-sum br_table, and 16-byte hot-tag skip", async () => {
+  await compileAndRun(
+    `
+type WideRec = {
+  id: U32,
+  hp: U32,
+  x: F64,
+  y: F64,
+  z: F64,
+  flags: U32,
+}
+
+type QuadEv is data =
+  | $Ping
+  | $Val U32
+  | $Pair { a: U32, b: U32 }
+  | $Huge { a: U64, b: U64, c: U64, d: U64, e: U64, f: U64, g: U64, h: U64 }
+
+io test_packed_simd_and_fast_push (n: U32): #[U32] =>
+  // 1. Fast range-push on Flat %[U32] (both auto-grow from %[] and pre-reserved + non-empty start)
+  let p_aff: %[U32] = %[]
+  for i in 0..n:
+    p_aff := self.push (i * 3 + 7)
+  let p_const: %[U32] = Packed.with_capacity n
+  for i in 0..n:
+    p_const := self.push 11
+  let p_nonempty: %[U32] = %[100, 200]
+  for i in 0..n:
+    p_nonempty := self.push (i + 1)
+
+  // Flat SIMD + and ^ reductions (U32 & U64)
+  let sum_aff: U32 = 0
+  for x in p_aff:
+    sum_aff := self + x
+  let xor_aff: U32 = 0
+  for x in p_aff:
+    xor_aff := self ^ x
+  let sum_const: U32 = 0
+  for x in p_const:
+    sum_const := self + x
+  let sum_ne: U32 = 0
+  for x in p_nonempty:
+    sum_ne := self + x
+
+  let p64: %[U64] = %[]
+  for i in 0..n:
+    p64 := self.push (i.to_u64 * 5u64 + 1u64)
+  let sum_u64: U64 = 0u64
+  for x in p64:
+    sum_u64 := self + x
+  let xor_u64: U64 = 0u64
+  for x in p64:
+    xor_u64 := self ^ x
+
+  // 2. Fast range-push on SoA %[WideRec] (auto-grow + non-empty start + affine/const/non-affine cols)
+  let soa: %[WideRec] = %[{ id: 50, hp: 70, x: 0.0f64, y: 0.0f64, z: 0.0f64, flags: 3 }]
+  for i in 0..n:
+    soa := self.push { id: i * 2 + 1, hp: 5, x: 1.0f64, y: 2.0f64, z: 3.0f64, flags: i % 7 }
+  // SoA SIMD reductions: single col, two cols, destructured
+  let soa_id_sum: U32 = 0
+  for r in soa:
+    soa_id_sum := self + r.id
+  let soa_hp_xor: U32 = 0
+  for { hp } in soa:
+    soa_hp_xor := self ^ hp
+  let soa_multi: U32 = 0
+  for { id, hp, flags } in soa:
+    soa_multi := self + id + hp + flags
+
+  return #[
+    p_aff.length,
+    sum_aff,
+    xor_aff,
+    sum_const,
+    sum_ne,
+    sum_u64.to_u32,
+    xor_u64.to_u32,
+    soa.length,
+    soa_id_sum,
+    soa_hp_xor,
+    soa_multi,
+  ]
+
+io test_split_sum_br_table_and_hot_skip (n: U32): #[U32] =>
+  // Dense 4-variant split-stream with mostly $Ping (hot tag 0) and periodic cold variants
+  let evs: %[QuadEv] = %[]
+  for i in 0..n:
+    if i % 37 == 0 and i > 0:
+      evs := self.push ($Huge { a: i.to_u64, b: 1u64, c: 2u64, d: 3u64, e: 4u64, f: 5u64, g: 6u64, h: 7u64 })
+    else:
+      if i % 23 == 0 and i > 0:
+        evs := self.push ($Pair { a: i, b: i + 1 })
+      else:
+        if i % 19 == 0 and i > 0:
+          evs := self.push ($Val i)
+        else:
+          evs := self.push $Ping
+
+  // 16-byte uniform-tag skip + flattened 4-arm br_table (all-hot when n <= 19, mixed when n > 19)
+  let ticks: U32 = 0
+  let total: U32 = 0
+  for ev in evs:
+    case ev of
+      $Ping =>
+        ticks := self + 1
+      $Val v =>
+        total := self + v
+      $Pair { a, b } =>
+        total := self + a + b
+      $Huge { a, h } =>
+        total := self + a.to_u32 + h.to_u32
+
+  // Diverging break/continue inside 4-variant match (guards branchMerge flattening soundness)
+  let partial: U32 = 0
+  let seen_ping: U32 = 0
+  for ev in evs:
+    case ev of
+      $Ping =>
+        seen_ping := self + 1
+        if seen_ping == 17:
+          continue
+        partial := self + 1
+      $Val v =>
+        partial := self + v
+      $Pair { a, b } =>
+        partial := self + a + b
+      $Huge _ =>
+        break
+
+  // Header-cached growth + pop + reserve + extend + copy + fork rollback on 4-variant split-sum
+  let evs_len = evs.length
+  let snap = evs.copy
+  let evs_ext = evs.extend snap
+  let (evs_pop, _) = if evs_ext.length > 0 then evs_ext.pop else (evs_ext, $Ping)
+  let evs_res = evs_pop.reserve 64
+  let fork_len = fork evs_res:
+    for j in 0..40:
+      evs_res := self.push ($Val j)
+    return evs_res.length
+
+  return #[
+    evs_len,
+    ticks,
+    total,
+    partial,
+    snap.length,
+    evs_res.length,
+    fork_len,
+  ]
+`,
+    (guest) => {
+      for (const n of [0, 1, 7, 15, 16, 17, 31, 32, 33, 65]) {
+        let sumAff = 0, xorAff = 0, sumNe = 300;
+        let sum64 = 0n, xor64 = 0n;
+        let soaId = 50, soaHpXor = 70, soaMulti = 50 + 70 + 3;
+        for (let i = 0; i < n; i++) {
+          const v = (i * 3 + 7) >>> 0;
+          sumAff = (sumAff + v) >>> 0;
+          xorAff = (xorAff ^ v) >>> 0;
+          sumNe = (sumNe + i + 1) >>> 0;
+          const v64 = BigInt(i) * 5n + 1n;
+          sum64 = (sum64 + v64) & 0xffffffffffffffffn;
+          xor64 ^= v64;
+          const id = (i * 2 + 1) >>> 0;
+          soaId = (soaId + id) >>> 0;
+          soaHpXor = (soaHpXor ^ 5) >>> 0;
+          soaMulti = (soaMulti + id + 5 + (i % 7)) >>> 0;
+        }
+        assert.deepEqual(
+          Array.from(guest.call("test_packed_simd_and_fast_push", n) as Uint32Array),
+          [
+            n,
+            sumAff,
+            xorAff,
+            (n * 11) >>> 0,
+            sumNe,
+            Number(sum64 & 0xffffffffn),
+            Number(xor64 & 0xffffffffn),
+            n + 1,
+            soaId,
+            soaHpXor,
+            soaMulti,
+          ],
+          `packed SIMD/fast-push mismatch at n=${n}`,
+        );
+      }
+
+      for (const n of [0, 1, 15, 16, 17, 31, 32, 33, 64, 100]) {
+        let ticks = 0, total = 0, partial = 0, seenPing = 0, broke = false;
+        for (let i = 0; i < n; i++) {
+          if (i % 37 === 0 && i > 0) {
+            total = (total + i + 7) >>> 0;
+            if (!broke) broke = true;
+          } else if (i % 23 === 0 && i > 0) {
+            total = (total + i + i + 1) >>> 0;
+            if (!broke) partial = (partial + i + i + 1) >>> 0;
+          } else if (i % 19 === 0 && i > 0) {
+            total = (total + i) >>> 0;
+            if (!broke) partial = (partial + i) >>> 0;
+          } else {
+            ticks++;
+            if (!broke) {
+              seenPing++;
+              if (seenPing !== 17) partial = (partial + 1) >>> 0;
+            }
+          }
+        }
+        const extLen = n * 2;
+        const popLen = extLen > 0 ? extLen - 1 : 0;
+        assert.deepEqual(
+          Array.from(guest.call("test_split_sum_br_table_and_hot_skip", n) as Uint32Array),
+          [n, ticks, total, partial, n, popLen, popLen + 40],
+          `packed split-sum mismatch at n=${n}`,
+        );
+      }
+    },
+  );
+});

@@ -1292,3 +1292,234 @@ io test_two_level_loops_and_radix (): #[U32] =>
     },
   );
 });
+
+Deno.test("Seq ~[]: SIMD reductions, fast range-push, 64-elem packed-sum rank/hot-skip, pop_front refill, CoW/fork focus promotion, and slab reclamation", async () => {
+  await compileAndRun(
+    `
+type WideEnt = {
+  id: U32,
+  hp: U32,
+  x: F64,
+  y: F64,
+  z: F64,
+  vx: F64,
+  vy: F64,
+  vz: F64,
+  flags: U32,
+}
+
+type SkewEv is data =
+  | $Tick
+  | $Big { a: U64, b: U64, c: U64, d: U64, e: U64, f: U64, g: U64, h: U64 }
+
+io test_seq_simd_and_fast_push (n: U32): #[U32] =>
+  // 1. Flat ~[U32] fast range-push from empty & non-empty + CoW isolation
+  let s1: ~[U32] = ~[]
+  for i in 0..n:
+    s1 := self.push (i * 3 + 5)
+  let snap1 = s1.copy
+  for i in 0..17:
+    s1 := self.push (i + 1000)
+
+  // Forward & reversed SIMD + and ^ reductions on snap1
+  let sum_fwd: U32 = 0
+  for x in snap1:
+    sum_fwd := self + x
+  let xor_fwd: U32 = 0
+  for x in snap1:
+    xor_fwd := self ^ x
+  let sum_rev: U32 = 0
+  for x in snap1.reverse:
+    sum_rev := self + x
+
+  // Fast push onto a REVERSED seq must preserve exact order (sound scalar fallback)
+  let rev_base: ~[U32] = ~[10, 20, 30]
+  rev_base := rev_base.reverse
+  for i in 0..10:
+    rev_base := self.push (i + 1)
+  let rev_first = rev_base[0]
+  let rev_mid = rev_base[3]
+  let rev_last = rev_base[12]
+
+  // 2. Wide SoA ~[WideEnt] fast range-push + SIMD reduction + CoW isolation
+  let ents: ~[WideEnt] = ~[{ id: 7, hp: 9, x: 0.0f64, y: 0.0f64, z: 0.0f64, vx: 0.0f64, vy: 0.0f64, vz: 0.0f64, flags: 1 }]
+  for i in 0..n:
+    ents := self.push { id: i * 2 + 1, hp: 4, x: 1.0f64, y: 2.0f64, z: 3.0f64, vx: 4.0f64, vy: 5.0f64, vz: 6.0f64, flags: i % 5 }
+  let ents_sum: U32 = 0
+  for { id, hp, flags } in ents:
+    ents_sum := self + id + hp + flags
+  let ents_rev_sum: U32 = 0
+  for { id, hp, flags } in ents.reverse:
+    ents_rev_sum := self + id + hp + flags
+
+  // 3. Zero-copy FocusGap -> LEAF_FLAT promotion + fork rollback
+  let promo: ~[U32] = ~[]
+  for i in 0..300:
+    promo := promo.push i
+  let promo_cp = promo.copy
+  let fork_len = fork promo:
+    for j in 0..300:
+      promo := promo.push (j + 500)
+    promo[10] := 99999
+    return promo.length
+  promo_cp[10] := 77777
+
+  return #[
+    snap1.length,
+    s1.length,
+    sum_fwd,
+    xor_fwd,
+    sum_rev,
+    rev_first,
+    rev_mid,
+    rev_last,
+    ents.length,
+    ents_sum,
+    ents_rev_sum,
+    promo.length,
+    promo[10],
+    promo_cp[10],
+    fork_len,
+  ]
+
+io test_seq_sum64_and_deque (n: U32): #[U32] =>
+  // 1. 64-elem LEAF_PACKED_SUM rank/get/set/split/concat + 16-byte hot-tag skip
+  let evs: ~[SkewEv] = ~[]
+  for i in 0..n:
+    if i % 29 == 0:
+      evs := evs.push ($Big { a: i.to_u64, b: 1u64, c: 2u64, d: 3u64, e: 4u64, f: 5u64, g: 6u64, h: 1u64 })
+    else:
+      evs := evs.push $Tick
+  let ticks_fwd: U32 = 0
+  let big_fwd: U32 = 0
+  for ev in evs:
+    case ev of
+      $Tick =>
+        ticks_fwd := self + 1
+      $Big { a, h } =>
+        big_fwd := self + a.to_u32 + h.to_u32
+  let ticks_rev: U32 = 0
+  let big_rev: U32 = 0
+  for ev in evs.reverse:
+    case ev of
+      $Tick =>
+        ticks_rev := self + 1
+      $Big { a, h } =>
+        big_rev := self + a.to_u32 + h.to_u32
+  // Verify O(1) 4x v128 + i64.popcnt rank across EVERY element!
+  let rank_mismatch: U32 = 0
+  for i in 0..n:
+    let got = case evs[i] of
+      $Tick => 0xffffffff
+      $Big { a } => a.to_u32
+    let exp = if i % 29 == 0 then i else 0xffffffff
+    if got != exp:
+      rank_mismatch := self + 1
+
+  // 2. Interleaved push_front / pop_front across multiple leaf refills
+  let dq: ~[U32] = ~[]
+  for i in 0..600:
+    dq := dq.push_front i
+  // dq = [599, 598, ..., 0]
+  let pop1_sum: U32 = 0
+  for _ in 0..150:
+    let (ndq, v) = dq.pop_front
+    dq := ndq
+    pop1_sum := self + v
+  // dq = [449..0] (len 450); push_front 50 more -> [1049..1000, 449..0]
+  for i in 0..50:
+    dq := dq.push_front (1000 + i)
+  let pop2_sum: U32 = 0
+  for _ in 0..500:
+    let (ndq, v) = dq.pop_front
+    dq := ndq
+    pop2_sum := self + v
+
+  return #[
+    ticks_fwd,
+    big_fwd,
+    ticks_rev,
+    big_rev,
+    rank_mismatch,
+    pop1_sum,
+    pop2_sum,
+    dq.length,
+  ]
+
+io build_large_seq_reclaim (n: U32): U32 =>
+  let s: ~[WideEnt] = ~[]
+  for i in 0..n:
+    s := self.push { id: i, hp: 1, x: 0.0f64, y: 0.0f64, z: 0.0f64, vx: 0.0f64, vy: 0.0f64, vz: 0.0f64, flags: 0 }
+  let total: U32 = 0
+  for { id } in s:
+    total := self + id
+  return total
+`,
+    (guest) => {
+      for (const n of [0, 1, 15, 16, 17, 255, 256, 257, 600]) {
+        let sumFwd = 0, xorFwd = 0;
+        let entsSum = 7 + 9 + 1;
+        for (let i = 0; i < n; i++) {
+          const v = (i * 3 + 5) >>> 0;
+          sumFwd = (sumFwd + v) >>> 0;
+          xorFwd = (xorFwd ^ v) >>> 0;
+          entsSum = (entsSum + (i * 2 + 1) + 4 + (i % 5)) >>> 0;
+        }
+        assert.deepEqual(
+          Array.from(guest.call("test_seq_simd_and_fast_push", n) as Uint32Array),
+          [
+            n,
+            n + 17,
+            sumFwd,
+            xorFwd,
+            sumFwd,
+            30,
+            1,
+            10,
+            n + 1,
+            entsSum,
+            entsSum,
+            300,
+            10,
+            77777,
+            600,
+          ],
+          `seq SIMD/fast-push mismatch at n=${n}`,
+        );
+      }
+
+      for (const n of [0, 15, 16, 17, 63, 64, 65, 200]) {
+        let ticks = 0, big = 0;
+        for (let i = 0; i < n; i++) {
+          if (i % 29 === 0) big = (big + i + 1) >>> 0;
+          else ticks++;
+        }
+        let pop1 = 0;
+        for (let v = 599; v >= 450; v--) pop1 += v;
+        let pop2 = 0;
+        for (let i = 0; i < 50; i++) pop2 += 1000 + i;
+        for (let v = 449; v >= 0; v--) pop2 += v;
+        assert.deepEqual(
+          Array.from(guest.call("test_seq_sum64_and_deque", n) as Uint32Array),
+          [ticks, big, ticks, big, 0, pop1, pop2, 0],
+          `seq sum64/deque mismatch at n=${n}`,
+        );
+      }
+
+      // Multi-invocation slab reclamation: 20 calls of 10,000 wide SoA elements (~720 KB each = 14.4 MB total)
+      // must reclaim slabs on export exit and stay flat after warmup!
+      const expectedTotal = ((9999 * 10000) / 2) >>> 0;
+      let memAfter2 = 0;
+      for (let rep = 0; rep < 20; rep++) {
+        assert.equal(guest.call("build_large_seq_reclaim", 10_000), expectedTotal);
+        if (rep === 1) memAfter2 = guest.memoryBytes();
+      }
+      const memAfter20 = guest.memoryBytes();
+      assert.equal(
+        memAfter20,
+        memAfter2,
+        `Expected ~[T] slabs to reclaim across invocations (after 2: ${memAfter2}, after 20: ${memAfter20})`,
+      );
+    },
+  );
+});

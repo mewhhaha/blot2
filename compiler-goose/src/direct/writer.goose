@@ -121,6 +121,7 @@ let OP_i32_shl: Op = 0x74;
 let OP_i32_shr_s: Op = 0x75;
 let OP_i32_shr_u: Op = 0x76;
 let OP_i64_clz: Op = 0x79;
+let OP_i64_popcnt: Op = 0x7b;
 let OP_i64_add: Op = 0x7c;
 let OP_i64_sub: Op = 0x7d;
 let OP_i64_mul: Op = 0x7e;

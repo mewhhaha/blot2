@@ -363,3 +363,248 @@ io call_unrelated (n: U32) : U32 => return unrelated n
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("Phase 2: k==3 cross-nominal AoS SIMD, Shape 2 indirect ids[k] AoS SIMD, #[T] SIMD reductions & fast range-push", async () => {
+  await compileAndRun(
+    `
+type Pos is data = $Pos { x: F32, y: F32, z: F32 }
+type Vel is data = $Vel { vx: F32, vy: F32, vz: F32 }
+type PairU32 = { a: U32, b: U32 }
+
+func make_pos (n: U32): #[Pos] =>
+  let ps: #[Pos] = #[]
+  for i in 0..n:
+    let f = U32.to_f32 (i + 1)
+    ps := self.push ($Pos { x: f * 0.5, y: f * 1.25, z: f * 2.0 })
+  return ps
+
+func make_vel (n: U32): #[Vel] =>
+  let vs: #[Vel] = #[]
+  for i in 0..n:
+    let f = U32.to_f32 ((i & 7) + 1)
+    vs := self.push ($Vel { vx: f * 0.25, vy: f * 0.5, vz: f * 0.75 })
+  return vs
+
+// 1. Contiguous k==3 cross-nominal AoS SIMD (Pos += Vel and Pos += Vel * dt)
+io aos3_add (n: U32): #[F32] =>
+  let ps = make_pos n
+  let vs = make_vel n
+  let len = min ps.length vs.length
+  for _ in 0..4:
+    for i in 0..len:
+      let $Pos { x, y, z } = ps[i]
+      let $Vel { vx, vy, vz } = vs[i]
+      ps[i] := $Pos { x: x + vx, y: y + vy, z: z + vz }
+  let out: #[F32] = #[]
+  for i in 0..len:
+    let $Pos { x, y, z } = ps[i]
+    out := self.push x
+    out := self.push y
+    out := self.push z
+  return out
+
+io aos3_fma (n: U32): #[F32] =>
+  let ps = make_pos n
+  let vs = make_vel n
+  let dt: F32 = 0.5
+  let len = min ps.length vs.length
+  for i in 0..len:
+    let $Pos { x, y, z } = ps[i]
+    let $Vel { vx, vy, vz } = vs[i]
+    ps[i] := $Pos { x: x + vx * dt, y: y + vy * dt, z: z + vz * dt }
+  let out: #[F32] = #[]
+  for i in 0..len:
+    let $Pos { x, y, z } = ps[i]
+    out := self.push x
+    out := self.push y
+    out := self.push z
+  return out
+
+// 2. Shape 2 indirect ids[k] AoS SIMD: contiguous, non-zero offset contiguous, sparse increasing, unsorted+duplicates
+io aos3_indirect (ids: #[U32]): #[F32] =>
+  let n: U32 = 24
+  let ps = make_pos n
+  let vs = make_vel n
+  let m = ids.length
+  for _ in 0..5:
+    for k in 0..m:
+      let id = ids[k]
+      let $Pos { x, y, z } = ps[id]
+      let $Vel { vx, vy, vz } = vs[id]
+      ps[id] := $Pos { x: x + vx, y: y + vy, z: z + vz }
+  let out: #[F32] = #[]
+  for i in 0..n:
+    let $Pos { x, y, z } = ps[i]
+    out := self.push x
+    out := self.push y
+    out := self.push z
+  return out
+
+// Self-aliasing indirect update (ps[id] += ps[id])
+io aos3_indirect_self_alias (ids: #[U32]): #[F32] =>
+  let ps = make_pos 12
+  let m = ids.length
+  for _ in 0..3:
+    for k in 0..m:
+      let id = ids[k]
+      let $Pos { x, y, z } = ps[id]
+      ps[id] := $Pos { x: x + x, y: y + y, z: z + z }
+  let out: #[F32] = #[]
+  for i in 0..12:
+    let $Pos { x, y, z } = ps[i]
+    out := self.push x
+    out := self.push y
+    out := self.push z
+  return out
+
+// Canonical NaN check through k==3 AoS SIMD + outer deferred-NaN loop
+io aos3_nan_canon (_: U32): #[F32] =>
+  let inf: F32 = 1.0 / 0.0
+  let ps: #[Pos] = #[]
+  let vs: #[Vel] = #[]
+  for _ in 0..8:
+    ps := self.push ($Pos { x: inf, y: 1.0, z: 0.0 })
+    vs := self.push ($Vel { vx: -inf, vy: 2.0, vz: 3.0 })
+  for _ in 0..3:
+    for i in 0..8:
+      let $Pos { x, y, z } = ps[i]
+      let $Vel { vx, vy, vz } = vs[i]
+      ps[i] := $Pos { x: x + vx, y: y + vy, z: z + vz }
+  let $Pos { x, y, z } = ps[7]
+  return #[x, y, z]
+
+// 3. #[T] SIMD reductions (+ and ^, U32/U64/record) & fast range-push (auto-grow, non-empty, const, AoS record)
+io arr_simd_red_and_fast_push (n: U32): #[U32] =>
+  let a: #[U32] = #[]
+  for i in 0..n:
+    a := self.push (i * 7 + 3)
+  let b: #[U32] = #[100, 200]
+  for i in 0..n:
+    b := self.push 9
+  let pairs: #[PairU32] = #[]
+  for i in 0..n:
+    pairs := self.push { a: i + 1, b: i * 2 + 3 }
+  let u64s: #[U64] = #[]
+  for i in 0..n:
+    u64s := self.push (i.to_u64 * 3u64 + 2u64)
+
+  let sum_a: U32 = 0
+  for x in a:
+    sum_a := self + x
+  let xor_a: U32 = 0
+  for x in a:
+    xor_a := self ^ x
+  let sum_b: U32 = 0
+  for x in b:
+    sum_b := self + x
+  let sum_p: U32 = 0
+  for { a: pa, b: pb } in pairs:
+    sum_p := self + pa + pb
+  let sum_64: U64 = 0u64
+  for x in u64s:
+    sum_64 := self + x
+  let xor_64: U64 = 0u64
+  for x in u64s:
+    xor_64 := self ^ x
+
+  return #[a.length, sum_a, xor_a, sum_b, sum_p, sum_64.to_u32, xor_64.to_u32]
+`,
+    (guest) => {
+      const f32 = Math.fround;
+      for (const n of [0, 1, 3, 4, 5, 7, 8, 9, 12, 16, 33]) {
+        const expAdd: number[] = [];
+        const expFma: number[] = [];
+        for (let i = 0; i < n; i++) {
+          const fp = f32(i + 1);
+          const fv = f32((i & 7) + 1);
+          let x = f32(fp * 0.5), y = f32(fp * 1.25), z = f32(fp * 2.0);
+          const vx = f32(fv * 0.25), vy = f32(fv * 0.5), vz = f32(fv * 0.75);
+          expFma.push(f32(x + f32(vx * 0.5)), f32(y + f32(vy * 0.5)), f32(z + f32(vz * 0.5)));
+          for (let t = 0; t < 4; t++) {
+            x = f32(x + vx); y = f32(y + vy); z = f32(z + vz);
+          }
+          expAdd.push(x, y, z);
+        }
+        deepStrictEqual(Array.from(guest.call("aos3_add", n) as Float32Array), expAdd, `aos3_add n=${n}`);
+        deepStrictEqual(Array.from(guest.call("aos3_fma", n) as Float32Array), expFma, `aos3_fma n=${n}`);
+      }
+
+      const idCases: number[][] = [
+        [],
+        [0, 1, 2],
+        Array.from({ length: 24 }, (_, i) => i), // contiguous from 0 (all_distinct == 2)
+        Array.from({ length: 12 }, (_, i) => i + 5), // contiguous from 5 (all_distinct == 2)
+        [1, 4, 7, 10, 13, 16, 19, 22], // strictly increasing sparse (all_distinct == 1)
+        [3, 1, 3, 0, 3, 2, 1, 3, 11], // unsorted + duplicate IDs (all_distinct == 0)
+      ];
+      for (const ids of idCases) {
+        const ps = Array.from({ length: 24 }, (_, i) => {
+          const fp = f32(i + 1);
+          return [f32(fp * 0.5), f32(fp * 1.25), f32(fp * 2.0)];
+        });
+        const vs = Array.from({ length: 24 }, (_, i) => {
+          const fv = f32((i & 7) + 1);
+          return [f32(fv * 0.25), f32(fv * 0.5), f32(fv * 0.75)];
+        });
+        for (let t = 0; t < 5; t++) {
+          for (const id of ids) {
+            ps[id][0] = f32(ps[id][0] + vs[id][0]);
+            ps[id][1] = f32(ps[id][1] + vs[id][1]);
+            ps[id][2] = f32(ps[id][2] + vs[id][2]);
+          }
+        }
+        deepStrictEqual(
+          Array.from(guest.call("aos3_indirect", Uint32Array.from(ids)) as Float32Array),
+          ps.flat(),
+          `aos3_indirect ids=${JSON.stringify(ids)}`,
+        );
+      }
+      // Out-of-bounds indirect ID must trap!
+      throws(() => guest.call("aos3_indirect", Uint32Array.of(0, 1, 24)));
+
+      // Self-aliasing indirect update (contiguous + duplicates)
+      for (const ids of [[0, 1, 2, 3, 4, 5, 6, 7], [2, 2, 5, 2]]) {
+        const ps = Array.from({ length: 12 }, (_, i) => {
+          const fp = f32(i + 1);
+          return [f32(fp * 0.5), f32(fp * 1.25), f32(fp * 2.0)];
+        });
+        for (let t = 0; t < 3; t++) {
+          for (const id of ids) {
+            ps[id][0] = f32(ps[id][0] + ps[id][0]);
+            ps[id][1] = f32(ps[id][1] + ps[id][1]);
+            ps[id][2] = f32(ps[id][2] + ps[id][2]);
+          }
+        }
+        deepStrictEqual(
+          Array.from(guest.call("aos3_indirect_self_alias", Uint32Array.from(ids)) as Float32Array),
+          ps.flat(),
+        );
+      }
+
+      // Canonical NaN through k==3 AoS SIMD + outer deferred-NaN loop
+      const nanRes = asWords(guest.call("aos3_nan_canon", 0));
+      deepStrictEqual(nanRes, [0x7fc00000, 0x40e00000, 0x41100000]);
+
+      // #[T] SIMD reductions & fast range-push
+      for (const n of [0, 1, 3, 15, 16, 17, 33, 65]) {
+        let sumA = 0, xorA = 0, sumB = 300, sumP = 0;
+        let sum64 = 0n, xor64 = 0n;
+        for (let i = 0; i < n; i++) {
+          const v = (i * 7 + 3) >>> 0;
+          sumA = (sumA + v) >>> 0;
+          xorA = (xorA ^ v) >>> 0;
+          sumB = (sumB + 9) >>> 0;
+          sumP = (sumP + (i + 1) + (i * 2 + 3)) >>> 0;
+          const v64 = BigInt(i) * 3n + 2n;
+          sum64 = (sum64 + v64) & 0xffffffffffffffffn;
+          xor64 ^= v64;
+        }
+        deepStrictEqual(
+          Array.from(guest.call("arr_simd_red_and_fast_push", n) as Uint32Array),
+          [n, sumA, xorA, sumB, sumP, Number(sum64 & 0xffffffffn), Number(xor64 & 0xffffffffn)],
+          `arr_simd_red_and_fast_push n=${n}`,
+        );
+      }
+    },
+  );
+});

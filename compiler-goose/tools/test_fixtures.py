@@ -356,6 +356,24 @@ all 109 fixtures keep 100% identical exit codes, diagnostics, and Wasm
 bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`, `wasm_diffs=0`); only prelude
 work counters updated (`+34` prelude body elaborations/lowerings).
 
+All-Collection SIMD, Fast Range-Push & Indirect AoS SIMD (28 November 2026)
+added shared 16-wide `i32` / 8-wide `i64` `v128` SIMD associative integer
+reductions (`+`/`^`) across `#[T]`, `%[T]` (Flat & SoA), and `~[T]` (Flat & SoA),
+fast counted range-push pre-reserve + SIMD affine/const fill across all three
+collection families (`tryEmitFastPushRangeLoop`), header-cached `PACKED_SPLIT_SUM`
+with dense `OP_br_table` push/match dispatch and 16-byte `v128` uniform-tag run
+skipping (`emitSplitSumHotRun16`), 64-element `LEAF_PACKED_SUM` with `v128` +
+`i64.popcnt` O(1) rank, zero-copy `FocusGap -> LEAF_FLAT` promotion, `pop_front`
+leaf batch refill, post-`emitAll` `seq_release_fn` export patching for cross-
+invocation slab reclamation, and generalized `k==3` (12B) cross-nominal +
+Shape 2 indirect `ids[k]` AoS `F32` SIMD (`tryEmitAosF32RecordLoop`, plus
+nominal-aware `tyHasU32` for outer deferred-NaN & 5B-2 indirect index scanning).
+Re-recorded `expected.json`: 0 exit-code diffs, 0 diagnostic diffs, 0 frontend
+or work-counter diffs; 106 of 109 fixtures remain bit-for-bit Wasm-identical
+while 3 `for v in arr: total := self + v` fixtures emit the new 16-wide `v128`
+reduction fast path (`direct/comprehensions.sq` 7781->8058 B,
+`direct/storage.sq` 7161->7438 B, `direct/view_calls.sq` 6104->6437 B).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

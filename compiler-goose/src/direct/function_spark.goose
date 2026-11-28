@@ -58,6 +58,7 @@ let SIMD_v128_bitselect: u32 = 82;
 let SIMD_v128_any_true: u32 = 83;
 let SIMD_v128_store32_lane: u32 = 90;
 let SIMD_v128_load32_zero: u32 = 92;
+let SIMD_i8x16_all_true: u32 = 99;
 let SIMD_i8x16_bitmask: u32 = 100;
 let SIMD_i8x16_narrow_i16x8_u: u32 = 102;
 let SIMD_f32x4_ceil: u32 = 103;
@@ -95,6 +96,7 @@ let SIMD_i32x4_mul: u32 = 181;
 let SIMD_i32x4_min_u: u32 = 183;
 let SIMD_i32x4_max_u: u32 = 185;
 let SIMD_i64x2_all_true: u32 = 195;
+let SIMD_i64x2_add: u32 = 206;
 let SIMD_f32x4_abs: u32 = 224;
 let SIMD_f32x4_neg: u32 = 225;
 let SIMD_f32x4_sqrt: u32 = 227;
@@ -4609,7 +4611,8 @@ fn tryEmitAffineInitLoop(
     return squid_direct_types::Error.none;
 }
 
-// Generalized AoS F32 record (`#[Vec2]` 8 B / `#[Vec4]` 16 B, structural or single-ctor nominal)
+// Generalized AoS F32 record (`#[Vec2]` 8 B / `#[Vec3]` 12 B / `#[Vec4]` 16 B, structural or single-ctor nominal,
+// same-type or cross-nominal same-layout sources, direct `0..n` or `5B-2` indirect `let id = ids[k]`)
 // auto-SIMD for counted range loops (`pos[i] := { x: p.x + v.x * dt, ... }`, add/sub/mul/scale/AXPY).
 fn unwrapAosF32RecordType(g: Generator&, f: Fn&, elem_ty: Ty, id: u32) -> Ty, i64, bool {
     var rec_ty = elem_ty;
@@ -4624,7 +4627,7 @@ fn unwrapAosF32RecordType(g: Generator&, f: Fn&, elem_ty: Ty, id: u32) -> Ty, i6
     }
     if tagOf(g, rec_ty) != squid_direct_types::Tag.record { return 0, 0, false; }
     let k = g.types.node(rec_ty).b as i64;
-    if k != 2 && k != 4 { return 0, 0, false; }
+    if k != 2 && k != 3 && k != 4 { return 0, 0, false; }
     let layout, lerr = g.types.layout(rec_ty);
     if lerr != squid_direct_types::Error.none || layout.len != k { return 0, 0, false; }
     for li in 0..k {
@@ -4634,31 +4637,33 @@ fn unwrapAosF32RecordType(g: Generator&, f: Fn&, elem_ty: Ty, id: u32) -> Ty, i6
     if serr != squid_direct_types::Error.none || step != (k as u32) * 4 { return 0, 0, false; }
     return rec_ty, k, is_nom;
 }
-fn aosArrayReadAtIter(m: const Module&, id: u32, iter_b: u32) -> u32 {
+fn aosArrayReadAtIter(m: const Module&, id: u32, idx_b: u32) -> u32 {
     if id == 0 { return 0; }
     let n = m.node(id);
     if n.tag == squid_check_core::Tag.array_op && m.arrayOperation(id) == squid_backend_collection_ops::Op.get {
         let ch = m.children(id);
-        if ch.len == 2 && localRef(m, ch[1]) == iter_b { return localRef(m, ch[0]); }
+        if ch.len == 2 && localRef(m, ch[1]) == idx_b { return localRef(m, ch[0]); }
     }
     if n.tag == squid_check_core::Tag.storage {
         let sop, err = squid_check_storage_ops::opFromCode(n.c);
         if err == squid_error::Error.none && sop == squid_check_storage_ops::Op.read {
             let ch = m.children(id);
-            if ch.len == 2 && localRef(m, ch[1]) == iter_b { return localRef(m, ch[0]); }
+            if ch.len == 2 && localRef(m, ch[1]) == idx_b { return localRef(m, ch[0]); }
         }
     }
     return 0;
 }
 fn aosFieldSlot(
     g: Generator&,
+    f: Fn&,
     m: const Module&,
     id: u32,
-    rec_ty: Ty,
+    loop_id: u32,
     k_lanes: i64,
-    iter_b: u32,
+    idx_b: u32,
     load_bs: const u32[4]&,
     load_arrs: const u32[4]&,
+    load_rec_tys: const Ty[4]&,
     load_len: i64,
     pat_bs: const u32[16]&,
     pat_arrs: const u32[16]&,
@@ -4677,19 +4682,32 @@ fn aosFieldSlot(
     if n.tag != squid_check_core::Tag.project { return 0, -1; }
     let fsp = m.fieldSpelling(m.projection(n.b).field);
     if !fsp.present { return 0, -1; }
-    let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
-    if slot < 0 || slot >= k_lanes { return 0, -1; }
-    let direct_arr = aosArrayReadAtIter(m, n.a, iter_b);
-    if direct_arr != 0 { return direct_arr, slot; }
+    let fname = g.types.fieldName(fsp.value);
+    let direct_arr = aosArrayReadAtIter(m, n.a, idx_b);
+    if direct_arr != 0 {
+        let av, aok = bindGet(g, f, direct_arr);
+        if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { return 0, -1; }
+        let se, seerr = elementOf(g, f, av.ty, loop_id);
+        if seerr != squid_direct_types::Error.none { g.dropFailure(); return 0, -1; }
+        let s_rec_ty, sk, _ = unwrapAosF32RecordType(g, f, se, loop_id);
+        if sk != k_lanes { return 0, -1; }
+        let slot = g.types.findField(s_rec_ty, fname);
+        if slot < 0 || slot >= k_lanes { return 0, -1; }
+        return direct_arr, slot;
+    }
     let recv_b = localRef(m, n.a);
     if recv_b != 0 {
         for li in 0..load_len {
-            if load_bs[li] == recv_b { return load_arrs[li], slot; }
+            if load_bs[li] == recv_b {
+                let slot = g.types.findField(load_rec_tys[li], fname);
+                if slot < 0 || slot >= k_lanes { return 0, -1; }
+                return load_arrs[li], slot;
+            }
         }
     }
     return 0, -1;
 }
-fn aosIsScalarF32(g: const Generator&, f: const Fn&, m: const Module&, id: u32, iter_b: u32) -> bool, bool, u32 {
+fn aosIsScalarF32(g: const Generator&, f: const Fn&, m: const Module&, id: u32, iter_b: u32, idx_b: u32) -> bool, bool, u32 {
     // Returns (ok, is_const, bits_or_binding)
     if id == 0 { return false, false, 0; }
     let n = m.node(id);
@@ -4701,7 +4719,7 @@ fn aosIsScalarF32(g: const Generator&, f: const Fn&, m: const Module&, id: u32, 
         return false, false, 0;
     }
     let b = localRef(m, id);
-    if b != 0 && b != iter_b {
+    if b != 0 && b != iter_b && b != idx_b {
         let _, is_cell = withCellType(g, f, b);
         if is_cell { return false, false, 0; }
         let v, ok = bindGet(g, f, b);
@@ -4713,15 +4731,17 @@ fn aosIsScalarF32(g: const Generator&, f: const Fn&, m: const Module&, id: u32, 
 }
 fn aosMatchMulByScalar(
     g: Generator&,
-    f: const Fn&,
+    f: Fn&,
     m: const Module&,
     id: u32,
-    rec_ty: Ty,
+    loop_id: u32,
     k_lanes: i64,
     want_lane: i64,
     iter_b: u32,
+    idx_b: u32,
     load_bs: const u32[4]&,
     load_arrs: const u32[4]&,
+    load_rec_tys: const Ty[4]&,
     load_len: i64,
     pat_bs: const u32[16]&,
     pat_arrs: const u32[16]&,
@@ -4733,25 +4753,27 @@ fn aosMatchMulByScalar(
     if (n.tag != squid_check_core::Tag.scalar && n.tag != squid_check_core::Tag.associated) || n.op != squid_check_core::Op.mul || n.b == 0 {
         return false, 0, false, 0;
     }
-    let la, lslot = aosFieldSlot(g, m, n.a, rec_ty, k_lanes, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
-    let rok, rconst, rval = aosIsScalarF32(g, f, m, n.b, iter_b);
+    let la, lslot = aosFieldSlot(g, f, m, n.a, loop_id, k_lanes, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+    let rok, rconst, rval = aosIsScalarF32(g, f, m, n.b, iter_b, idx_b);
     if la != 0 && lslot == want_lane && rok { return true, la, rconst, rval; }
-    let ra, rslot = aosFieldSlot(g, m, n.b, rec_ty, k_lanes, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
-    let lok, lconst, lval = aosIsScalarF32(g, f, m, n.a, iter_b);
+    let ra, rslot = aosFieldSlot(g, f, m, n.b, loop_id, k_lanes, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+    let lok, lconst, lval = aosIsScalarF32(g, f, m, n.a, iter_b, idx_b);
     if ra != 0 && rslot == want_lane && lok { return true, ra, lconst, lval; }
     return false, 0, false, 0;
 }
 fn aosMatchLaneExpr(
     g: Generator&,
-    f: const Fn&,
+    f: Fn&,
     m: const Module&,
     id: u32,
-    rec_ty: Ty,
+    loop_id: u32,
     k_lanes: i64,
     want_lane: i64,
     iter_b: u32,
+    idx_b: u32,
     load_bs: const u32[4]&,
     load_arrs: const u32[4]&,
+    load_rec_tys: const Ty[4]&,
     load_len: i64,
     pat_bs: const u32[16]&,
     pat_arrs: const u32[16]&,
@@ -4766,8 +4788,8 @@ fn aosMatchLaneExpr(
         return false, 0, 0, 0, false, 0;
     }
     if n.op == squid_check_core::Op.add || n.op == squid_check_core::Op.sub || n.op == squid_check_core::Op.mul {
-        let la, lslot = aosFieldSlot(g, m, n.a, rec_ty, k_lanes, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
-        let ra, rslot = aosFieldSlot(g, m, n.b, rec_ty, k_lanes, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+        let la, lslot = aosFieldSlot(g, f, m, n.a, loop_id, k_lanes, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+        let ra, rslot = aosFieldSlot(g, f, m, n.b, loop_id, k_lanes, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
         if la != 0 && lslot == want_lane && ra != 0 && rslot == want_lane {
             var mode: u8 = 0;
             if n.op == squid_check_core::Op.sub { mode = 1; }
@@ -4775,21 +4797,21 @@ fn aosMatchLaneExpr(
             return true, mode, la, ra, false, 0;
         }
         if n.op == squid_check_core::Op.mul {
-            let mok, ma, mc, mv = aosMatchMulByScalar(g, f, m, id, rec_ty, k_lanes, want_lane, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+            let mok, ma, mc, mv = aosMatchMulByScalar(g, f, m, id, loop_id, k_lanes, want_lane, iter_b, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
             if mok { return true, 3, ma, 0, mc, mv; }
         }
         if n.op == squid_check_core::Op.add {
             if la != 0 && lslot == want_lane {
-                let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.b, rec_ty, k_lanes, want_lane, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+                let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.b, loop_id, k_lanes, want_lane, iter_b, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
                 if mok { return true, 4, la, mb, mc, mv; }
             }
             if ra != 0 && rslot == want_lane {
-                let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.a, rec_ty, k_lanes, want_lane, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+                let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.a, loop_id, k_lanes, want_lane, iter_b, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
                 if mok { return true, 4, ra, mb, mc, mv; }
             }
         }
         if n.op == squid_check_core::Op.sub && la != 0 && lslot == want_lane {
-            let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.b, rec_ty, k_lanes, want_lane, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+            let mok, mb, mc, mv = aosMatchMulByScalar(g, f, m, n.b, loop_id, k_lanes, want_lane, iter_b, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
             if mok { return true, 5, la, mb, mc, mv; }
         }
     }
@@ -4841,6 +4863,128 @@ fn emitAosF32VecStripeOp(
     if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_vlocal); }
     simdMemOp(g, SIMD_v128_store, 2, byte_off);
 }
+fn emitAosF32ContiguousSimd(
+    g: Generator&,
+    f: Fn&,
+    k_lanes: i64,
+    mode: u8,
+    p_dst: u32,
+    p_a: u32,
+    p_b: u32,
+    has_b: bool,
+    v_scale: u32,
+    nan_vlocal: u32,
+    rem: u32,
+) {
+    if k_lanes == 3 {
+        // 12-byte records: 8 elements = 96 bytes = 6 x v128 (zero shuffles!), 4 elements = 48 bytes = 3 x v128!
+        let s8_exit = open(g, f, OP_block);
+        let s8_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 8); op(g, OP_i32_lt_u);
+        br(g, f, OP_br_if, s8_exit);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 80);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 64);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 48);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 32);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 16);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
+        lget(g, p_dst); i32Const(g, 96); op(g, OP_i32_add); lset(g, p_dst);
+        lget(g, p_a); i32Const(g, 96); op(g, OP_i32_add); lset(g, p_a);
+        if has_b { lget(g, p_b); i32Const(g, 96); op(g, OP_i32_add); lset(g, p_b); }
+        lget(g, rem); i32Const(g, 8); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s8_top);
+        close(g, f);
+        close(g, f);
+
+        let s4_exit = open(g, f, OP_block);
+        let s4_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u);
+        br(g, f, OP_br_if, s4_exit);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 32);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 16);
+        emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
+        lget(g, p_dst); i32Const(g, 48); op(g, OP_i32_add); lset(g, p_dst);
+        lget(g, p_a); i32Const(g, 48); op(g, OP_i32_add); lset(g, p_a);
+        if has_b { lget(g, p_b); i32Const(g, 48); op(g, OP_i32_add); lset(g, p_b); }
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s4_top);
+        close(g, f);
+        close(g, f);
+        return;
+    }
+    let step = (k_lanes as u32) * 4;
+    let elems_per_vec: u32 = 16 / step;
+    let elems_per_4x: u32 = elems_per_vec * 4;
+
+    // 4x unrolled descending-offset (48, 32, 16, 0) 64-byte SIMD stripe loop.
+    let s4_exit = open(g, f, OP_block);
+    let s4_top = open(g, f, OP_loop);
+    lget(g, rem); i32Const(g, elems_per_4x); op(g, OP_i32_lt_u);
+    br(g, f, OP_br_if, s4_exit);
+    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 48);
+    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 32);
+    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 16);
+    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
+    lget(g, p_dst); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_dst);
+    lget(g, p_a); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_a);
+    if has_b { lget(g, p_b); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_b); }
+    lget(g, rem); i32Const(g, elems_per_4x); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, s4_top);
+    close(g, f);
+    close(g, f);
+
+    // 1x v128 (16-byte) tail loop (handles remaining 1..3 Vec4s or 2..6 Vec2s).
+    let s1_exit = open(g, f, OP_block);
+    let s1_top = open(g, f, OP_loop);
+    lget(g, rem); i32Const(g, elems_per_vec); op(g, OP_i32_lt_u);
+    br(g, f, OP_br_if, s1_exit);
+    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
+    lget(g, p_dst); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_dst);
+    lget(g, p_a); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_a);
+    if has_b { lget(g, p_b); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_b); }
+    lget(g, rem); i32Const(g, elems_per_vec); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, s1_top);
+    close(g, f);
+    close(g, f);
+}
+fn emitAosF32ScalarElemOp(
+    g: Generator&,
+    f: const Fn&,
+    k_lanes: i64,
+    mode: u8,
+    dst_addr: u32,
+    a_addr: u32,
+    b_addr: u32,
+    scale_f32: u32,
+) {
+    var li = k_lanes;
+    while li > 0 {
+        li -= 1;
+        let off = (li as u32) * 4;
+        lget(g, dst_addr);
+        lget(g, a_addr); op(g, OP_f32_load); uleb(g, 2); uleb(g, off);
+        if mode == 0 {
+            lget(g, b_addr); op(g, OP_f32_load); uleb(g, 2); uleb(g, off);
+            op(g, OP_f32_add);
+        } else if mode == 1 {
+            lget(g, b_addr); op(g, OP_f32_load); uleb(g, 2); uleb(g, off);
+            op(g, squid_direct_writer::OP_f32_sub);
+        } else if mode == 2 {
+            lget(g, b_addr); op(g, OP_f32_load); uleb(g, 2); uleb(g, off);
+            op(g, squid_direct_writer::OP_f32_mul);
+        } else if mode == 3 {
+            lget(g, scale_f32);
+            op(g, squid_direct_writer::OP_f32_mul);
+        } else {
+            lget(g, b_addr); op(g, OP_f32_load); uleb(g, 2); uleb(g, off);
+            lget(g, scale_f32);
+            op(g, squid_direct_writer::OP_f32_mul);
+            if mode == 4 { op(g, OP_f32_add); } else { op(g, squid_direct_writer::OP_f32_sub); }
+        }
+        if !f.defer_f32_nan { canonicalizeF32Stack(g, f); }
+        op(g, squid_direct_writer::OP_f32_store); uleb(g, 2); uleb(g, off);
+    }
+}
 fn tryEmitAosF32RecordLoop(
     g: Generator&,
     f: Fn&,
@@ -4860,6 +5004,9 @@ fn tryEmitAosF32RecordLoop(
     var srcA_val = neverVal();
     var srcB_b: u32 = 0;
     var srcB_val = neverVal();
+    var is_indirect = false;
+    var ind_id_b: u32 = 0;
+    var ids_arr_b: u32 = 0;
     var mode: u8 = 0;
     var scale_is_const = false;
     var scale_bits_or_b: u32 = 0;
@@ -4889,7 +5036,31 @@ fn tryEmitAosF32RecordLoop(
             stmts_len = 1;
         }
 
-        // Last statement must be `dst[i] := <record or single-ctor record>`
+        // Optional Shape 2 leading indirect index: `let id = ids[k]` (verified by 5B-2!).
+        var idx_b = iter_b;
+        var first_load_si: i64 = 0;
+        if stmts_len >= 2 && f.indirect_bound_binding != 0 && f.indirect_bound_len != 0 {
+            let s0 = m.node(stmts[0]);
+            if s0.tag == squid_check_core::Tag.bind && s0.c < 2 && s0.a == f.indirect_bound_binding {
+                let gok, ia_n, ip_n = matchArrayGet(m, s0.b);
+                if gok && localRef(m, ip_n) == iter_b {
+                    let iab = localRef(m, ia_n);
+                    if iab != 0 {
+                        let iv, iok = bindGet(g, f, iab);
+                        if iok && tagOf(g, iv.ty) == squid_direct_types::Tag.array &&
+                            tagOf(g, g.types.node(iv.ty).a) == squid_direct_types::Tag.u32_ {
+                            is_indirect = true;
+                            ind_id_b = s0.a;
+                            ids_arr_b = iab;
+                            idx_b = ind_id_b;
+                            first_load_si = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Last statement must be `dst[idx_b] := <record or single-ctor record>`
         let last_id = stmts[stmts_len - 1];
         let last_n = m.node(last_id);
         var uid: u32 = 0;
@@ -4901,7 +5072,7 @@ fn tryEmitAosF32RecordLoop(
         let uinfo = m.updateInfo(uid);
         let sels = m.updateSelectors(uid);
         if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { return squid_direct_types::Error.none; }
-        if localRef(m, sels[0].index) != iter_b { return squid_direct_types::Error.none; }
+        if localRef(m, sels[0].index) != idx_b { return squid_direct_types::Error.none; }
         if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return squid_direct_types::Error.none; }
         dst_b = localRef(m, uinfo.root);
         if dst_b == 0 { return squid_direct_types::Error.none; }
@@ -4916,35 +5087,42 @@ fn tryEmitAosF32RecordLoop(
         if k == 0 { return squid_direct_types::Error.none; }
         k_lanes = k;
 
-        // Parse leading `let p = src[i]` or `let $Vec { x, y } = src[i]` statements.
+        // Parse leading `let p = src[idx_b]` or `let $Vec { x, y, ... } = src[idx_b]` statements
+        // (supports cross-nominal same-layout sources, e.g. `#[Pos]` + `#[Vel]`).
         var load_bs: u32[4] = [0; 4];
         var load_arrs: u32[4] = [0; 4];
+        var load_rec_tys: Ty[4] = [0; 4];
         var load_len: i64 = 0;
         var pat_bs: u32[16] = [0; 16];
         var pat_arrs: u32[16] = [0; 16];
         var pat_slots: i64[16] = [0; 16];
         var pat_len: i64 = 0;
-        for si in 0..(stmts_len - 1) {
+        for si in first_load_si..(stmts_len - 1) {
             let sn = m.node(stmts[si]);
             if sn.tag == squid_check_core::Tag.bind && sn.c < 2 {
-                let src_arr = aosArrayReadAtIter(m, sn.b, iter_b);
+                let src_arr = aosArrayReadAtIter(m, sn.b, idx_b);
                 if src_arr == 0 || load_len >= 4 { return squid_direct_types::Error.none; }
                 let sav, saok = bindGet(g, f, src_arr);
                 if !saok || tagOf(g, sav.ty) != squid_direct_types::Tag.array { return squid_direct_types::Error.none; }
                 let se, seerr = elementOf(g, f, sav.ty, loop_id);
-                if seerr != squid_direct_types::Error.none || se != elem_ty { g.dropFailure(); return squid_direct_types::Error.none; }
+                if seerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+                let s_rec_ty, sk, _ = unwrapAosF32RecordType(g, f, se, loop_id);
+                if sk != k { return squid_direct_types::Error.none; }
                 load_bs[load_len] = sn.a;
                 load_arrs[load_len] = src_arr;
+                load_rec_tys[load_len] = s_rec_ty;
                 load_len += 1;
             } else if sn.tag == squid_check_core::Tag.pattern_bind && sn.c == 0 {
-                let src_arr = aosArrayReadAtIter(m, sn.b, iter_b);
+                let src_arr = aosArrayReadAtIter(m, sn.b, idx_b);
                 if src_arr == 0 { return squid_direct_types::Error.none; }
                 let sav, saok = bindGet(g, f, src_arr);
                 if !saok || tagOf(g, sav.ty) != squid_direct_types::Tag.array { return squid_direct_types::Error.none; }
                 let se, seerr = elementOf(g, f, sav.ty, loop_id);
-                if seerr != squid_direct_types::Error.none || se != elem_ty { g.dropFailure(); return squid_direct_types::Error.none; }
+                if seerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+                let s_rec_ty, sk, s_is_nom = unwrapAosF32RecordType(g, f, se, loop_id);
+                if sk != k { return squid_direct_types::Error.none; }
                 var p_id = sn.a;
-                if is_nom {
+                if s_is_nom {
                     let cp = m.pattern(p_id);
                     if cp.tag != squid_check_core::PatternTag.constructor { return squid_direct_types::Error.none; }
                     p_id = cp.b;
@@ -4967,7 +5145,7 @@ fn tryEmitAosF32RecordLoop(
                     if cp.tag != squid_check_core::PatternTag.bind || pat_len >= 16 { return squid_direct_types::Error.none; }
                     let fsp = m.fieldSpelling(m.types.recordField(storage, pi).name);
                     if !fsp.present { return squid_direct_types::Error.none; }
-                    let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
+                    let slot = g.types.findField(s_rec_ty, g.types.fieldName(fsp.value));
                     if slot < 0 || slot >= k { return squid_direct_types::Error.none; }
                     pat_bs[pat_len] = cp.a;
                     pat_arrs[pat_len] = src_arr;
@@ -5023,7 +5201,7 @@ fn tryEmitAosF32RecordLoop(
         }
         for lane in 0..k {
             if !seen[lane] { return squid_direct_types::Error.none; }
-            let ok, lm, la, lb, lsc, lsv = aosMatchLaneExpr(g, f, m, lane_exprs[lane], rec_ty, k, lane, iter_b, load_bs, load_arrs, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
+            let ok, lm, la, lb, lsc, lsv = aosMatchLaneExpr(g, f, m, lane_exprs[lane], loop_id, k, lane, iter_b, idx_b, load_bs, load_arrs, load_rec_tys, load_len, pat_bs, pat_arrs, pat_slots, pat_len);
             if !ok { return squid_direct_types::Error.none; }
             if lane == 0 {
                 mode = lm; srcA_b = la; srcB_b = lb; scale_is_const = lsc; scale_bits_or_b = lsv;
@@ -5038,7 +5216,9 @@ fn tryEmitAosF32RecordLoop(
         let av, aok = bindGet(g, f, srcA_b);
         if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { return squid_direct_types::Error.none; }
         let ae, aeerr = elementOf(g, f, av.ty, loop_id);
-        if aeerr != squid_direct_types::Error.none || ae != elem_ty { g.dropFailure(); return squid_direct_types::Error.none; }
+        if aeerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+        let _, ak, _ = unwrapAosF32RecordType(g, f, ae, loop_id);
+        if ak != k { return squid_direct_types::Error.none; }
         srcA_val = av;
         if srcB_b != 0 {
             let _, b_cell = withCellType(g, f, srcB_b);
@@ -5046,7 +5226,9 @@ fn tryEmitAosF32RecordLoop(
             let bv, bok = bindGet(g, f, srcB_b);
             if !bok || tagOf(g, bv.ty) != squid_direct_types::Tag.array { return squid_direct_types::Error.none; }
             let be, beerr = elementOf(g, f, bv.ty, loop_id);
-            if beerr != squid_direct_types::Error.none || be != elem_ty { g.dropFailure(); return squid_direct_types::Error.none; }
+            if beerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+            let _, bk, _ = unwrapAosF32RecordType(g, f, be, loop_id);
+            if bk != k { return squid_direct_types::Error.none; }
             srcB_val = bv;
         }
         if mode >= 3 && scale_is_const {
@@ -5057,9 +5239,6 @@ fn tryEmitAosF32RecordLoop(
     if !matched { return squid_direct_types::Error.none; }
 
     let step = (k_lanes as u32) * 4;
-    let elems_per_vec: u32 = 16 / step;
-    let elems_per_4x: u32 = elems_per_vec * 4;
-
     let dst_base, dst_len = ensureCheckedArray(g, f, dst_val);
     let a_base, a_len = ensureCheckedArray(g, f, srcA_val);
     var b_base: u32 = a_base;
@@ -5067,6 +5246,146 @@ fn tryEmitAosF32RecordLoop(
     if srcB_b != 0 {
         let bb, bl = ensureCheckedArray(g, f, srcB_val);
         b_base = bb; b_len = bl;
+    }
+
+    if is_indirect {
+        // Shape 2: `let id = ids[k]` — requires 5B-2 proof that every `ids[k] < min(dst_len, a_len, b_len)`!
+        if f.indirect_bound_binding != ind_id_b || f.indirect_bound_len == 0 {
+            return squid_direct_types::Error.none;
+        }
+        if !(f.indirect_bound_len == dst_len || findCheckedLe(f, f.indirect_bound_len, dst_len) >= 0) ||
+            !(f.indirect_bound_len == a_len || findCheckedLe(f, f.indirect_bound_len, a_len) >= 0) ||
+            (srcB_b != 0 && !(f.indirect_bound_len == b_len || findCheckedLe(f, f.indirect_bound_len, b_len) >= 0)) {
+            return squid_direct_types::Error.none;
+        }
+        let ids_val, _ = bindGet(g, f, ids_arr_b);
+        let ids_base, ids_len = ensureCheckedArray(g, f, ids_val);
+
+        let ok_loc = local32(g, f);
+        lget(g, index); lget(g, end_local); op(g, OP_i32_lt_u);
+        lget(g, end_local); lget(g, ids_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        lget(g, dst_len); i32Const(g, 0x7fffffff / step); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        lget(g, a_len); i32Const(g, 0x7fffffff / step); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        if srcB_b != 0 {
+            lget(g, b_len); i32Const(g, 0x7fffffff / step); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        }
+        lset(g, ok_loc);
+
+        lget(g, ok_loc);
+        let run_if = open(g, f, OP_if_);
+
+        var v_scale: u32 = 0xffffffff;
+        var scale_f32: u32 = 0xffffffff;
+        if mode >= 3 {
+            v_scale = local(g, f, VT_v128);
+            scale_f32 = local(g, f, VT_f32);
+            if scale_is_const {
+                v128Const4(g, scale_bits_or_b);
+                ltee(g, v_scale);
+                simdLaneOp(g, SIMD_f32x4_extract_lane, 0);
+                lset(g, scale_f32);
+            } else {
+                let sv, _ = bindGet(g, f, scale_bits_or_b);
+                lget(g, w(g, sv, 0));
+                ltee(g, scale_f32);
+                simdOp(g, SIMD_f32x4_splat);
+                lset(g, v_scale);
+            }
+        }
+        var nan_vlocal: u32 = 0xffffffff;
+        if !f.defer_f32_nan {
+            nan_vlocal = local(g, f, VT_v128);
+            v128Const4(g, 0x7fc00000);
+            lset(g, nan_vlocal);
+        }
+
+        let ids_ptr = local32(g, f);
+        lget(g, ids_base); lget(g, index); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, ids_ptr);
+        let count = local32(g, f);
+        lget(g, end_local); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+        let rem = local32(g, f);
+        lget(g, count); lset(g, rem);
+
+        var has_contig = false;
+        if f.indirect_bound_distinct_local != 0xffffffff {
+            has_contig = true;
+            let contig_ok = local32(g, f);
+            lget(g, f.indirect_bound_distinct_local); i32Const(g, 2); op(g, OP_i32_eq);
+            let dst_bytes = emitScaledBytes(g, f, dst_len, step);
+            let dst_slot = w(g, dst_val, 0);
+            let dst_gen = w(g, dst_val, 1);
+            if !(w(g, srcA_val, 0) == dst_slot && w(g, srcA_val, 1) == dst_gen) {
+                let a_bytes = emitScaledBytes(g, f, a_len, step);
+                lget(g, a_base); lget(g, dst_base); op(g, OP_i32_eq);
+                lget(g, a_base); lget(g, a_bytes); op(g, OP_i32_add); lget(g, dst_base); op(g, OP_i32_le_u); op(g, OP_i32_or);
+                lget(g, dst_base); lget(g, dst_bytes); op(g, OP_i32_add); lget(g, a_base); op(g, OP_i32_le_u); op(g, OP_i32_or);
+                op(g, OP_i32_and);
+            }
+            if srcB_b != 0 && !(w(g, srcB_val, 0) == dst_slot && w(g, srcB_val, 1) == dst_gen) {
+                let b_bytes = emitScaledBytes(g, f, b_len, step);
+                lget(g, b_base); lget(g, dst_base); op(g, OP_i32_eq);
+                lget(g, b_base); lget(g, b_bytes); op(g, OP_i32_add); lget(g, dst_base); op(g, OP_i32_le_u); op(g, OP_i32_or);
+                lget(g, dst_base); lget(g, dst_bytes); op(g, OP_i32_add); lget(g, b_base); op(g, OP_i32_le_u); op(g, OP_i32_or);
+                op(g, OP_i32_and);
+            }
+            lset(g, contig_ok);
+
+            lget(g, contig_ok);
+            let contig_if = open(g, f, OP_if_);
+            let id0 = local32(g, f);
+            lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, id0);
+            let base_off = emitScaledBytes(g, f, id0, step);
+            let cp_dst = local32(g, f);
+            lget(g, dst_base); lget(g, base_off); op(g, OP_i32_add); lset(g, cp_dst);
+            let cp_a = local32(g, f);
+            lget(g, a_base); lget(g, base_off); op(g, OP_i32_add); lset(g, cp_a);
+            var cp_b = cp_a;
+            if srcB_b != 0 {
+                cp_b = local32(g, f);
+                lget(g, b_base); lget(g, base_off); op(g, OP_i32_add); lset(g, cp_b);
+            }
+            emitAosF32ContiguousSimd(g, f, k_lanes, mode, cp_dst, cp_a, cp_b, srcB_b != 0, v_scale, nan_vlocal, rem);
+            popCheckedArraysAt(f, contig_if);
+            op(g, OP_else_);
+        }
+
+        // Sparse / arbitrary IDs: 4x unrolled hoisted-bounds unchecked indirect loop
+        // (sequential per-entity compute inside 4-unroll => safe even for duplicate IDs & aliasing!).
+        var id_l: u32[4] = [0; 4];
+        for s in 0..4 { id_l[s] = local32(g, f); }
+        let da = local32(g, f);
+        let aa = local32(g, f);
+        let ba = local32(g, f);
+        let sp_exit = open(g, f, OP_block);
+        let sp_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u);
+        br(g, f, OP_br_if, sp_exit);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 12); lset(g, id_l[3]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 8);  lset(g, id_l[2]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4);  lset(g, id_l[1]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);  lset(g, id_l[0]);
+        for s in 0..4 {
+            let off = emitScaledBytes(g, f, id_l[s], step);
+            lget(g, dst_base); lget(g, off); op(g, OP_i32_add); lset(g, da);
+            lget(g, a_base); lget(g, off); op(g, OP_i32_add); lset(g, aa);
+            if srcB_b != 0 {
+                lget(g, b_base); lget(g, off); op(g, OP_i32_add); lset(g, ba);
+            }
+            emitAosF32ScalarElemOp(g, f, k_lanes, mode, da, aa, if srcB_b != 0 { ba } else { aa }, scale_f32);
+        }
+        lget(g, ids_ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ids_ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, sp_top);
+        close(g, f);
+        close(g, f);
+
+        if has_contig { close(g, f); }
+
+        lget(g, end_local); lget(g, rem); op(g, OP_i32_sub); lset(g, index);
+        popCheckedArraysAt(f, run_if);
+        close(g, f);
+        f.checked_elems_len = 0;
+        return squid_direct_types::Error.none;
     }
 
     let ok_loc = constLocal(g, f, 1);
@@ -5082,11 +5401,7 @@ fn tryEmitAosF32RecordLoop(
     lset(g, ok_loc);
 
     // Disjointness guard: each source is either identical to dst or non-overlapping.
-    let end_bytes = local32(g, f);
-    lget(g, end_local);
-    if step == 16 { i32Const(g, 4); } else { i32Const(g, 3); }
-    op(g, OP_i32_shl);
-    lset(g, end_bytes);
+    let end_bytes = emitScaledBytes(g, f, end_local, step);
     let dst_slot = w(g, dst_val, 0);
     let dst_gen = w(g, dst_val, 1);
     if !(w(g, srcA_val, 0) == dst_slot && w(g, srcA_val, 1) == dst_gen) {
@@ -5128,12 +5443,7 @@ fn tryEmitAosF32RecordLoop(
         lset(g, nan_vlocal);
     }
 
-    let start_bytes = local32(g, f);
-    lget(g, index);
-    if step == 16 { i32Const(g, 4); } else { i32Const(g, 3); }
-    op(g, OP_i32_shl);
-    lset(g, start_bytes);
-
+    let start_bytes = emitScaledBytes(g, f, index, step);
     let p_dst = local32(g, f);
     lget(g, dst_base); lget(g, start_bytes); op(g, OP_i32_add); lset(g, p_dst);
     let p_a = local32(g, f);
@@ -5144,44 +5454,1388 @@ fn tryEmitAosF32RecordLoop(
         lget(g, b_base); lget(g, start_bytes); op(g, OP_i32_add); lset(g, p_b);
     }
 
-    // 4x unrolled descending-offset (48, 32, 16, 0) 64-byte SIMD stripe loop.
     lget(g, end_local); lget(g, index); op(g, OP_i32_sub); lset(g, count);
     let rem = local32(g, f);
     lget(g, count); lset(g, rem);
+    emitAosF32ContiguousSimd(g, f, k_lanes, mode, p_dst, p_a, p_b, srcB_b != 0, v_scale, nan_vlocal, rem);
+
+    // Advance `index` to `end_local - rem`; any remaining <4 Vec3 / <2 Vec2 tail runs in scalar loop.
+    lget(g, end_local); lget(g, rem); op(g, OP_i32_sub); lset(g, index);
+    popCheckedArraysAt(f, run_if);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return squid_direct_types::Error.none;
+}
+
+// ---- Shared `for x in xs:` / `for { f0, f1 } in ps:` associative integer reduction (SIMD + 4x unroll) ----
+// Reused across `#[T]` (Array), `%[T]` (Packed Flat & SoA), and `~[T]` (Seq Flat/Span & SoA).
+
+struct ForInRedPlan {
+    matched: bool = false,
+    carry_idx: i64 = -1,
+    is_xor: bool = false,
+    is_i64: bool = false,
+    is_record: bool = false,
+    inner_ty: Ty = 0,
+    inner_is_record: bool = false,
+    field_count: i64 = 0,
+    field_pos: i64[4] = [0; 4],
+}
+
+recursive fn matchForInRedExpr(
+    g: Generator&,
+    m: const Module&,
+    id: u32,
+    want_op: squid_check_core::Op,
+    carry_iter_b: u32,
+    carry_hits: i64&,
+    is_record: bool,
+    elem_bind: u32,
+    inner_ty: Ty,
+    is_nominal: bool,
+    pat_bs: const u32[16]&,
+    pat_pos: const i64[16]&,
+    pat_len: i64,
+    out_pos: i64[4]&,
+    out_len: i64&,
+    depth: i64,
+) -> bool {
+    if id == 0 || depth > 12 { return false; }
+    let n = m.node(id);
+    if n.tag == squid_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if b == 0 { return false; }
+        if b == carry_iter_b {
+            carry_hits += 1;
+            return carry_hits <= 1;
+        }
+        if !is_record {
+            if b == elem_bind && out_len < 4 {
+                out_pos[out_len] = 0;
+                out_len += 1;
+                return true;
+            }
+            return false;
+        }
+        for pi in 0..pat_len {
+            if pat_bs[pi] == b {
+                if out_len >= 4 { return false; }
+                out_pos[out_len] = pat_pos[pi];
+                out_len += 1;
+                return true;
+            }
+        }
+        return false;
+    }
+    if n.tag == squid_check_core::Tag.project && is_record && elem_bind != 0 && localRef(m, n.a) == elem_bind {
+        let pos = soaProjectFieldPos(g, m, n.b, inner_ty, is_nominal);
+        if pos < 0 || out_len >= 4 { return false; }
+        out_pos[out_len] = pos;
+        out_len += 1;
+        return true;
+    }
+    let is_op = n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none);
+    if is_op && n.op == want_op && n.b != 0 {
+        return matchForInRedExpr(g, m, n.a, want_op, carry_iter_b, carry_hits, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, depth + 1) &&
+               matchForInRedExpr(g, m, n.b, want_op, carry_iter_b, carry_hits, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, depth + 1);
+    }
+    return false;
+}
+
+fn analyzeForInRedPlan(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    slots: Words,
+    elem_ty: Ty,
+) -> ForInRedPlan {
+    var plan = ForInRedPlan {};
+    if info.kind != squid_check_core::LoopKind.array || info.pattern == 0 || info.body == 0 { return plan; }
+    let m .= g.units[f.unit - 1];
+    let carries = m.loopCarries(loop_id);
+    if carries.len == 0 || carries.len > 64 { return plan; }
+
+    var red_ci: i64 = -1;
+    var acc_tag = squid_direct_types::Tag.unit;
+    for carry, ci in carries {
+        if carry.backedge == carry.iteration { continue; }
+        if red_ci >= 0 || carry.backedge == 0 { return plan; }
+        if g.s.words[slots.start + ci] != 0 { return plan; }
+        let iv = g.s.vals[iteration.start + ci];
+        if iv.len != 1 { return plan; }
+        let t = tagOf(g, iv.ty);
+        if t != squid_direct_types::Tag.u32_ && t != squid_direct_types::Tag.i32_ &&
+            t != squid_direct_types::Tag.u64_ && t != squid_direct_types::Tag.i64_ {
+            return plan;
+        }
+        red_ci = ci;
+        acc_tag = t;
+    }
+    if red_ci < 0 { return plan; }
+    let carry_iter_b = carries[red_ci].iteration;
+    let carry_back_b = carries[red_ci].backedge;
+    let is_i64 = acc_tag == squid_direct_types::Tag.u64_ || acc_tag == squid_direct_types::Tag.i64_;
+
+    let body_node = unwrapSingleBody(m, info.body);
+    if body_node == 0 { return plan; }
+    let bn = m.node(body_node);
+    if bn.tag != squid_check_core::Tag.bind || bn.c >= 2 || bn.a != carry_back_b { return plan; }
+    let rhs_n = m.node(bn.b);
+    let is_op = rhs_n.tag == squid_check_core::Tag.scalar || (rhs_n.tag == squid_check_core::Tag.associated && rhs_n.op != squid_check_core::Op.none);
+    if !is_op || (rhs_n.op != squid_check_core::Op.add && rhs_n.op != squid_check_core::Op.bit_xor) { return plan; }
+    let want_op = rhs_n.op;
+
+    // Classify element & loop pattern: flat scalar vs record/tuple/single-ctor field projection or destructuring.
+    var is_record = false;
+    var is_nominal = false;
+    var inner_ty = elem_ty;
+    var inner_is_record = false;
+    var elem_bind: u32 = 0;
+    var pat_bs: u32[16] = [0; 16];
+    var pat_pos: i64[16] = [0; 16];
+    var pat_len: i64 = 0;
+
+    let etag = tagOf(g, elem_ty);
+    if etag == acc_tag {
+        let pnode = m.pattern(info.pattern);
+        if pnode.tag != squid_check_core::PatternTag.bind { return plan; }
+        elem_bind = pnode.a;
+    } else {
+        let is_rec, rerr = g.types.isRecursive(elem_ty);
+        if rerr != squid_direct_types::Error.none || is_rec { return plan; }
+        if etag == squid_direct_types::Tag.nominal {
+            let cases, cerr = g.types.variants(elem_ty);
+            if cerr != squid_direct_types::Error.none || cases.len != 1 { return plan; }
+            inner_ty = g.types.variant_payloads[cases.payloads];
+            let prec, prerr = g.types.isRecursive(inner_ty);
+            if prerr != squid_direct_types::Error.none || prec { return plan; }
+            is_nominal = true;
+        }
+        let in_node = g.types.node(inner_ty);
+        if in_node.tag == squid_direct_types::Tag.record {
+            inner_is_record = true;
+        } else if in_node.tag != squid_direct_types::Tag.tuple {
+            return plan;
+        }
+        let fcount = in_node.b as i64;
+        if fcount < 1 || fcount > 16 { return plan; }
+        is_record = true;
+
+        let pnode = m.pattern(info.pattern);
+        if pnode.tag == squid_check_core::PatternTag.bind {
+            if !inner_is_record { return plan; }
+            elem_bind = pnode.a;
+        } else {
+            var p_cur = info.pattern;
+            if is_nominal {
+                if pnode.tag != squid_check_core::PatternTag.constructor || pnode.b == 0 { return plan; }
+                p_cur = pnode.b;
+            }
+            let ip = m.pattern(p_cur);
+            if !inner_is_record {
+                if ip.tag != squid_check_core::PatternTag.product { return plan; }
+                let ch = m.patternChildren(p_cur);
+                if ch.len != fcount { return plan; }
+                for c, ci in ch {
+                    let cp = m.pattern(c);
+                    if cp.tag == squid_check_core::PatternTag.wildcard { continue; }
+                    if cp.tag != squid_check_core::PatternTag.bind || pat_len >= 16 { return plan; }
+                    pat_bs[pat_len] = cp.a;
+                    pat_pos[pat_len] = ci;
+                    pat_len += 1;
+                }
+            } else {
+                var prod_id: u32 = 0;
+                if ip.tag == squid_check_core::PatternTag.record_payload { prod_id = ip.b; }
+                else if ip.tag == squid_check_core::PatternTag.product { prod_id = p_cur; }
+                else { return plan; }
+                let rty = m.types.node(ip.ty);
+                if rty.tag != squid_check_types::Tag.record { return plan; }
+                let ch = m.patternChildren(prod_id);
+                if ch.len != (rty.b as i64) { return plan; }
+                for c, ci in ch {
+                    let cp = m.pattern(c);
+                    if cp.tag == squid_check_core::PatternTag.wildcard { continue; }
+                    if cp.tag != squid_check_core::PatternTag.bind || pat_len >= 16 { return plan; }
+                    let fsp = m.fieldSpelling(m.types.recordField(rty, ci).name);
+                    if !fsp.present { return plan; }
+                    let pos = g.types.findField(inner_ty, g.types.fieldName(fsp.value));
+                    if pos < 0 || pos >= fcount { return plan; }
+                    pat_bs[pat_len] = cp.a;
+                    pat_pos[pat_len] = pos;
+                    pat_len += 1;
+                }
+            }
+        }
+    }
+
+    var carry_hits: i64 = 0;
+    var out_pos: i64[4] = [0; 4];
+    var out_len: i64 = 0;
+    if !matchForInRedExpr(g, m, bn.b, want_op, carry_iter_b, carry_hits, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, 0) {
+        return plan;
+    }
+    if carry_hits != 1 || out_len == 0 { return plan; }
+
+    if is_record {
+        let in_node = g.types.node(inner_ty);
+        for fi in 0..out_len {
+            let pos = out_pos[fi];
+            let fty = if inner_is_record { g.types.recordField(inner_ty, pos).ty } else { g.types.words[in_node.a + pos] };
+            if tagOf(g, fty) != acc_tag { return plan; }
+        }
+    }
+
+    plan.matched = true;
+    plan.carry_idx = red_ci;
+    plan.is_xor = want_op == squid_check_core::Op.bit_xor;
+    plan.is_i64 = is_i64;
+    plan.is_record = is_record;
+    plan.inner_ty = inner_ty;
+    plan.inner_is_record = inner_is_record;
+    plan.field_count = out_len;
+    for fi in 0..out_len { plan.field_pos[fi] = out_pos[fi]; }
+    return plan;
+}
+
+// Emits full 16-wide (i32) / 8-wide (i64) v128 SIMD + 4/2-wide tail + scalar tail reduction
+// across `col_count` (1..4) contiguous column pointers for `count_loc` elements into `acc_loc`.
+fn emitSimdColumnSum(
+    g: Generator&,
+    f: Fn&,
+    col_starts: const u32[4]&,
+    col_count: i64,
+    count_loc: u32,
+    acc_loc: u32,
+    is_i64: bool,
+    is_xor: bool,
+) {
+    let elem_bytes: u32 = if is_i64 { 8 } else { 4 };
+    let lanes_per_vec: u32 = if is_i64 { 2 } else { 4 };
+    let elems_per_4x: u32 = lanes_per_vec * 4;
+    let vop: u32 = if is_xor { SIMD_v128_xor } else if is_i64 { SIMD_i64x2_add } else { SIMD_i32x4_add };
+    let sop = if is_i64 {
+        if is_xor { squid_direct_writer::OP_i64_xor } else { squid_direct_writer::OP_i64_add }
+    } else {
+        if is_xor { OP_i32_xor } else { OP_i32_add }
+    };
+    let load_op = if is_i64 { squid_direct_writer::OP_i64_load } else { OP_i32_load };
+    let load_align: u32 = if is_i64 { 3 } else { 2 };
+
+    var ptrs: u32[4] = [0; 4];
+    for c in 0..col_count {
+        ptrs[c] = local32(g, f);
+        lget(g, col_starts[c]);
+        lset(g, ptrs[c]);
+    }
+    let rem = local32(g, f);
+    lget(g, count_loc);
+    lset(g, rem);
+
+    let vacc0 = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vacc0);
+    let vacc1 = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vacc1);
+
+    // 4x v128 (64-byte) loop with descending offsets 48, 16, 32, 0 per column
     let s4_exit = open(g, f, OP_block);
     let s4_top = open(g, f, OP_loop);
     lget(g, rem); i32Const(g, elems_per_4x); op(g, OP_i32_lt_u);
     br(g, f, OP_br_if, s4_exit);
-    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 48);
-    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 32);
-    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 16);
-    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
-    lget(g, p_dst); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_dst);
-    lget(g, p_a); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_a);
-    if srcB_b != 0 { lget(g, p_b); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_b); }
+    for c in 0..col_count {
+        lget(g, vacc0); lget(g, ptrs[c]); simdMemOp(g, SIMD_v128_load, load_align, 48); simdOp(g, vop);
+        lget(g, ptrs[c]); simdMemOp(g, SIMD_v128_load, load_align, 16); simdOp(g, vop); lset(g, vacc0);
+        lget(g, vacc1); lget(g, ptrs[c]); simdMemOp(g, SIMD_v128_load, load_align, 32); simdOp(g, vop);
+        lget(g, ptrs[c]); simdMemOp(g, SIMD_v128_load, load_align, 0); simdOp(g, vop); lset(g, vacc1);
+        lget(g, ptrs[c]); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptrs[c]);
+    }
     lget(g, rem); i32Const(g, elems_per_4x); op(g, OP_i32_sub); lset(g, rem);
     br(g, f, OP_br, s4_top);
     close(g, f);
     close(g, f);
 
-    // 1x v128 (16-byte) tail loop (handles remaining 1..3 Vec4s or 2..6 Vec2s).
+    // 1x v128 (16-byte) tail loop
     let s1_exit = open(g, f, OP_block);
     let s1_top = open(g, f, OP_loop);
-    lget(g, rem); i32Const(g, elems_per_vec); op(g, OP_i32_lt_u);
+    lget(g, rem); i32Const(g, lanes_per_vec); op(g, OP_i32_lt_u);
     br(g, f, OP_br_if, s1_exit);
-    emitAosF32VecStripeOp(g, f, mode, p_dst, p_a, p_b, v_scale, nan_vlocal, 0);
-    lget(g, p_dst); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_dst);
-    lget(g, p_a); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_a);
-    if srcB_b != 0 { lget(g, p_b); i32Const(g, 16); op(g, OP_i32_add); lset(g, p_b); }
-    lget(g, rem); i32Const(g, elems_per_vec); op(g, OP_i32_sub); lset(g, rem);
+    for c in 0..col_count {
+        lget(g, vacc0); lget(g, ptrs[c]); simdMemOp(g, SIMD_v128_load, load_align, 0); simdOp(g, vop); lset(g, vacc0);
+        lget(g, ptrs[c]); i32Const(g, 16); op(g, OP_i32_add); lset(g, ptrs[c]);
+    }
+    lget(g, rem); i32Const(g, lanes_per_vec); op(g, OP_i32_sub); lset(g, rem);
     br(g, f, OP_br, s1_top);
     close(g, f);
     close(g, f);
 
-    // Advance `index` to `end_local - rem`; any 0..1 odd Vec2 tail runs in scalar loop.
-    lget(g, end_local); lget(g, rem); op(g, OP_i32_sub); lset(g, index);
+    // Horizontal reduction into acc_loc
+    let vtot = local(g, f, VT_v128);
+    lget(g, vacc0); lget(g, vacc1); simdOp(g, vop); lset(g, vtot);
+    lget(g, acc_loc);
+    if is_i64 {
+        lget(g, vtot); simdLaneOp(g, SIMD_i64x2_extract_lane, 0); op(g, sop);
+        lget(g, vtot); simdLaneOp(g, SIMD_i64x2_extract_lane, 1); op(g, sop);
+    } else {
+        for lane in 0..4 {
+            lget(g, vtot); simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8); op(g, sop);
+        }
+    }
+    lset(g, acc_loc);
+
+    // Scalar tail (0..3 i32 or 0..1 i64)
+    let t_exit = open(g, f, OP_block);
+    let t_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+    lget(g, acc_loc);
+    for c in 0..col_count {
+        lget(g, ptrs[c]); op(g, load_op); uleb(g, load_align); uleb(g, 0); op(g, sop);
+        lget(g, ptrs[c]); i32Const(g, elem_bytes); op(g, OP_i32_add); lset(g, ptrs[c]);
+    }
+    lset(g, acc_loc);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, t_top);
+    close(g, f);
+    close(g, f);
+}
+
+fn tryEmitForInArrayReduction(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    slots: Words,
+    index: u32,
+    end_loc: u32,
+    source: Val,
+) -> Error {
+    let elem_ty, eerr = elementOf(g, f, source.ty, loop_id);
+    if eerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+    let plan = analyzeForInRedPlan(g, f, loop_id, info, iteration, slots, elem_ty);
+    if !plan.matched { return squid_direct_types::Error.none; }
+    let ada = findDirectArrayBySlot(f, w(g, source, 0));
+    if ada >= 0 && f.direct_arrays[ada].scalar_packed { return squid_direct_types::Error.none; }
+
+    let step, sterr = stride(g, f, elem_ty, loop_id);
+    if sterr != squid_direct_types::Error.none || step == 0 { g.dropFailure(); return squid_direct_types::Error.none; }
+
+    var field_offs: u32[4] = [0; 4];
+    if plan.is_record {
+        for fi in 0..plan.field_count {
+            var off: u32 = 0;
+            var oerr = squid_direct_types::Error.none;
+            if plan.inner_is_record {
+                let o1, e1 = fieldOffset(g, f, plan.inner_ty, plan.field_pos[fi], loop_id);
+                off = o1;
+                oerr = e1;
+            } else {
+                let o2, e2 = itemOffset(g, f, plan.inner_ty, plan.field_pos[fi], loop_id);
+                off = o2;
+                oerr = e2;
+            }
+            if oerr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+            field_offs[fi] = off;
+        }
+    }
+
+    let arr_base, arr_len = ensureCheckedArray(g, f, source);
+    let acc_loc = w(g, g.s.vals[iteration.start + plan.carry_idx], 0);
+
+    lget(g, index); lget(g, end_loc); op(g, OP_i32_lt_u);
+    lget(g, end_loc); lget(g, arr_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    let run_if = open(g, f, OP_if_);
+    let count = local32(g, f);
+    lget(g, end_loc); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+    let start_ptr = emitOffsetAddress(g, f, arr_base, index, step);
+
+    if !plan.is_record {
+        var cols: u32[4] = [start_ptr, 0, 0, 0];
+        emitSimdColumnSum(g, f, cols, 1, count, acc_loc, plan.is_i64, plan.is_xor);
+    } else {
+        // 4x unrolled direct-offset AoS record field reduction (zero record copy, 1 bounds check / 4 records!).
+        let sop = if plan.is_i64 {
+            if plan.is_xor { squid_direct_writer::OP_i64_xor } else { squid_direct_writer::OP_i64_add }
+        } else {
+            if plan.is_xor { OP_i32_xor } else { OP_i32_add }
+        };
+        let load_op = if plan.is_i64 { squid_direct_writer::OP_i64_load } else { OP_i32_load };
+        let load_align: u32 = if plan.is_i64 { 3 } else { 2 };
+        let ptr = local32(g, f);
+        lget(g, start_ptr); lset(g, ptr);
+        let rem = local32(g, f);
+        lget(g, count); lset(g, rem);
+
+        let a_exit = open(g, f, OP_block);
+        let a_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u);
+        br(g, f, OP_br_if, a_exit);
+        lget(g, acc_loc);
+        var u: i64 = 4;
+        while u > 0 {
+            u -= 1;
+            let base_off = (u as u32) * step;
+            var fi = plan.field_count;
+            while fi > 0 {
+                fi -= 1;
+                lget(g, ptr); op(g, load_op); uleb(g, load_align); uleb(g, base_off + field_offs[fi]);
+                op(g, sop);
+            }
+        }
+        lset(g, acc_loc);
+        lget(g, ptr); i32Const(g, step * 4); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, a_top);
+        close(g, f);
+        close(g, f);
+
+        let t_exit = open(g, f, OP_block);
+        let t_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+        lget(g, acc_loc);
+        for fi in 0..plan.field_count {
+            lget(g, ptr); op(g, load_op); uleb(g, load_align); uleb(g, field_offs[fi]);
+            op(g, sop);
+        }
+        lset(g, acc_loc);
+        lget(g, ptr); i32Const(g, step); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, t_top);
+        close(g, f);
+        close(g, f);
+    }
+
+    lget(g, end_loc); lset(g, index);
     popCheckedArraysAt(f, run_if);
     close(g, f);
     f.checked_elems_len = 0;
+    return squid_direct_types::Error.none;
+}
+
+// ---- Fast counted range-push loops across `#[T]`, `%[T]` (Flat & SoA), and `~[T]` (Flat & SoA) ----
+// Matches `for i in start..end: xs := xs.push <pure_val_expr>` (or `self.push` / `@storage.push`)
+// and lowers to:
+//   - `#[T]` & `%[T]` Flat: single pre-reserve + 16-wide v128 affine/const SIMD fill (or direct AoS field writes) + single entry.length update.
+//   - `%[T]` SoA: single pre-reserve + per-column contiguous 64B/iter v128 SIMD affine/const fill + single entry.length update.
+//   - `~[T]` Flat & SoA: direct full-leaf (`leaf_cap`) allocation + 64B/iter v128 SIMD fill + O(1) right-spine leaf append (zero FocusGap copy!).
+
+recursive fn isPureNonTrappingPushExpr(
+    g: Generator&,
+    f: const Fn&,
+    m: const Module&,
+    id: u32,
+    iter_b: u32,
+    uses_iter: bool&,
+    budget: i64&,
+) -> bool {
+    if id == 0 || budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return true; },
+        reference => {
+            let b = localRef(m, id);
+            if b == 0 { return false; }
+            if iter_b != 0 && b == iter_b {
+                uses_iter = true;
+                return true;
+            }
+            let _, is_cell = withCellType(g, f, b);
+            if is_cell { return false; }
+            let bv, bok = bindGet(g, f, b);
+            return bok && isScalarTag(tagOf(g, bv.ty));
+        },
+        scalar, associated => {
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
+            if n.op == squid_check_core::Op.div || n.op == squid_check_core::Op.rem { return false; }
+            if !isPureNonTrappingPushExpr(g, f, m, n.a, iter_b, uses_iter, budget) { return false; }
+            if n.b != 0 && !isPureNonTrappingPushExpr(g, f, m, n.b, iter_b, uses_iter, budget) { return false; }
+            return true;
+        },
+        record, product => {
+            for ch in m.children(id) {
+                if !isPureNonTrappingPushExpr(g, f, m, ch, iter_b, uses_iter, budget) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+
+recursive fn matchAffineI32OfIter(
+    g: Generator&,
+    f: const Fn&,
+    m: const Module&,
+    id: u32,
+    iter_b: u32,
+    depth: i64,
+) -> bool, u32, u32 {
+    if id == 0 || depth > 12 { return false, 0, 0; }
+    let ty, tok = lowerInEnv(g, m, m.typeOf(id), f.env);
+    if !tok { return false, 0, 0; }
+    let t = tagOf(g, ty);
+    if t != squid_direct_types::Tag.u32_ && t != squid_direct_types::Tag.i32_ { return false, 0, 0; }
+    let n = m.node(id);
+    if n.tag == squid_check_core::Tag.constant {
+        return true, 0, n.a;
+    }
+    if n.tag == squid_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if iter_b != 0 && b == iter_b { return true, 1, 0; }
+        return false, 0, 0;
+    }
+    let is_op = n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none);
+    if !is_op { return false, 0, 0; }
+    if n.b == 0 {
+        if n.op == squid_check_core::Op.neg {
+            let ok, a, b = matchAffineI32OfIter(g, f, m, n.a, iter_b, depth + 1);
+            if !ok { return false, 0, 0; }
+            return true, 0 - a, 0 - b;
+        }
+        return false, 0, 0;
+    }
+    let ok1, a1, b1 = matchAffineI32OfIter(g, f, m, n.a, iter_b, depth + 1);
+    if !ok1 { return false, 0, 0; }
+    let ok2, a2, b2 = matchAffineI32OfIter(g, f, m, n.b, iter_b, depth + 1);
+    if !ok2 { return false, 0, 0; }
+    if n.op == squid_check_core::Op.add { return true, a1 + a2, b1 + b2; }
+    if n.op == squid_check_core::Op.sub { return true, a1 - a2, b1 - b2; }
+    if n.op == squid_check_core::Op.mul {
+        if a1 == 0 { return true, b1 * a2, b1 * b2; }
+        if a2 == 0 { return true, a1 * b2, b1 * b2; }
+        return false, 0, 0;
+    }
+    if n.op == squid_check_core::Op.shift_left && a2 == 0 {
+        let sh = b2 & 31;
+        return true, a1 << sh, b1 << sh;
+    }
+    return false, 0, 0;
+}
+
+// Writes `count_loc` 32-bit values `a_val * (start_idx + k) + b_val` into `[dst_ptr .. dst_ptr + count_loc * 4)`
+// using 16-wide (64B/iter) descending v128 stores + 4-wide tail + scalar tail.
+fn emitAffineI32SimdFill(
+    g: Generator&,
+    f: Fn&,
+    dst_ptr: u32,
+    start_idx: u32,
+    count_loc: u32,
+    a_val: u32,
+    b_val: u32,
+) {
+    let ptr = local32(g, f);
+    lget(g, dst_ptr); lset(g, ptr);
+    let rem = local32(g, f);
+    lget(g, count_loc); lset(g, rem);
+
+    let v0 = local(g, f, VT_v128);
+    if a_val == 0 {
+        v128Const4(g, b_val); lset(g, v0);
+        let s16_exit = open(g, f, OP_block);
+        let s16_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 16); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s16_exit);
+        lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 48);
+        lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 32);
+        lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 16);
+        lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 0);
+        lget(g, ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 16); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s16_top);
+        close(g, f); close(g, f);
+
+        let s4_exit = open(g, f, OP_block);
+        let s4_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s4_exit);
+        lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 0);
+        lget(g, ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s4_top);
+        close(g, f); close(g, f);
+
+        let t_exit = open(g, f, OP_block);
+        let t_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+        lget(g, ptr); i32Const(g, b_val); op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, 0);
+        lget(g, ptr); i32Const(g, 4); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, t_top);
+        close(g, f); close(g, f);
+        return;
+    }
+
+    let v1 = local(g, f, VT_v128);
+    let v2 = local(g, f, VT_v128);
+    let v3 = local(g, f, VT_v128);
+    let v_base = local(g, f, VT_v128);
+    let v16 = local(g, f, VT_v128);
+    let v4 = local(g, f, VT_v128);
+
+    lget(g, start_idx);
+    if a_val != 1 {
+        i32Const(g, a_val); op(g, squid_direct_writer::OP_i32_mul);
+    }
+    if b_val != 0 {
+        i32Const(g, b_val); op(g, OP_i32_add);
+    }
+    simdOp(g, SIMD_i32x4_splat); lset(g, v_base);
+
+    lget(g, v_base); v128ConstWords(g, 0, a_val, a_val * 2, a_val * 3); simdOp(g, SIMD_i32x4_add); lset(g, v0);
+    lget(g, v_base); v128ConstWords(g, a_val * 4, a_val * 5, a_val * 6, a_val * 7); simdOp(g, SIMD_i32x4_add); lset(g, v1);
+    lget(g, v_base); v128ConstWords(g, a_val * 8, a_val * 9, a_val * 10, a_val * 11); simdOp(g, SIMD_i32x4_add); lset(g, v2);
+    lget(g, v_base); v128ConstWords(g, a_val * 12, a_val * 13, a_val * 14, a_val * 15); simdOp(g, SIMD_i32x4_add); lset(g, v3);
+    v128Const4(g, a_val * 16); lset(g, v16);
+    v128Const4(g, a_val * 4); lset(g, v4);
+
+    let s16_exit = open(g, f, OP_block);
+    let s16_top = open(g, f, OP_loop);
+    lget(g, rem); i32Const(g, 16); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s16_exit);
+    lget(g, ptr); lget(g, v3); simdMemOp(g, SIMD_v128_store, 2, 48);
+    lget(g, ptr); lget(g, v2); simdMemOp(g, SIMD_v128_store, 2, 32);
+    lget(g, ptr); lget(g, v1); simdMemOp(g, SIMD_v128_store, 2, 16);
+    lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 0);
+    lget(g, v0); lget(g, v16); simdOp(g, SIMD_i32x4_add); lset(g, v0);
+    lget(g, v1); lget(g, v16); simdOp(g, SIMD_i32x4_add); lset(g, v1);
+    lget(g, v2); lget(g, v16); simdOp(g, SIMD_i32x4_add); lset(g, v2);
+    lget(g, v3); lget(g, v16); simdOp(g, SIMD_i32x4_add); lset(g, v3);
+    lget(g, ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, rem); i32Const(g, 16); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, s16_top);
+    close(g, f); close(g, f);
+
+    let s4_exit = open(g, f, OP_block);
+    let s4_top = open(g, f, OP_loop);
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s4_exit);
+    lget(g, ptr); lget(g, v0); simdMemOp(g, SIMD_v128_store, 2, 0);
+    lget(g, v0); lget(g, v4); simdOp(g, SIMD_i32x4_add); lset(g, v0);
+    lget(g, ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, s4_top);
+    close(g, f); close(g, f);
+
+    let cur_v = local32(g, f);
+    lget(g, v0); simdLaneOp(g, SIMD_i32x4_extract_lane, 0); lset(g, cur_v);
+    let t_exit = open(g, f, OP_block);
+    let t_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+    lget(g, ptr); lget(g, cur_v); op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, 0);
+    lget(g, cur_v); i32Const(g, a_val); op(g, OP_i32_add); lset(g, cur_v);
+    lget(g, ptr); i32Const(g, 4); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, t_top);
+    close(g, f); close(g, f);
+}
+
+// Writes `count_loc` copies of a loop-invariant scalar `val` (pre-splatted in `v_splat` when != 0xffffffff)
+// into `[dst_ptr .. dst_ptr + count_loc * step)`.
+fn emitConstSimdFill(
+    g: Generator&,
+    f: Fn&,
+    dst_ptr: u32,
+    count_loc: u32,
+    val: Val,
+    v_splat: u32,
+    step: u32,
+    id: u32,
+) -> Error {
+    if step == 1 && val.len == 1 {
+        lget(g, dst_ptr); lget(g, w(g, val, 0)); lget(g, count_loc); memoryFillOp(g);
+        return squid_direct_types::Error.none;
+    }
+    let ptr = local32(g, f);
+    lget(g, dst_ptr); lset(g, ptr);
+    let rem = local32(g, f);
+    lget(g, count_loc); lset(g, rem);
+
+    if v_splat != 0xffffffff && (step == 4 || step == 8) {
+        let lanes: u32 = if step == 4 { 4 } else { 2 };
+        let lanes16: u32 = lanes * 4;
+        let s16_exit = open(g, f, OP_block);
+        let s16_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, lanes16); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s16_exit);
+        lget(g, ptr); lget(g, v_splat); simdMemOp(g, SIMD_v128_store, 2, 48);
+        lget(g, ptr); lget(g, v_splat); simdMemOp(g, SIMD_v128_store, 2, 32);
+        lget(g, ptr); lget(g, v_splat); simdMemOp(g, SIMD_v128_store, 2, 16);
+        lget(g, ptr); lget(g, v_splat); simdMemOp(g, SIMD_v128_store, 2, 0);
+        lget(g, ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, lanes16); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s16_top);
+        close(g, f); close(g, f);
+
+        let s4_exit = open(g, f, OP_block);
+        let s4_top = open(g, f, OP_loop);
+        lget(g, rem); i32Const(g, lanes); op(g, OP_i32_lt_u); br(g, f, OP_br_if, s4_exit);
+        lget(g, ptr); lget(g, v_splat); simdMemOp(g, SIMD_v128_store, 2, 0);
+        lget(g, ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, lanes); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s4_top);
+        close(g, f); close(g, f);
+    }
+
+    let t_exit = open(g, f, OP_block);
+    let t_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+    let werr = writeElement(g, f, ptr, 0, val, id);
+    if werr != squid_direct_types::Error.none { return werr; }
+    lget(g, ptr); i32Const(g, step); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, t_top);
+    close(g, f); close(g, f);
+    return squid_direct_types::Error.none;
+}
+
+fn splatScalarVal(g: Generator&, f: Fn&, val: Val, step: u32) -> u32 {
+    if val.len != 1 { return 0xffffffff; }
+    let t = tagOf(g, val.ty);
+    if step == 4 && (t == squid_direct_types::Tag.u32_ || t == squid_direct_types::Tag.i32_ || t == squid_direct_types::Tag.f32_) {
+        let vl = local(g, f, VT_v128);
+        lget(g, w(g, val, 0));
+        if t == squid_direct_types::Tag.f32_ { simdOp(g, SIMD_f32x4_splat); } else { simdOp(g, SIMD_i32x4_splat); }
+        lset(g, vl);
+        return vl;
+    }
+    if step == 8 && (t == squid_direct_types::Tag.u64_ || t == squid_direct_types::Tag.i64_ || t == squid_direct_types::Tag.f64_) {
+        let vl = local(g, f, VT_v128);
+        lget(g, w(g, val, 0));
+        if t == squid_direct_types::Tag.f64_ { simdOp(g, SIMD_f64x2_splat); } else { simdOp(g, SIMD_i64x2_splat); }
+        lset(g, vl);
+        return vl;
+    }
+    return 0xffffffff;
+}
+
+recursive fn emitPushColumnFill(
+    g: Generator&,
+    f: Fn&,
+    dst_ptr: u32,
+    start_idx: u32,
+    count_loc: u32,
+    iter_b: u32,
+    col_expr_id: u32,
+    is_inv: bool,
+    inv_val: Val,
+    inv_vsplat: u32,
+    is_affine: bool,
+    aff_a: u32,
+    aff_b: u32,
+    step: u32,
+    id: u32,
+) -> Error {
+    if is_inv {
+        return emitConstSimdFill(g, f, dst_ptr, count_loc, inv_val, inv_vsplat, step, id);
+    }
+    if is_affine && step == 4 {
+        emitAffineI32SimdFill(g, f, dst_ptr, start_idx, count_loc, aff_a, aff_b);
+        return squid_direct_types::Error.none;
+    }
+    let ptr = local32(g, f);
+    lget(g, dst_ptr); lset(g, ptr);
+    let cur_i = local32(g, f);
+    lget(g, start_idx); lset(g, cur_i);
+    let rem = local32(g, f);
+    lget(g, count_loc); lset(g, rem);
+    if iter_b != 0 { bindPut(g, f, iter_b, valOf1(g, squid_direct_types::u32_, cur_i)); }
+    let t_exit = open(g, f, OP_block);
+    let t_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+    let ev, eerr = expr(g, f, col_expr_id);
+    if eerr != squid_direct_types::Error.none { return eerr; }
+    let werr = writeElement(g, f, ptr, 0, ev, id);
+    if werr != squid_direct_types::Error.none { return werr; }
+    lget(g, ptr); i32Const(g, step); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, cur_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, cur_i);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, t_top);
+    close(g, f); close(g, f);
+    return squid_direct_types::Error.none;
+}
+
+struct FastPushPlan {
+    matched: bool = false,
+    iter_b: u32 = 0,
+    dest: Val = Val {},
+    dtag: squid_direct_types::Tag = squid_direct_types::Tag.unit,
+    elem_ty: Ty = 0,
+    elem_step: u32 = 0,
+    val_expr_id: u32 = 0,
+    method_target: BindingRef = BindingRef { 0, 0 },
+    is_rec_lit: bool = false,
+    rec_field_count: i64 = 0,
+    rec_exprs: u32[16] = [0; 16],
+    rec_offs: u32[16] = [0; 16],
+    rec_steps: u32[16] = [0; 16],
+    rec_is_inv: bool[16] = [false; 16],
+    rec_is_aff: bool[16] = [false; 16],
+    rec_aff_a: u32[16] = [0; 16],
+    rec_aff_b: u32[16] = [0; 16],
+    scalar_is_inv: bool = false,
+    scalar_is_aff: bool = false,
+    scalar_aff_a: u32 = 0,
+    scalar_aff_b: u32 = 0,
+}
+
+fn analyzeFastPushRangeLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+) -> FastPushPlan {
+    var plan = FastPushPlan {};
+    let m .= g.units[f.unit - 1];
+    let pat = m.pattern(info.pattern);
+    if pat.tag == squid_check_core::PatternTag.bind {
+        plan.iter_b = pat.a;
+    } else if pat.tag != squid_check_core::PatternTag.wildcard {
+        return plan;
+    }
+    let carries = m.loopCarries(loop_id);
+    if carries.len != 1 || !carry_in_place[0] { return plan; }
+    let carry = carries[0];
+    if carry.backedge == 0 { return plan; }
+    plan.dest = g.s.vals[iteration.start];
+    plan.dtag = tagOf(g, plan.dest.ty);
+    if plan.dtag != squid_direct_types::Tag.array && plan.dtag != squid_direct_types::Tag.packed && plan.dtag != squid_direct_types::Tag.seq {
+        return plan;
+    }
+    if findDirectArray(f, carry.incoming) >= 0 || findDirectArrayBySlot(f, w(g, plan.dest, 0)) >= 0 {
+        return plan;
+    }
+
+    let body_node = unwrapSingleBody(m, info.body);
+    if body_node == 0 { return plan; }
+    let bnode = m.node(body_node);
+    if bnode.tag != squid_check_core::Tag.bind || bnode.c >= 2 || bnode.a != carry.backedge {
+        return plan;
+    }
+    let push_id = bnode.b;
+    let bn = m.node(push_id);
+    var recv_b: u32 = 0;
+    if bn.tag == squid_check_core::Tag.storage {
+        let op_kind, ok = squid_check_storage_ops::opFromCode(bn.c);
+        if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push {
+            return plan;
+        }
+        let ch = m.children(push_id);
+        if ch.len != 2 { return plan; }
+        recv_b = localRef(m, ch[0]);
+        plan.val_expr_id = ch[1];
+    } else if bn.tag == squid_check_core::Tag.apply {
+        if m.node(bn.a).tag != squid_check_core::Tag.project { return plan; }
+        let proj = m.node(bn.a);
+        recv_b = localRef(m, proj.a);
+        if recv_b == 0 { return plan; }
+        let identity, has_id = g.receiverIdentity(plan.dest.ty);
+        if !has_id { return plan; }
+        let target, has_target = g.dispatchTarget(m, identity, m.projection(proj.b).field, squid_check_types::Operator.none);
+        if !has_target || !g.hasUnit(target.unit) { return plan; }
+        let tm .= g.units[target.unit - 1];
+        let tbody .= tm.body(target.binding);
+        if !tbody || !isTwoParamPushForwarder(tm, tbody) { return plan; }
+        plan.method_target = target;
+        plan.val_expr_id = bn.b;
+    } else if bn.tag == squid_check_core::Tag.call {
+        let cinfo = m.call(push_id);
+        if cinfo.arguments.len != 2 { return plan; }
+        let target = g.resolve(m, cinfo.target);
+        if !g.hasUnit(target.unit) { return plan; }
+        let tm .= g.units[target.unit - 1];
+        let tbody .= tm.body(target.binding);
+        if !tbody || !isTwoParamPushForwarder(tm, tbody) { return plan; }
+        recv_b = localRef(m, cinfo.arguments[0]);
+        plan.val_expr_id = cinfo.arguments[1];
+        plan.method_target = target;
+    } else {
+        return plan;
+    }
+    if recv_b != carry.iteration || plan.val_expr_id == 0 { return plan; }
+
+    let ety, eerr = elementOf(g, f, plan.dest.ty, loop_id);
+    if eerr != squid_direct_types::Error.none { g.dropFailure(); return plan; }
+    plan.elem_ty = ety;
+    if holdsContainer(g, ety, 0) { return plan; }
+    let st, sterr = stride(g, f, ety, loop_id);
+    if sterr != squid_direct_types::Error.none || st == 0 || st > 65536 {
+        g.dropFailure();
+        return plan;
+    }
+    plan.elem_step = st;
+
+    let etag = tagOf(g, ety);
+    if isScalarTag(etag) {
+        var uses_it = false;
+        var budget: i64 = 128;
+        if !isPureNonTrappingPushExpr(g, f, m, plan.val_expr_id, plan.iter_b, uses_it, budget) {
+            return plan;
+        }
+        plan.scalar_is_inv = !uses_it;
+        if uses_it && (etag == squid_direct_types::Tag.u32_ || etag == squid_direct_types::Tag.i32_) {
+            let aok, aa, ab = matchAffineI32OfIter(g, f, m, plan.val_expr_id, plan.iter_b, 0);
+            if aok {
+                plan.scalar_is_aff = true;
+                plan.scalar_aff_a = aa;
+                plan.scalar_aff_b = ab;
+            }
+        }
+        plan.matched = true;
+        return plan;
+    }
+    if etag != squid_direct_types::Tag.record && etag != squid_direct_types::Tag.tuple {
+        return plan;
+    }
+    let vn = m.node(plan.val_expr_id);
+    let shape = g.types.node(ety);
+    let nf = shape.b as i64;
+    if nf <= 0 || nf > 16 { return plan; }
+    let ch = m.children(plan.val_expr_id);
+    if ch.len != nf { return plan; }
+    let is_rec = etag == squid_direct_types::Tag.record;
+    if is_rec {
+        if vn.tag != squid_check_core::Tag.record { return plan; }
+        let source = m.types.node(m.typeOf(plan.val_expr_id));
+        if source.tag != squid_check_types::Tag.record { return plan; }
+        let dests = m.recordDestinations(plan.val_expr_id);
+        for ci in 0..nf {
+            let fld = m.types.recordField(source, dests[ci]);
+            let fname, has_fn = g.types.fieldNameOf(m, fld.name, true);
+            if !has_fn { return plan; }
+            let pos = g.types.findField(ety, fname);
+            if pos < 0 || pos >= nf || plan.rec_exprs[pos] != 0 { return plan; }
+            plan.rec_exprs[pos] = ch[ci];
+        }
+    } else {
+        if vn.tag != squid_check_core::Tag.product { return plan; }
+        for ci in 0..nf { plan.rec_exprs[ci] = ch[ci]; }
+    }
+    for fi in 0..nf {
+        let fty = if is_rec { g.types.recordField(ety, fi).ty } else { g.types.words[shape.a + fi] };
+        let ftag = tagOf(g, fty);
+        if !isScalarTag(ftag) { return plan; }
+        let fstep, fserr = stride(g, f, fty, loop_id);
+        if fserr != squid_direct_types::Error.none || fstep == 0 { g.dropFailure(); return plan; }
+        var foff: u32 = 0;
+        var foerr = squid_direct_types::Error.none;
+        if is_rec {
+            let fo1, fe1 = fieldOffset(g, f, ety, fi, loop_id);
+            foff = fo1;
+            foerr = fe1;
+        } else {
+            let fo2, fe2 = itemOffset(g, f, ety, fi, loop_id);
+            foff = fo2;
+            foerr = fe2;
+        }
+        if foerr != squid_direct_types::Error.none { g.dropFailure(); return plan; }
+        var uses_it = false;
+        var budget: i64 = 128;
+        if !isPureNonTrappingPushExpr(g, f, m, plan.rec_exprs[fi], plan.iter_b, uses_it, budget) {
+            return plan;
+        }
+        plan.rec_offs[fi] = foff;
+        plan.rec_steps[fi] = fstep;
+        plan.rec_is_inv[fi] = !uses_it;
+        if uses_it && (ftag == squid_direct_types::Tag.u32_ || ftag == squid_direct_types::Tag.i32_) {
+            let aok, aa, ab = matchAffineI32OfIter(g, f, m, plan.rec_exprs[fi], plan.iter_b, 0);
+            if aok {
+                plan.rec_is_aff[fi] = true;
+                plan.rec_aff_a[fi] = aa;
+                plan.rec_aff_b[fi] = ab;
+            }
+        }
+    }
+    plan.rec_field_count = nf;
+    plan.is_rec_lit = true;
+    plan.matched = true;
+    return plan;
+}
+
+recursive fn emitFastPushAosRecLoop(
+    g: Generator&,
+    f: Fn&,
+    plan: const FastPushPlan&,
+    dst_ptr: u32,
+    start_idx: u32,
+    count_loc: u32,
+    inv_vals: Vals,
+    loop_id: u32,
+) -> Error {
+    let ptr = local32(g, f);
+    lget(g, dst_ptr); lset(g, ptr);
+    let cur_i = local32(g, f);
+    lget(g, start_idx); lset(g, cur_i);
+    let rem = local32(g, f);
+    lget(g, count_loc); lset(g, rem);
+    if plan.iter_b != 0 { bindPut(g, f, plan.iter_b, valOf1(g, squid_direct_types::u32_, cur_i)); }
+    let r_exit = open(g, f, OP_block);
+    let r_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, r_exit);
+    for fi in 0..plan.rec_field_count {
+        let fv = if plan.rec_is_inv[fi] {
+            g.s.vals[inv_vals.start + fi]
+        } else {
+            let ev, eerr = expr(g, f, plan.rec_exprs[fi]);
+            if eerr != squid_direct_types::Error.none { return eerr; }
+            ev
+        };
+        let werr = writeElement(g, f, ptr, plan.rec_offs[fi], fv, loop_id);
+        if werr != squid_direct_types::Error.none { return werr; }
+    }
+    lget(g, ptr); i32Const(g, plan.elem_step); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, cur_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, cur_i);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, r_top);
+    close(g, f); close(g, f);
+    return squid_direct_types::Error.none;
+}
+
+recursive fn emitFastPushFlatBackend(
+    g: Generator&,
+    f: Fn&,
+    plan: const FastPushPlan&,
+    loop_id: u32,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    let rt = g.runtime_();
+    let dest = plan.dest;
+    lget(g, index); lget(g, end_local); op(g, OP_i32_lt_u);
+    let run_if = open(g, f, OP_if_);
+    let count = local32(g, f);
+    lget(g, end_local); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+    let entry = ensureCheckedGrow(g, f, dest);
+    let cap = local32(g, f);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity); ltee(g, cap);
+    i32Const(g, squid_direct_runtime::static_pool_flag); op(g, OP_i32_and); trap(g, f);
+    let old_len = local32(g, f);
+    let new_len = local32(g, f);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); ltee(g, old_len);
+    lget(g, count); op(g, OP_i32_add); ltee(g, new_len);
+    lget(g, old_len); op(g, OP_i32_lt_u);
+    let max_count = (rt.layout.heap_end - rt.layout.heap_base) / plan.elem_step;
+    lget(g, new_len); i32Const(g, max_count); op(g, OP_i32_gt_u); op(g, OP_i32_or); trap(g, f);
+    let need_bytes = emitScaledBytes(g, f, new_len, plan.elem_step);
+    let cap_bytes = local32(g, f);
+    lget(g, cap); i32Const(g, squid_direct_runtime::capacity_mask); op(g, OP_i32_and); lset(g, cap_bytes);
+    lget(g, need_bytes); lget(g, cap_bytes); op(g, OP_i32_gt_u);
+    let grow_if = open(g, f, OP_if_);
+    lget(g, w(g, dest, 0)); lget(g, w(g, dest, 1)); lget(g, new_len); i32Const(g, plan.elem_step); callf(g, rt.reserve);
+    popCheckedArraysAt(f, grow_if);
+    close(g, f);
+
+    let arr_base = local32(g, f);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, arr_base);
+    let dst_ptr = emitOffsetAddress(g, f, arr_base, old_len, plan.elem_step);
+
+    if !plan.is_rec_lit {
+        var inv_val = neverVal();
+        var inv_vsplat: u32 = 0xffffffff;
+        if plan.scalar_is_inv {
+            let iv, ierr = expr(g, f, plan.val_expr_id);
+            if ierr != squid_direct_types::Error.none { return ierr; }
+            inv_val = iv;
+            inv_vsplat = splatScalarVal(g, f, iv, plan.elem_step);
+        }
+        let ferr = emitPushColumnFill(g, f, dst_ptr, index, count, plan.iter_b, plan.val_expr_id, plan.scalar_is_inv, inv_val, inv_vsplat, plan.scalar_is_aff, plan.scalar_aff_a, plan.scalar_aff_b, plan.elem_step, loop_id);
+        if ferr != squid_direct_types::Error.none { return ferr; }
+    } else {
+        let inv_vals = g.reserveVals(plan.rec_field_count);
+        for fi in 0..plan.rec_field_count {
+            if plan.rec_is_inv[fi] {
+                let fv, ferr = expr(g, f, plan.rec_exprs[fi]);
+                if ferr != squid_direct_types::Error.none { return ferr; }
+                g.s.vals[inv_vals.start + fi] = fv;
+            }
+        }
+        let aerr = emitFastPushAosRecLoop(g, f, plan, dst_ptr, index, count, inv_vals, loop_id);
+        if aerr != squid_direct_types::Error.none { return aerr; }
+    }
+
+    lget(g, entry); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    lget(g, end_local); lset(g, index);
+    popCheckedArraysAt(f, run_if);
+    close(g, f);
+    invalidateCheckedOwner(g, f, dest);
+    return squid_direct_types::Error.none;
+}
+
+recursive fn emitFastPushSoaBackend(
+    g: Generator&,
+    f: Fn&,
+    plan: const FastPushPlan&,
+    pplan: const PackedPlan&,
+    loop_id: u32,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    let rt = g.runtime_();
+    let dest = plan.dest;
+    lget(g, index); lget(g, end_local); op(g, OP_i32_lt_u);
+    let run_if = open(g, f, OP_if_);
+    let count = local32(g, f);
+    lget(g, end_local); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+    let h_entry, h_base, old_len = emitCheckPackedHeaderMutable(g, f, dest);
+    let new_len = local32(g, f);
+    lget(g, old_len); lget(g, count); op(g, OP_i32_add); ltee(g, new_len);
+    lget(g, old_len); op(g, OP_i32_lt_u); trap(g, f);
+    let cur_cap = local32(g, f);
+    lget(g, new_len);
+    lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, PACKED_SOA_HDR_CAP); ltee(g, cur_cap);
+    op(g, OP_i32_gt_u);
+    let need_grow = open(g, f, OP_if_);
+    emitPackedSoaSyncSubLens(g, f, pplan, h_base, old_len);
+    let new_cap = local32(g, f);
+    lget(g, cur_cap); i32Const(g, 1); op(g, OP_i32_shl);
+    i32Const(g, 16);
+    lget(g, cur_cap); i32Const(g, 8); op(g, OP_i32_ge_u);
+    op(g, OP_select);
+    ltee(g, new_cap);
+    lget(g, new_len); op(g, OP_i32_lt_u);
+    let fix_cap = open(g, f, OP_if_);
+    lget(g, new_len); lset(g, new_cap);
+    close(g, f);
+    for s in 0..pplan.stream_count {
+        let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, pplan, h_base, s);
+        lget(g, sub_slot); lget(g, sub_gen); lget(g, new_cap); i32Const(g, pplan.stream_stride[s]);
+        callf(g, rt.reserve);
+    }
+    emitPackedSoaRefreshCache(g, f, pplan, h_base, new_cap);
+    popCheckedArraysAt(f, need_grow);
+    close(g, f);
+
+    for fi in 0..pplan.soa_field_count {
+        let s = pplan.soa_field_stream[fi];
+        if s < 0 { continue; }
+        let fstep = pplan.stream_stride[s];
+        let col_base = local32(g, f);
+        lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(pplan, s)); lset(g, col_base);
+        let dst_ptr = emitOffsetAddress(g, f, col_base, old_len, fstep);
+        var inv_val = neverVal();
+        var inv_vsplat: u32 = 0xffffffff;
+        if plan.rec_is_inv[fi] {
+            let fv, ferr = expr(g, f, plan.rec_exprs[fi]);
+            if ferr != squid_direct_types::Error.none { return ferr; }
+            inv_val = fv;
+            inv_vsplat = splatScalarVal(g, f, fv, fstep);
+        }
+        let cerr = emitPushColumnFill(g, f, dst_ptr, index, count, plan.iter_b, plan.rec_exprs[fi], plan.rec_is_inv[fi], inv_val, inv_vsplat, plan.rec_is_aff[fi], plan.rec_aff_a[fi], plan.rec_aff_b[fi], fstep, loop_id);
+        if cerr != squid_direct_types::Error.none { return cerr; }
+    }
+
+    lget(g, h_entry); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    lget(g, end_local); lset(g, index);
+    popCheckedArraysAt(f, run_if);
+    close(g, f);
+    invalidateCheckedOwner(g, f, dest);
+    return squid_direct_types::Error.none;
+}
+
+recursive fn emitFastPushSeqBackend(
+    g: Generator&,
+    f: Fn&,
+    plan: const FastPushPlan&,
+    splan: const SeqPlan&,
+    loop_id: u32,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    let wr_fn, werr = ensureSeqWritable(g);
+    if werr != squid_direct_types::Error.none { return werr; }
+    let flush_fn, flerr = ensureSeqFlushFocus(g, splan);
+    if flerr != squid_direct_types::Error.none { return flerr; }
+    let push_leaf_fn, plerr = ensureSeqTreePushLeaf(g);
+    if plerr != squid_direct_types::Error.none { return plerr; }
+    let concat_fn, cerr = ensureSeqTreeConcat(g, splan);
+    if cerr != squid_direct_types::Error.none { return cerr; }
+
+    let dest = plan.dest;
+    let lcap = splan.leaf_cap;
+    lget(g, index); lget(g, end_local); op(g, OP_i32_lt_u);
+    let has_iters = open(g, f, OP_if_);
+    let count = local32(g, f);
+    lget(g, end_local); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+    lget(g, count); i32Const(g, lcap); op(g, OP_i32_ge_u);
+    let big_enough = open(g, f, OP_if_);
+
+    let entry = local32(g, f);
+    let hdr = local32(g, f);
+    let epoch = local32(g, f);
+    lget(g, w(g, dest, 0)); lget(g, w(g, dest, 1)); callf(g, wr_fn);
+    lset(g, epoch); lset(g, hdr); lset(g, entry);
+
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV); op(g, OP_i32_eqz);
+    let not_rev = open(g, f, OP_if_);
+
+    let chunks = local32(g, f);
+    lget(g, count); i32Const(g, lcap); op(g, squid_direct_writer::OP_i32_div_u); lset(g, chunks);
+    let fast_n = local32(g, f);
+    lget(g, chunks); i32Const(g, lcap); op(g, squid_direct_writer::OP_i32_mul); lset(g, fast_n);
+    let old_len = local32(g, f);
+    let new_len = local32(g, f);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); ltee(g, old_len);
+    lget(g, fast_n); op(g, OP_i32_add); ltee(g, new_len);
+    lget(g, old_len); op(g, OP_i32_lt_u); trap(g, f);
+
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_FOCUS);
+    let has_foc = open(g, f, OP_if_);
+    lget(g, hdr); lget(g, epoch); callf(g, flush_fn);
+    popCheckedArraysAt(f, has_foc);
+    close(g, f);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_APPEND_EP);
+    lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FAST_PREPEND_EP);
+
+    var sc_inv_val = neverVal();
+    var sc_inv_vsplat: u32 = 0xffffffff;
+    var rec_inv_vals = Vals {};
+    var rec_inv_vsplats = Words {};
+    if !plan.is_rec_lit {
+        if plan.scalar_is_inv {
+            let iv, ierr = expr(g, f, plan.val_expr_id);
+            if ierr != squid_direct_types::Error.none { return ierr; }
+            sc_inv_val = iv;
+            sc_inv_vsplat = splatScalarVal(g, f, iv, plan.elem_step);
+        }
+    } else {
+        rec_inv_vals = g.reserveVals(plan.rec_field_count);
+        rec_inv_vsplats = Words { g.s.words.len as u32, plan.rec_field_count as u32 };
+        for fi in 0..plan.rec_field_count { g.s.words.push(0xffffffff); }
+        for fi in 0..plan.rec_field_count {
+            if plan.rec_is_inv[fi] {
+                let fv, ferr = expr(g, f, plan.rec_exprs[fi]);
+                if ferr != squid_direct_types::Error.none { return ferr; }
+                g.s.vals[rec_inv_vals.start + fi] = fv;
+                g.s.words[rec_inv_vsplats.start + fi] = splatScalarVal(g, f, fv, plan.rec_steps[fi]);
+            }
+        }
+    }
+
+    let root = local32(g, f);
+    lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); lset(g, root);
+    let cur_i = local32(g, f);
+    lget(g, index); lset(g, cur_i);
+    let c_rem = local32(g, f);
+    lget(g, chunks); lset(g, c_rem);
+    let lcap_loc = constLocal(g, f, lcap);
+    let leaf = local32(g, f);
+    let fast_r = local32(g, f);
+    let leaf_bytes = if splan.leaf_kind == SEQ_KIND_PACKED_SOA { splan.soa_leaf_bytes } else { splan.flat_leaf_bytes };
+
+    let ch_exit = open(g, f, OP_block);
+    let ch_top = open(g, f, OP_loop);
+    lget(g, c_rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, ch_exit);
+
+    i32Const(g, leaf_bytes); callf(g, g.s.seq_alloc_fn); lset(g, leaf);
+    lget(g, leaf); i32Const(g, splan.leaf_kind); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
+    lget(g, leaf); lget(g, epoch); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_EPOCH);
+    lget(g, leaf); i32Const(g, lcap); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
+    if splan.leaf_kind == SEQ_KIND_FLAT {
+        lget(g, leaf); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_CAP);
+        let ldata = local32(g, f);
+        lget(g, leaf); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, ldata);
+        if !plan.is_rec_lit {
+            let ferr = emitPushColumnFill(g, f, ldata, cur_i, lcap_loc, plan.iter_b, plan.val_expr_id, plan.scalar_is_inv, sc_inv_val, sc_inv_vsplat, plan.scalar_is_aff, plan.scalar_aff_a, plan.scalar_aff_b, plan.elem_step, loop_id);
+            if ferr != squid_direct_types::Error.none { return ferr; }
+        } else {
+            let aerr = emitFastPushAosRecLoop(g, f, plan, ldata, cur_i, lcap_loc, rec_inv_vals, loop_id);
+            if aerr != squid_direct_types::Error.none { return aerr; }
+        }
+    } else {
+        for fi in 0..splan.packed.soa_field_count {
+            let s = splan.packed.soa_field_stream[fi];
+            if s < 0 { continue; }
+            let fstep = splan.packed.stream_stride[s];
+            let col_ptr = local32(g, f);
+            lget(g, leaf); i32Const(g, splan.soa_col_off[s]); op(g, OP_i32_add); lset(g, col_ptr);
+            let iv = if plan.rec_is_inv[fi] { g.s.vals[rec_inv_vals.start + fi] } else { neverVal() };
+            let vs = if plan.rec_is_inv[fi] { g.s.words[rec_inv_vsplats.start + fi] } else { 0xffffffff };
+            let ferr = emitPushColumnFill(g, f, col_ptr, cur_i, lcap_loc, plan.iter_b, plan.rec_exprs[fi], plan.rec_is_inv[fi], iv, vs, plan.rec_is_aff[fi], plan.rec_aff_a[fi], plan.rec_aff_b[fi], fstep, loop_id);
+            if ferr != squid_direct_types::Error.none { return ferr; }
+        }
+    }
+
+    lget(g, root); op(g, OP_i32_eqz);
+    let r_empty = open(g, f, OP_if_);
+    lget(g, leaf); lset(g, root);
+    popCheckedArraysAt(f, r_empty);
+    op(g, OP_else_);
+    lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, push_leaf_fn); ltee(g, fast_r);
+    let did_fast = open(g, f, OP_if_);
+    lget(g, fast_r); lset(g, root);
+    popCheckedArraysAt(f, did_fast);
+    op(g, OP_else_);
+    lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, concat_fn); lset(g, root);
+    close(g, f);
+    close(g, f);
+
+    lget(g, cur_i); i32Const(g, lcap); op(g, OP_i32_add); lset(g, cur_i);
+    lget(g, c_rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, c_rem);
+    br(g, f, OP_br, ch_top);
+    close(g, f); close(g, f);
+
+    lget(g, hdr); lget(g, root); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_ROOT);
+    lget(g, hdr); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
+    lget(g, entry); lget(g, new_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    lget(g, cur_i); lset(g, index);
+
+    popCheckedArraysAt(f, not_rev);
+    close(g, f);
+    popCheckedArraysAt(f, big_enough);
+    close(g, f);
+    popCheckedArraysAt(f, has_iters);
+    close(g, f);
+    invalidateCheckedOwner(g, f, dest);
+    return squid_direct_types::Error.none;
+}
+
+recursive fn tryEmitFastPushRangeLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return squid_direct_types::Error.none;
+    }
+    let plan = analyzeFastPushRangeLoop(g, f, loop_id, info, iteration, carry_in_place);
+    if !plan.matched { return squid_direct_types::Error.none; }
+
+    var pplan = PackedPlan {};
+    var splan = SeqPlan {};
+    if plan.dtag == squid_direct_types::Tag.packed {
+        let pp, perr = computePackedPlan(g, f, plan.elem_ty, loop_id);
+        if perr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+        if pp.mode != PACKED_FLAT && pp.mode != PACKED_SOA { return squid_direct_types::Error.none; }
+        if pp.mode == PACKED_SOA && !plan.is_rec_lit { return squid_direct_types::Error.none; }
+        pplan = pp;
+    } else if plan.dtag == squid_direct_types::Tag.seq {
+        let sp, sperr = computeSeqPlan(g, f, plan.elem_ty, loop_id);
+        if sperr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+        if sp.leaf_kind != SEQ_KIND_FLAT && sp.leaf_kind != SEQ_KIND_PACKED_SOA { return squid_direct_types::Error.none; }
+        if sp.leaf_kind == SEQ_KIND_PACKED_SOA && !plan.is_rec_lit { return squid_direct_types::Error.none; }
+        splan = sp;
+    }
+
+    {
+        let m .= g.units[f.unit - 1];
+        if !plan.is_rec_lit && plan.scalar_is_aff {
+            markUnpatchableExprConstants(m, plan.val_expr_id, 0);
+        } else if plan.is_rec_lit {
+            for fi in 0..plan.rec_field_count {
+                if plan.rec_is_aff[fi] { markUnpatchableExprConstants(m, plan.rec_exprs[fi], 0); }
+            }
+        }
+    }
+    if plan.method_target.unit != 0 { g.recordInlined(plan.method_target.unit, plan.method_target.binding); }
+
+    if plan.dtag == squid_direct_types::Tag.array || (plan.dtag == squid_direct_types::Tag.packed && pplan.mode == PACKED_FLAT) {
+        return emitFastPushFlatBackend(g, f, plan, loop_id, index, end_local);
+    }
+    if plan.dtag == squid_direct_types::Tag.packed && pplan.mode == PACKED_SOA {
+        return emitFastPushSoaBackend(g, f, plan, pplan, loop_id, index, end_local);
+    }
+    if plan.dtag == squid_direct_types::Tag.seq {
+        return emitFastPushSeqBackend(g, f, plan, splan, loop_id, index, end_local);
+    }
     return squid_direct_types::Error.none;
 }

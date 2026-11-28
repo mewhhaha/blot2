@@ -17,6 +17,11 @@ let PACKED_SPLIT_SUM: u32 = 2;
 //   +0:            cached `elem_cap: u32` guaranteed across all S columns
 //   +16:           S * 8 bytes of `(sub_slot, sub_gen)` handles
 //   +16 + S * 8:   S * 4 bytes of cached `col_base[s]: u32` direct data pointers
+// PACKED_SPLIT_SUM header layout (16-byte aligned):
+//   +0:            S * 8 bytes of `(sub_slot, sub_gen)` handles
+//   +S * 8:        S * 4 bytes of cached `stream_base[s]: u32` direct data pointers
+//   +S * 12:       S * 4 bytes of cached `stream_len[s]: u32` (stream 0 mirrors header len)
+//   +S * 16:       S * 4 bytes of cached `stream_cap[s]: u32` (in elements)
 let PACKED_SOA_HDR_CAP: u32 = 0;
 let PACKED_SOA_HDR_SUBS: u32 = 16;
 
@@ -29,11 +34,23 @@ fn packedSoaColBaseOff(plan: const PackedPlan&, s: i64) -> u32 {
     return PACKED_SOA_HDR_SUBS + (plan.stream_count as u32) * 8 + (s as u32) * 4;
 }
 
+fn packedSplitBaseOff(plan: const PackedPlan&, s: i64) -> u32 {
+    return (plan.stream_count as u32) * 8 + (s as u32) * 4;
+}
+
+fn packedSplitLenOff(plan: const PackedPlan&, s: i64) -> u32 {
+    return (plan.stream_count as u32) * 12 + (s as u32) * 4;
+}
+
+fn packedSplitCapOff(plan: const PackedPlan&, s: i64) -> u32 {
+    return (plan.stream_count as u32) * 16 + (s as u32) * 4;
+}
+
 fn packedHeaderBytes(plan: const PackedPlan&) -> u32 {
     if plan.mode == PACKED_SOA {
         return (PACKED_SOA_HDR_SUBS + (plan.stream_count as u32) * 12 + 15) & 0xfffffff0;
     }
-    return (plan.stream_count as u32) * 8;
+    return ((plan.stream_count as u32) * 20 + 15) & 0xfffffff0;
 }
 
 struct PackedPlan {
@@ -306,6 +323,114 @@ fn emitPackedSoaRefreshCache(g: Generator&, f: const Fn&, plan: const PackedPlan
     }
 }
 
+// Syncs `sub_entry.entry_length` for all PACKED_SPLIT_SUM sub-slots before slow-path
+// `rt.pop`, `rt.copy`, `rt.persist`, or `extend`.
+fn emitPackedSplitSyncSubLens(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, h_len: u32) {
+    for s in 0..plan.stream_count {
+        let off = packedSubOff(plan, s);
+        let sub_slot = local32(g, f);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+        lset(g, sub_slot);
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        lget(g, sub_entry);
+        if s == 0 {
+            lget(g, h_len);
+        } else {
+            lget(g, h_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s));
+        }
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    }
+}
+
+// Refreshes PACKED_SPLIT_SUM header cached `stream_base[s]`, `stream_len[s]`, and `stream_cap[s]`.
+fn emitPackedSplitRefreshAll(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, zero_caps: bool) {
+    for s in 0..plan.stream_count {
+        let off = packedSubOff(plan, s);
+        let sub_slot = local32(g, f);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+        lset(g, sub_slot);
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        lget(g, h_base);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, s));
+        lget(g, h_base);
+        lget(g, sub_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s));
+        lget(g, h_base);
+        if zero_caps {
+            i32Const(g, 0);
+        } else {
+            let step = plan.stream_stride[s];
+            lget(g, sub_entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+            i32Const(g, squid_direct_runtime::capacity_mask);
+            op(g, OP_i32_and);
+            if step > 1 {
+                i32Const(g, step);
+                op(g, squid_direct_writer::OP_i32_div_u);
+            }
+        }
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitCapOff(plan, s));
+    }
+}
+
+// Header-cached zero-lookup push onto PACKED_SPLIT_SUM stream `s` (`!rt.has_fork` only).
+// Reads `stream_cap[s]`/`stream_base[s]` directly from header; syncs + grows only on rare cap miss.
+fn emitPackedSplitStreamPushCached(
+    g: Generator&,
+    f: Fn&,
+    plan: const PackedPlan&,
+    h_base: u32,
+    s: i64,
+    cur_len: u32,
+    step: u32,
+) -> u32 {
+    let rt = g.runtime_();
+    let cur_cap = local32(g, f);
+    let next_len = local32(g, f);
+    lget(g, cur_len);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    ltee(g, next_len);
+    lget(g, h_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitCapOff(plan, s));
+    ltee(g, cur_cap);
+    op(g, OP_i32_gt_u);
+    let need_grow = open(g, f, OP_if_);
+    let min_cap: u32 = if s == 0 { 16 } else { 8 };
+    let new_cap = local32(g, f);
+    lget(g, cur_cap); i32Const(g, 1); op(g, OP_i32_shl);
+    i32Const(g, min_cap);
+    lget(g, cur_cap); i32Const(g, min_cap >> 1); op(g, OP_i32_ge_u);
+    op(g, OP_select);
+    ltee(g, new_cap);
+    lget(g, next_len); op(g, OP_i32_lt_u);
+    let fix_c = open(g, f, OP_if_);
+    lget(g, next_len); lset(g, new_cap);
+    close(g, f);
+    let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, s);
+    let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+    lget(g, sub_entry); lget(g, cur_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    lget(g, sub_slot); lget(g, sub_gen); lget(g, new_cap); i32Const(g, step); callf(g, rt.reserve);
+    lget(g, h_base);
+    lget(g, sub_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, s));
+    lget(g, h_base); lget(g, new_cap); op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitCapOff(plan, s));
+    popCheckedArraysAt(f, need_grow);
+    close(g, f);
+    if s >= 1 {
+        lget(g, h_base); lget(g, next_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s));
+    }
+    let sbase = local32(g, f);
+    lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, s)); lset(g, sbase);
+    return emitOffsetAddress(g, f, sbase, cur_len, step);
+}
+
 // Loads `(sub_slot, sub_gen)` of stream `s` from header buffer `h_base`.
 fn emitLoadPackedSubHandle(g: Generator&, f: const Fn&, plan: const PackedPlan&, h_base: u32, s: i64) -> u32, u32 {
     let off = packedSubOff(plan, s);
@@ -322,11 +447,19 @@ fn emitLoadPackedSubHandle(g: Generator&, f: const Fn&, plan: const PackedPlan&,
 
 fn emitLoadPackedSubBase(g: Generator&, f: Fn&, plan: const PackedPlan&, h_base: u32, s: i64) -> u32 {
     let sub_base = local32(g, f);
-    if plan.mode == PACKED_SOA && !g.runtime_().has_fork {
-        lget(g, h_base);
-        op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
-        lset(g, sub_base);
-        return sub_base;
+    if !g.runtime_().has_fork {
+        if plan.mode == PACKED_SOA {
+            lget(g, h_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSoaColBaseOff(plan, s));
+            lset(g, sub_base);
+            return sub_base;
+        }
+        if plan.mode == PACKED_SPLIT_SUM {
+            lget(g, h_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, s));
+            lset(g, sub_base);
+            return sub_base;
+        }
     }
     let off = packedSubOff(plan, s);
     let sub_slot = local32(g, f);
@@ -443,6 +576,20 @@ fn emitPackedWithCapacity(g: Generator&, f: Fn&, ty: Ty, cap_local: u32, has_cap
     if plan.mode == PACKED_SOA {
         let init_cap = if has_cap { cap_local } else { constLocal(g, f, 0) };
         emitPackedSoaRefreshCache(g, f, plan, h_base, init_cap);
+    } else if plan.mode == PACKED_SPLIT_SUM {
+        for s in 0..plan.stream_count {
+            let off = packedSubOff(plan, s);
+            let sub_slot = local32(g, f);
+            lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, off); lset(g, sub_slot);
+            let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+            lget(g, h_base);
+            lget(g, sub_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, s));
+            lget(g, h_base); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s));
+            lget(g, h_base);
+            if s == 0 && has_cap { lget(g, cap_local); } else { i32Const(g, 0); }
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitCapOff(plan, s));
+        }
     }
     lget(g, h_base);
     i32Const(g, 0);
@@ -700,8 +847,93 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
     let terr = emitValueTag(g, f, value, id);
     if terr != squid_direct_types::Error.none { return neverVal(), terr; }
     lset(g, tag_loc);
+    if !rt.has_fork {
+        // Zero-lookup header-cached fast path (with dense `br_table` dispatch when >= 3 variants).
+        let t_addr = emitPackedSplitStreamPushCached(g, f, plan, h_base, 0, h_len, 1);
+        var dense_tags = plan.variant_count >= 3 && plan.variant_count <= 64;
+        if dense_tags {
+            for ci in 0..plan.variant_count {
+                if g.types.variant_tags[cases.tags + ci] != (ci as u32) { dense_tags = false; break; }
+            }
+        }
+        let done = open(g, f, OP_block);
+        if dense_tags {
+            let nvar = plan.variant_count;
+            for _ in 0..(nvar + 1) { let _ = open(g, f, OP_block); }
+            lget(g, tag_loc);
+            op(g, OP_br_table);
+            uleb(g, nvar as u32);
+            for ci in 0..nvar { uleb(g, ci as u32); }
+            uleb(g, nvar as u32);
+            for ci in 0..nvar {
+                close(g, f);
+                let vtag = g.types.variant_tags[cases.tags + ci];
+                lget(g, t_addr); i32Const(g, ci as u32); op(g, OP_i32_store8); uleb(g, 0); uleb(g, 0);
+                let s = plan.variant_stream[ci];
+                if s >= 0 {
+                    let payload, uerr = unwrapVariant(g, f, value, vtag, id);
+                    if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
+                    let step = plan.stream_stride[s];
+                    let slen = local32(g, f);
+                    lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s)); lset(g, slen);
+                    let p_addr = emitPackedSplitStreamPushCached(g, f, plan, h_base, s, slen, step);
+                    if holdsContainer(g, payload.ty, 0) {
+                        let p_slot = local32(g, f);
+                        lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSubOff(plan, s)); lset(g, p_slot);
+                        let noted = noteStoreToSlot(g, f, p_slot, payload);
+                        if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+                    }
+                    let werr = writeElement(g, f, p_addr, 0, payload, id);
+                    if werr != squid_direct_types::Error.none { return neverVal(), werr; }
+                }
+                br(g, f, OP_br, done);
+            }
+            close(g, f);
+            op(g, OP_unreachable_);
+        } else {
+            for ci in 0..plan.variant_count {
+                let vtag = g.types.variant_tags[cases.tags + ci];
+                let next = open(g, f, OP_block);
+                lget(g, tag_loc);
+                i32Const(g, vtag);
+                op(g, OP_i32_ne);
+                br(g, f, OP_br_if, next);
+                lget(g, t_addr);
+                i32Const(g, ci as u32);
+                op(g, OP_i32_store8); uleb(g, 0); uleb(g, 0);
+                let s = plan.variant_stream[ci];
+                if s >= 0 {
+                    let payload, uerr = unwrapVariant(g, f, value, vtag, id);
+                    if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
+                    let step = plan.stream_stride[s];
+                    let slen = local32(g, f);
+                    lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s)); lset(g, slen);
+                    let p_addr = emitPackedSplitStreamPushCached(g, f, plan, h_base, s, slen, step);
+                    if holdsContainer(g, payload.ty, 0) {
+                        let p_slot = local32(g, f);
+                        lget(g, h_base); op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSubOff(plan, s)); lset(g, p_slot);
+                        let noted = noteStoreToSlot(g, f, p_slot, payload);
+                        if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+                    }
+                    let werr = writeElement(g, f, p_addr, 0, payload, id);
+                    if werr != squid_direct_types::Error.none { return neverVal(), werr; }
+                }
+                br(g, f, OP_br, done);
+                close(g, f);
+            }
+            op(g, OP_unreachable_);
+        }
+        close(g, f);
+        lget(g, h_entry);
+        lget(g, h_len);
+        i32Const(g, 1);
+        op(g, OP_i32_add);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
+        return container, squid_direct_types::Error.none;
+    }
     let t_slot, t_addr = emitPackedSubPushFast(g, f, h_base, 0, 1);
-    if rt.has_fork { recordBeforeWrite(g, f, t_slot, t_addr, 0, 1); }
+    recordBeforeWrite(g, f, t_slot, t_addr, 0, 1);
     let done = open(g, f, OP_block);
     for ci in 0..plan.variant_count {
         let vtag = g.types.variant_tags[cases.tags + ci];
@@ -721,7 +953,7 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
             let p_slot, p_addr = emitPackedSubPushFast(g, f, h_base, s, step);
             let noted = noteStoreToSlot(g, f, p_slot, payload);
             if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-            if rt.has_fork { recordBeforeWrite(g, f, p_slot, p_addr, 0, step); }
+            recordBeforeWrite(g, f, p_slot, p_addr, 0, step);
             let werr = writeElement(g, f, p_addr, 0, payload, id);
             if werr != squid_direct_types::Error.none { return neverVal(), werr; }
         }
@@ -730,9 +962,7 @@ fn emitPackedPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32,
     }
     op(g, OP_unreachable_);
     close(g, f);
-    if rt.has_fork {
-        recordBeforeWrite(g, f, w(g, container, 0), h_entry, squid_direct_runtime::entry_length, 4);
-    }
+    recordBeforeWrite(g, f, w(g, container, 0), h_entry, squid_direct_runtime::entry_length, 4);
     lget(g, h_entry);
     lget(g, h_len);
     i32Const(g, 1);
@@ -856,6 +1086,9 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
     // PACKED_SPLIT_SUM
     let cases, cerr = g.types.variants(elem_ty);
     if cerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+    if !rt.has_fork {
+        emitPackedSplitSyncSubLens(g, f, plan, h_base, h_len);
+    }
     let t_slot, t_gen = emitLoadPackedSubHandle(g, f, plan, h_base, 0);
     let t_addr = local32(g, f);
     let ci_loc = local32(g, f);
@@ -896,6 +1129,12 @@ fn emitPackedPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, sele
             i32Const(g, step);
             callf(g, rt.pop);
             lset(g, p_addr);
+            if !rt.has_fork {
+                let p_entry = emitPackedSubEntryAddr(g, f, p_slot);
+                lget(g, h_base);
+                lget(g, p_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+                op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitLenOff(plan, s));
+            }
             let loaded, lerr = loadElement(g, f, p_addr, 0, pty, id);
             if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
             payload = loaded;
@@ -965,6 +1204,21 @@ fn emitPackedReserve(g: Generator&, f: Fn&, container: Val, additional: u32, id:
             callf(g, rt.reserve);
         }
         emitPackedSoaRefreshCache(g, f, plan, h_base, need);
+        close(g, f);
+    } else if plan.mode == PACKED_SPLIT_SUM && !rt.has_fork {
+        lget(g, need);
+        lget(g, h_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, packedSplitCapOff(plan, 0));
+        op(g, OP_i32_gt_u);
+        let need_r = open(g, f, OP_if_);
+        let sub_slot, sub_gen = emitLoadPackedSubHandle(g, f, plan, h_base, 0);
+        let sub_entry = emitPackedSubEntryAddr(g, f, sub_slot);
+        lget(g, sub_entry); lget(g, h_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        lget(g, sub_slot); lget(g, sub_gen); lget(g, need); i32Const(g, 1); callf(g, rt.reserve);
+        lget(g, h_base);
+        lget(g, sub_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitBaseOff(plan, 0));
+        lget(g, h_base); lget(g, need); op(g, OP_i32_store); uleb(g, 2); uleb(g, packedSplitCapOff(plan, 0));
         close(g, f);
     } else {
         let limit = if plan.mode == PACKED_SOA { plan.stream_count } else { 1 };
@@ -1140,6 +1394,9 @@ fn emitPackedExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId,
         if plan.mode == PACKED_SOA && !rt.has_fork {
             emitPackedSoaSyncSubLens(g, f, plan, dst_h_base, dst_h_len);
             emitPackedSoaSyncSubLens(g, f, plan, src_h_base, src_h_len);
+        } else if plan.mode == PACKED_SPLIT_SUM && !rt.has_fork {
+            emitPackedSplitSyncSubLens(g, f, plan, dst_h_base, dst_h_len);
+            emitPackedSplitSyncSubLens(g, f, plan, src_h_base, src_h_len);
         }
         for s in 0..plan.stream_count {
             let step = plan.stream_stride[s];
@@ -1192,6 +1449,8 @@ fn emitPackedExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId,
             op(g, OP_select);
             lset(g, final_cap);
             emitPackedSoaRefreshCache(g, f, plan, dst_h_base, final_cap);
+        } else if plan.mode == PACKED_SPLIT_SUM && !rt.has_fork {
+            emitPackedSplitRefreshAll(g, f, plan, dst_h_base, false);
         }
         if rt.has_fork {
             recordBeforeWrite(g, f, w(g, dst, 0), dst_h_entry, squid_direct_runtime::entry_length, 4);
@@ -1344,6 +1603,8 @@ recursive fn emitPackedDeepCopy(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u
     if !holds {
         if plan.mode == PACKED_SOA && !rt.has_fork {
             emitPackedSoaSyncSubLens(g, f, plan, src_h_base, length);
+        } else if plan.mode == PACKED_SPLIT_SUM && !rt.has_fork {
+            emitPackedSplitSyncSubLens(g, f, plan, src_h_base, length);
         }
         let header_bytes = packedHeaderBytes(plan);
         let new_h_base = local32(g, f);
@@ -1367,6 +1628,8 @@ recursive fn emitPackedDeepCopy(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u
         }
         if plan.mode == PACKED_SOA {
             emitPackedSoaRefreshCache(g, f, plan, new_h_base, length);
+        } else if plan.mode == PACKED_SPLIT_SUM {
+            emitPackedSplitRefreshAll(g, f, plan, new_h_base, false);
         }
         lget(g, new_h_base);
         lget(g, length);
@@ -1441,6 +1704,8 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, h_len);
     if plan.mode == PACKED_SOA && !rt.has_fork {
         emitPackedSoaSyncSubLens(g, f, plan, h_base, h_len);
+    } else if plan.mode == PACKED_SPLIT_SUM && !rt.has_fork {
+        emitPackedSplitSyncSubLens(g, f, plan, h_base, h_len);
     }
     let header_bytes = packedHeaderBytes(plan);
     let p_h_base = local32(g, f);
@@ -1471,6 +1736,8 @@ recursive fn emitPackedPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u3
     if plan.mode == PACKED_SOA {
         let zero_cap = constLocal(g, f, 0);
         emitPackedSoaRefreshCache(g, f, plan, p_h_base, zero_cap);
+    } else if plan.mode == PACKED_SPLIT_SUM {
+        emitPackedSplitRefreshAll(g, f, plan, p_h_base, true);
     }
     let p_slot = local32(g, f);
     let p_gen = local32(g, f);
@@ -1863,6 +2130,322 @@ recursive fn packedPatternIrrefutable(m: const Module&, pat_id: u32) -> bool {
     }
 }
 
+// Flattened representation of a `Tag.match_` (or binary `caseLevel` chain) on a split-sum binding.
+struct FlatSplitArm {
+    ci: i64 = 0,
+    ctor_tag: u32 = 0,
+    subpat: u32 = 0,
+    body: u32 = 0,
+}
+
+struct FlatSplitChain {
+    ok: bool = false,
+    arm_count: i64 = 0,
+    arms: FlatSplitArm[64] = [FlatSplitArm {}; 64],
+    has_wild: bool = false,
+    wild_body: u32 = 0,
+    merges_len: i64 = 0,
+    // [arm_idx * 16 + merge_at] -> binding delivering outer merge `merge_at` in flattened arm `arm_idx`
+    arm_merge_bind: u32[1024] = [0; 1024],
+    wild_merge_bind: u32[16] = [0; 16],
+}
+
+recursive fn collectFlatSplitChain(
+    g: Generator&,
+    m: const Module&,
+    match_id: u32,
+    binding: u32,
+    cases: squid_direct_types::Variants,
+    cur_merges: const u32[16]&,
+    merges_len: i64,
+    out: FlatSplitChain&,
+    seen_mask: u64&,
+    depth: i64,
+) -> bool {
+    if depth > 64 || match_id == 0 { return false; }
+    let n = m.node(match_id);
+    if n.tag != squid_check_core::Tag.match_ { return false; }
+    let inputs = m.matchInputs(match_id);
+    if inputs.len != 1 || localRef(m, inputs[0]) != binding { return false; }
+    let arms = m.matchArms(match_id);
+    let local_merges = m.branchMerges(match_id);
+    if local_merges.len > 0 && arms.len > 2 { return false; }
+    if depth > 0 && local_merges.len > 0 {
+        for lm in local_merges {
+            var tracked = false;
+            for at in 0..merges_len {
+                if cur_merges[at] == lm.result { tracked = true; break; }
+            }
+            if !tracked { return false; }
+        }
+    }
+
+    var saw_wild = false;
+    for arm, ai in arms {
+        if arm.guard_ != 0 { return false; }
+        let rows = m.armRows(arm);
+        if rows.len != 1 { return false; }
+        let pats = m.rowPatterns(rows[0]);
+        if pats.len != 1 { return false; }
+        let pat = m.pattern(pats[0]);
+
+        // Compute the active merge bindings for this arm (ai == 0 -> then, ai == 1 -> else).
+        var arm_mb: u32[16] = [0; 16];
+        for at in 0..merges_len {
+            var mb = cur_merges[at];
+            if local_merges.len > 0 && ai < 2 {
+                for lm in local_merges {
+                    if lm.result == mb {
+                        mb = if ai == 0 { lm.then_binding } else { lm.else_binding };
+                        break;
+                    }
+                }
+            }
+            arm_mb[at] = mb;
+        }
+
+        if pat.tag == squid_check_core::PatternTag.constructor {
+            if saw_wild || out.arm_count >= 64 { return false; }
+            let ctag = m.constructor(pat.a).tag;
+            var ci: i64 = -1;
+            for pos in 0..(cases.len as i64) {
+                if g.types.variant_tags[cases.tags + pos] == ctag { ci = pos; break; }
+            }
+            if ci < 0 || ci >= 64 { return false; }
+            let bit = (1 as u64) << (ci as u64);
+            if (seen_mask & bit) != 0 { return false; }
+            if pat.b != 0 && !packedPatternIrrefutable(m, pat.b) { return false; }
+            seen_mask |= bit;
+            let slot = out.arm_count;
+            out.arms[slot] = FlatSplitArm { ci: ci, ctor_tag: ctag, subpat: pat.b, body: arm.body };
+            for at in 0..merges_len { out.arm_merge_bind[slot * 16 + at] = arm_mb[at]; }
+            out.arm_count += 1;
+        } else if pat.tag == squid_check_core::PatternTag.wildcard || pat.tag == squid_check_core::PatternTag.bind {
+            saw_wild = true;
+            var next_binding = binding;
+            if pat.tag == squid_check_core::PatternTag.bind { next_binding = pat.a; }
+            let sub = unwrapSingleMatchNode(m, arm.body);
+            if sub != 0 && m.matchInputs(sub).len == 1 && localRef(m, m.matchInputs(sub)[0]) == next_binding {
+                if !collectFlatSplitChain(g, m, sub, next_binding, cases, arm_mb, merges_len, out, seen_mask, depth + 1) {
+                    return false;
+                }
+            } else {
+                if pat.tag == squid_check_core::PatternTag.bind || out.has_wild { return false; }
+                out.has_wild = true;
+                out.wild_body = arm.body;
+                for at in 0..merges_len { out.wild_merge_bind[at] = arm_mb[at]; }
+            }
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn flattenSplitSumMatch(
+    g: Generator&,
+    m: const Module&,
+    id: u32,
+    binding: u32,
+    cases: squid_direct_types::Variants,
+) -> FlatSplitChain {
+    var chain = FlatSplitChain {};
+    let merges = m.branchMerges(id);
+    if merges.len > 16 || (cases.len as i64) > 64 { return chain; }
+    chain.merges_len = merges.len;
+    var init_mb: u32[16] = [0; 16];
+    for merge, at in merges { init_mb[at] = merge.result; }
+    var seen_mask: u64 = 0;
+    if !collectFlatSplitChain(g, m, id, binding, cases, init_mb, merges.len, chain, seen_mask, 0) {
+        return FlatSplitChain {};
+    }
+    chain.ok = true;
+    return chain;
+}
+
+// 16-byte v128 uniform-tag run skip plan for dominant zero-payload variants (e.g. `$Tick => acc := self + 1`).
+// Shared between `%[T]` (`PACKED_SPLIT_SUM`) and `~[T]` (`SEQ_KIND_PACKED_SUM`).
+struct SplitSumHotSkipPlan {
+    matched: bool = false,
+    ci: u32 = 0,
+    upd_count: i64 = 0,
+    carry_idx: i64[4] = [0; 4],
+    delta_u32: u32[4] = [0; 4],
+    const_node: u32[4] = [0; 4],
+}
+
+fn analyzeSplitSumHotSkip(
+    g: Generator&,
+    f: const Fn&,
+    loop_id: u32,
+    match_root: u32,
+    ev_bind: u32,
+    elem_ty: Ty,
+    plan: const PackedPlan&,
+    iteration: Vals,
+    slots: Words,
+) -> SplitSumHotSkipPlan {
+    var hot = SplitSumHotSkipPlan {};
+    if match_root == 0 || g.runtime_().has_fork { return hot; }
+    let cases, cerr = g.types.variants(elem_ty);
+    if cerr != squid_direct_types::Error.none { return hot; }
+    let m .= g.units[f.unit - 1];
+    let chain = flattenSplitSumMatch(g, m, match_root, ev_bind, cases);
+    if !chain.ok { return hot; }
+    let carries = m.loopCarries(loop_id);
+    if carries.len > 16 { return hot; }
+    let outer_merges = m.branchMerges(match_root);
+
+    // Search flattened arms for a zero-payload variant whose body only does constant U32/I32 carry additions.
+    for ai in 0..chain.arm_count {
+        let ci = chain.arms[ai].ci;
+        if ci < 0 || ci >= plan.variant_count || plan.variant_stream[ci] >= 0 { continue; }
+        let body_id = chain.arms[ai].body;
+
+        // Collect all top-level statements in arm body; must be only `Tag.bind` (or unit/empty).
+        var stmts: u32[8] = [0; 8];
+        var slen: i64 = 0;
+        var stmts_ok = true;
+        if body_id != 0 {
+            let bn = m.node(body_id);
+            if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
+                let ch = m.children(body_id);
+                if ch.len > 8 { stmts_ok = false; }
+                else {
+                    for s_i in 0..ch.len { stmts[s_i] = ch[s_i]; }
+                    slen = ch.len;
+                }
+            } else if bn.tag == squid_check_core::Tag.constant {
+                slen = 0;
+            } else {
+                stmts[0] = body_id;
+                slen = 1;
+            }
+        }
+        if !stmts_ok { continue; }
+
+        // Parse each statement: must be `bind b = carry_iter + const_u32` (or trailing unit constant).
+        var def_b: u32[8] = [0; 8];
+        var def_src: u32[8] = [0; 8];
+        var def_delta: u32[8] = [0; 8];
+        var def_cnode: u32[8] = [0; 8];
+        var def_len: i64 = 0;
+        for si in 0..slen {
+            let sn = m.node(stmts[si]);
+            if sn.tag == squid_check_core::Tag.constant && si + 1 == slen { continue; }
+            if sn.tag != squid_check_core::Tag.bind || sn.c >= 2 { stmts_ok = false; break; }
+            let en = m.node(sn.b);
+            let is_add = (en.tag == squid_check_core::Tag.scalar || (en.tag == squid_check_core::Tag.associated && en.op != squid_check_core::Op.none)) &&
+                en.op == squid_check_core::Op.add && en.b != 0;
+            if !is_add { stmts_ok = false; break; }
+            let la = localRef(m, en.a);
+            let rb = localRef(m, en.b);
+            let na = m.node(en.a);
+            let nb = m.node(en.b);
+            if la != 0 && nb.tag == squid_check_core::Tag.constant {
+                def_b[def_len] = sn.a;
+                def_src[def_len] = la;
+                def_delta[def_len] = nb.a;
+                def_cnode[def_len] = en.b;
+                def_len += 1;
+            } else if rb != 0 && na.tag == squid_check_core::Tag.constant {
+                def_b[def_len] = sn.a;
+                def_src[def_len] = rb;
+                def_delta[def_len] = na.a;
+                def_cnode[def_len] = en.a;
+                def_len += 1;
+            } else {
+                stmts_ok = false;
+                break;
+            }
+        }
+        if !stmts_ok { continue; }
+
+        // Verify every loop carry maps cleanly through this arm's merges.
+        var cand = SplitSumHotSkipPlan { matched: true, ci: ci as u32, .. };
+        var all_carries_ok = true;
+        for carry, c_idx in carries {
+            if carry.backedge == carry.iteration { continue; }
+            var merge_at: i64 = -1;
+            for om, om_i in outer_merges {
+                if om.result == carry.backedge { merge_at = om_i; break; }
+            }
+            if merge_at < 0 { all_carries_ok = false; break; }
+            let arm_b = chain.arm_merge_bind[ai * 16 + merge_at];
+            if arm_b == carry.iteration { continue; }
+            if g.s.words[slots.start + c_idx] != 0 { all_carries_ok = false; break; }
+            let iv = g.s.vals[iteration.start + c_idx];
+            let itag = tagOf(g, iv.ty);
+            if iv.len != 1 || (itag != squid_direct_types::Tag.u32_ && itag != squid_direct_types::Tag.i32_) {
+                all_carries_ok = false; break;
+            }
+            var found_def = false;
+            for di in 0..def_len {
+                if def_b[di] == arm_b && def_src[di] == carry.iteration {
+                    if cand.upd_count >= 4 { all_carries_ok = false; break; }
+                    cand.carry_idx[cand.upd_count] = c_idx;
+                    cand.delta_u32[cand.upd_count] = def_delta[di];
+                    cand.const_node[cand.upd_count] = def_cnode[di];
+                    cand.upd_count += 1;
+                    found_def = true;
+                    break;
+                }
+            }
+            if !found_def { all_carries_ok = false; break; }
+        }
+        if all_carries_ok {
+            for ui in 0..cand.upd_count {
+                squid_direct_relocations::unpatchableOperand(m.unit, cand.const_node[ui]);
+            }
+            return cand;
+        }
+    }
+    return hot;
+}
+
+// Emits inner 16-byte v128 uniform-tag run skip loop (`while tags_end - tags_cur >= 16 && all16 == hot.ci`).
+fn emitSplitSumHotRun16(
+    g: Generator&,
+    f: Fn&,
+    hot: const SplitSumHotSkipPlan&,
+    iteration: Vals,
+    tags_cur: u32,
+    tags_end: u32,
+    v_hot: u32,
+) {
+    let run_done = open(g, f, OP_block);
+    let run_lp = open(g, f, OP_loop);
+    lget(g, tags_end); lget(g, tags_cur); op(g, OP_i32_sub);
+    i32Const(g, 16); op(g, OP_i32_lt_u);
+    br(g, f, OP_br_if, run_done);
+    lget(g, tags_cur);
+    simdMemOp(g, SIMD_v128_load, 0, 0);
+    if hot.ci == 0 {
+        simdOp(g, SIMD_v128_any_true);
+        br(g, f, OP_br_if, run_done);
+    } else {
+        lget(g, v_hot);
+        simdOp(g, SIMD_i8x16_eq);
+        simdOp(g, SIMD_i8x16_all_true);
+        op(g, OP_i32_eqz);
+        br(g, f, OP_br_if, run_done);
+    }
+    for ui in 0..hot.upd_count {
+        let cloc = w(g, g.s.vals[iteration.start + hot.carry_idx[ui]], 0);
+        let d16: u32 = hot.delta_u32[ui] * 16;
+        if d16 != 0 {
+            lget(g, cloc);
+            i32Const(g, d16);
+            op(g, OP_i32_add);
+            lset(g, cloc);
+        }
+    }
+    lget(g, tags_cur); i32Const(g, 16); op(g, OP_i32_add); lset(g, tags_cur);
+    br(g, f, OP_br, run_lp);
+    close(g, f);
+    close(g, f);
+}
+
 // Intercepts `Tag.match_` on the active fused split-stream loop variable.
 recursive fn tryEmitSplitSumMatch(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     if split_sum_depth == 0 { return neverVal(), false, squid_direct_types::Error.none; }
@@ -1890,38 +2473,16 @@ recursive fn tryEmitSplitSumMatch(g: Generator&, f: Fn&, id: u32) -> Val, bool, 
     var falls = false;
     let done = open(g, f, OP_block);
 
-    // Dense `br_table` on `ci_loc` when >= 3 arms and no branchMerges.
-    var use_br_table = arms_len >= 3 && arms_len <= 64 && merges_len == 0 && (cases.len as i64) <= 64;
-    var tbl_arm: i64[64] = [-1; 64];
-    var tbl_wild: i64 = -1;
-    if use_br_table {
-        for ai in 0..arms_len {
-            let pm .= g.units[f.unit - 1];
-            let arm = pm.matchArms(id)[ai];
-            let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
-            if pat.tag == squid_check_core::PatternTag.wildcard {
-                tbl_wild = ai;
-                break;
-            } else if pat.tag == squid_check_core::PatternTag.constructor {
-                let ctag = pm.constructor(pat.a).tag;
-                var ci: i64 = -1;
-                for pos in 0..(cases.len as i64) {
-                    if g.types.variant_tags[cases.tags + pos] == ctag { ci = pos; break; }
-                }
-                if ci < 0 || ci >= 64 || tbl_arm[ci] >= 0 { use_br_table = false; break; }
-                if pat.b != 0 && !packedPatternIrrefutable(pm, pat.b) { use_br_table = false; break; }
-                tbl_arm[ci] = ai;
-            } else {
-                use_br_table = false;
-                break;
-            }
-        }
-    }
+    // Flattened dense `OP_br_table` on `ci_loc` across `caseLevel` chains (supports branchMerges!).
+    let flat = flattenSplitSumMatch(g, m, id, in_b, cases);
+    let use_br_table = flat.ok && flat.arm_count >= 3 && (cases.len as i64) <= 64;
 
     if use_br_table {
-        let num_arms = if tbl_wild >= 0 { tbl_wild + 1 } else { arms_len };
-        let default_rel: u32 = if tbl_wild >= 0 { tbl_wild as u32 } else { num_arms as u32 };
-        let open_blocks = if tbl_wild >= 0 { num_arms } else { num_arms + 1 };
+        var tbl_arm: i64[64] = [-1; 64];
+        for ai in 0..flat.arm_count { tbl_arm[flat.arms[ai].ci] = ai; }
+        let num_arms = flat.arm_count + (if flat.has_wild { 1 } else { 0 });
+        let default_rel: u32 = if flat.has_wild { flat.arm_count as u32 } else { num_arms as u32 };
+        let open_blocks = if flat.has_wild { num_arms } else { num_arms + 1 };
         for _ in 0..open_blocks { let _ = open(g, f, OP_block); }
         lget(g, ci_loc);
         op(g, OP_br_table);
@@ -1932,40 +2493,31 @@ recursive fn tryEmitSplitSumMatch(g: Generator&, f: Fn&, id: u32) -> Val, bool, 
         uleb(g, default_rel);
         for ai in 0..num_arms {
             close(g, f);
-            var pat_tag = squid_check_core::PatternTag.wildcard;
-            var ctor_tag: u32 = 0;
-            var subpat: u32 = 0;
+            let is_wild_arm = flat.has_wild && ai == flat.arm_count;
             var body_id: u32 = 0;
-            {
-                let pm .= g.units[f.unit - 1];
-                let arm = pm.matchArms(id)[ai];
-                body_id = arm.body;
-                let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
-                pat_tag = pat.tag;
-                if pat_tag == squid_check_core::PatternTag.constructor {
-                    ctor_tag = pm.constructor(pat.a).tag;
-                    subpat = pat.b;
+            if is_wild_arm {
+                body_id = flat.wild_body;
+            } else {
+                let fa = flat.arms[ai];
+                body_id = fa.body;
+                if fa.subpat != 0 && g.units[f.unit - 1].pattern(fa.subpat).tag != squid_check_core::PatternTag.wildcard {
+                    let s = split_sum_variant_stream[d * 64 + fa.ci];
+                    let pty = g.types.variant_payloads[cases.payloads + fa.ci];
+                    var payload_val = Val { pty, 0, 0 };
+                    if s >= 0 {
+                        let cur_ptr = split_sum_cur_ptrs[d * 16 + s];
+                        let step = split_sum_stream_stride[d * 16 + s];
+                        let loaded, lerr = loadElement(g, f, cur_ptr, 0, pty, id);
+                        if lerr != squid_direct_types::Error.none { return neverVal(), false, lerr; }
+                        lget(g, cur_ptr);
+                        i32Const(g, step);
+                        op(g, OP_i32_add);
+                        lset(g, cur_ptr);
+                        payload_val = loaded;
+                    }
+                    let terr = test_(g, f, fa.subpat, payload_val, false, 0, id);
+                    if terr != squid_direct_types::Error.none { return neverVal(), false, terr; }
                 }
-            }
-            if pat_tag == squid_check_core::PatternTag.constructor && subpat != 0 && g.units[f.unit - 1].pattern(subpat).tag != squid_check_core::PatternTag.wildcard {
-                let ci, cierr = variantPosition(g, f, cases, ctor_tag, id);
-                if cierr != squid_direct_types::Error.none { return neverVal(), false, cierr; }
-                let s = split_sum_variant_stream[d * 64 + ci];
-                let pty = g.types.variant_payloads[cases.payloads + ci];
-                var payload_val = Val { pty, 0, 0 };
-                if s >= 0 {
-                    let cur_ptr = split_sum_cur_ptrs[d * 16 + s];
-                    let step = split_sum_stream_stride[d * 16 + s];
-                    let loaded, lerr = loadElement(g, f, cur_ptr, 0, pty, id);
-                    if lerr != squid_direct_types::Error.none { return neverVal(), false, lerr; }
-                    lget(g, cur_ptr);
-                    i32Const(g, step);
-                    op(g, OP_i32_add);
-                    lset(g, cur_ptr);
-                    payload_val = loaded;
-                }
-                let terr = test_(g, f, subpat, payload_val, false, 0, id);
-                if terr != squid_direct_types::Error.none { return neverVal(), false, terr; }
             }
             let body, berr = stmt(g, f, body_id);
             if berr != squid_direct_types::Error.none { return body, false, berr; }
@@ -1975,14 +2527,35 @@ recursive fn tryEmitSplitSumMatch(g: Generator&, f: Fn&, id: u32) -> Val, bool, 
                     let derr = deliver(g, f, body, result, id);
                     if derr != squid_direct_types::Error.none { return neverVal(), false, derr; }
                 }
+                for at in 0..merges_len {
+                    let binding = if is_wild_arm { flat.wild_merge_bind[at] } else { flat.arm_merge_bind[ai * 16 + at] };
+                    let value, present = bindGet(g, f, binding);
+                    if present {
+                        let derr = deliver(g, f, value, merged + (at as u32), id);
+                        if derr != squid_direct_types::Error.none { return neverVal(), false, derr; }
+                    }
+                }
             }
             br(g, f, OP_br, done);
         }
-        if tbl_wild < 0 {
+        if !flat.has_wild {
             close(g, f);
             op(g, OP_unreachable_);
         }
         close(g, f);
+        let pm .= g.units[f.unit - 1];
+        for merge, at in pm.branchMerges(id) {
+            let slot = g.s.slots[merged + at];
+            if slot.present {
+                bindPut(g, f, merge.result, slot.value);
+                let ct1, ok1 = withCellType(g, f, merge.then_binding);
+                if ok1 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+                else {
+                    let ct2, ok2 = withCellType(g, f, merge.else_binding);
+                    if ok2 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+                }
+            }
+        }
         if !falls { return neverVal(), true, squid_direct_types::Error.none; }
         if info.statement { return unitVal(), true, squid_direct_types::Error.none; }
         if g.s.slots[result].present { return g.s.slots[result].value, true, squid_direct_types::Error.none; }
@@ -2106,10 +2679,48 @@ recursive fn emitPackedLoopCore(
 
     // Hoist bases/cursors ONCE before OP_loop!
     let base, _ = ensureCheckedArray(g, f, source);
+
+    // 16-wide (i32) / 8-wide (i64) v128 SIMD fast path for associative scalar / touched-column SoA reductions!
+    if !g.runtime_().has_fork && (plan.mode == PACKED_FLAT || plan.mode == PACKED_SOA) {
+        let red = analyzeForInRedPlan(g, f, id, info, iteration, slots, elem_ty);
+        if red.matched {
+            var cols_ok = true;
+            var col_starts: u32[4] = [0; 4];
+            let elem_bytes: u32 = if red.is_i64 { 8 } else { 4 };
+            if plan.mode == PACKED_FLAT {
+                if red.is_record { cols_ok = false; }
+                else { col_starts[0] = emitOffsetAddress(g, f, base, index, elem_bytes); }
+            } else {
+                if !red.is_record { cols_ok = false; }
+                else {
+                    for fi in 0..red.field_count {
+                        let st = plan.soa_field_stream[red.field_pos[fi]];
+                        if st < 0 { cols_ok = false; break; }
+                        let cb = emitLoadPackedSubBase(g, f, plan, base, st);
+                        col_starts[fi] = emitOffsetAddress(g, f, cb, index, elem_bytes);
+                    }
+                }
+            }
+            if cols_ok {
+                let acc_loc = w(g, g.s.vals[iteration.start + red.carry_idx], 0);
+                lget(g, index); lget(g, end_loc); op(g, OP_i32_lt_u);
+                let run_if = open(g, f, OP_if_);
+                let count = local32(g, f);
+                lget(g, end_loc); lget(g, index); op(g, OP_i32_sub); lset(g, count);
+                emitSimdColumnSum(g, f, col_starts, if plan.mode == PACKED_FLAT { 1 } else { red.field_count }, count, acc_loc, red.is_i64, red.is_xor);
+                popCheckedArraysAt(f, run_if);
+                close(g, f);
+                return assign(g, f, iteration, outgoing, id);
+            }
+        }
+    }
+
     var flat_cur: u32 = 0;
     var flat_step: u32 = 0;
     var cur_ptrs: u32[16] = [0; 16];
     var tags_base: u32 = 0;
+    var tags_cur: u32 = 0;
+    var tags_end: u32 = 0;
 
     // Mode-specific static analysis before emitting the loop.
     var soa_virtual = false;
@@ -2121,6 +2732,8 @@ recursive fn emitPackedLoopCore(
     var split_fused = false;
     var split_bind_id: u32 = 0;
     var split_needed_mask: u64 = 0;
+    var split_hot = SplitSumHotSkipPlan {};
+    var v_hot: u32 = 0xffffffff;
 
     if plan.mode == PACKED_FLAT {
         let st, sterr = stride(g, f, elem_ty, id);
@@ -2171,11 +2784,22 @@ recursive fn emitPackedLoopCore(
                         split_fused = true;
                         split_bind_id = ev_b;
                         split_needed_mask = nmask;
+                        split_hot = analyzeSplitSumHotSkip(g, f, id, match_root, ev_b, elem_ty, plan, iteration, slots);
                     }
                 }
             }
         }
         if split_fused {
+            tags_cur = local32(g, f);
+            tags_end = local32(g, f);
+            lget(g, tags_base); lget(g, index); op(g, OP_i32_add); lset(g, tags_cur);
+            lget(g, tags_base); lget(g, end_loc); op(g, OP_i32_add); lset(g, tags_end);
+            if split_hot.matched && split_hot.ci != 0 {
+                v_hot = local(g, f, VT_v128);
+                i32Const(g, split_hot.ci);
+                simdOp(g, SIMD_i8x16_splat);
+                lset(g, v_hot);
+            }
             for ci in 0..plan.variant_count {
                 let s = plan.variant_stream[ci];
                 if s >= 0 && ((split_needed_mask >> (ci as u64)) & 1) != 0 {
@@ -2213,24 +2837,32 @@ recursive fn emitPackedLoopCore(
     }
 
     let exit = open(g, f, OP_block);
+    let normal_done = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
     f.checked_elems_len = 0;
-    lget(g, index);
-    lget(g, end_loc);
-    op(g, OP_i32_ge_u);
-    let done_if = open(g, f, OP_if_);
-    let assigned = assign(g, f, iteration, outgoing, id);
-    if assigned != squid_direct_types::Error.none { return assigned; }
-    br(g, f, OP_br, exit);
-    close(g, f);
-
-    let current = local32(g, f);
-    lget(g, index);
-    lset(g, current);
-    lget(g, index);
-    i32Const(g, 1);
-    op(g, OP_i32_add);
-    lset(g, index);
+    let use_tags_ptr = plan.mode == PACKED_SPLIT_SUM && split_fused;
+    var current: u32 = 0;
+    if use_tags_ptr {
+        if split_hot.matched && !release {
+            emitSplitSumHotRun16(g, f, split_hot, iteration, tags_cur, tags_end, v_hot);
+        }
+        lget(g, tags_cur);
+        lget(g, tags_end);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, normal_done);
+    } else {
+        lget(g, index);
+        lget(g, end_loc);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, normal_done);
+        current = local32(g, f);
+        lget(g, index);
+        lset(g, current);
+        lget(g, index);
+        i32Const(g, 1);
+        op(g, OP_i32_add);
+        lset(g, index);
+    }
 
     // Emit per-iteration scratch marks before decoding/running the body.
     var release_owner: u32 = 0;
@@ -2323,11 +2955,13 @@ recursive fn emitPackedLoopCore(
         // PACKED_SPLIT_SUM
         if split_fused {
             let ci_loc = local32(g, f);
-            lget(g, tags_base);
-            lget(g, current);
-            op(g, OP_i32_add);
+            lget(g, tags_cur);
             op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, 0);
             lset(g, ci_loc);
+            lget(g, tags_cur);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lset(g, tags_cur);
             let d = split_sum_depth;
             split_sum_binding[d] = split_bind_id;
             split_sum_ty[d] = elem_ty;
@@ -2408,7 +3042,10 @@ recursive fn emitPackedLoopCore(
     }
     f.loop_depth -= 1;
     s_lbl.labels.resize(labels_mark);
-    close(g, f);
-    close(g, f);
+    close(g, f); // top
+    close(g, f); // normal_done
+    let assigned_out = assign(g, f, iteration, outgoing, id);
+    if assigned_out != squid_direct_types::Error.none { return assigned_out; }
+    close(g, f); // exit
     return squid_direct_types::Error.none;
 }

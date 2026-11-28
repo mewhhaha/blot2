@@ -1047,8 +1047,16 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::Direct
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::DirectArray,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::ExtU32U64)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::ExtU32U64,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::FastPushPlan)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::FastPushPlan,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::FlatSplitArm)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::FlatSplitArm,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::FlatSplitChain)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::FlatSplitChain,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::Fn)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::Fn,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::ForInRedPlan)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::ForInRedPlan,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::KnownClosure)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::KnownClosure,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::LoopReciprocal)->bool {return equalFields(left,right);}
@@ -1079,6 +1087,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::SparkV
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::SparkVecLocal,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::SparkVecPlan)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::SparkVecPlan,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::SplitSumHotSkipPlan)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::SplitSumHotSkipPlan,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::Stage)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::Stage,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::StageAggregate)->bool {return equalFields(left,right);}
