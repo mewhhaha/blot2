@@ -374,6 +374,23 @@ while 3 `for v in arr: total := self + v` fixtures emit the new 16-wide `v128`
 reduction fast path (`direct/comprehensions.sq` 7781->8058 B,
 `direct/storage.sq` 7161->7438 B, `direct/view_calls.sq` 6104->6437 B).
 
+Batch 6 General Benchmark & Memory Optimizations (28 November 2026) added
+loop-invariant `U64` reciprocal strength reduction (skipping compile-time
+constant `U64` divisors via derived-const markers), expanded `bodyNoAlloc`
+(`@simd.*`, unboxed `update`/`~[T]`, budget `2048`), `~[T]` SIMD reverse bulk
+`push_front` and zero-alloc `pop_front` focus reuse, `CheckedSimdWindow` loop
+bounds-check hoisting and Mode-2 `own #[U8]` SIMD store workers, non-recursive
+Mode-1/2/3 array-descriptor workers (guarded by `bodyOnlyUsesWorkerMOps` for
+inlined helpers) + `emitExtendFromRodata` `knownMutable` fast path, overlapping
+`v128` disjoint range-copy (`4..16` 4B elements) + `tryEmitForeverEqBoundLoop` +
+constant-`0 < len` BCE + RMW `checked_elems` retention, escape-loop `v128`
+constant hoisting & `v128.andnot`, and shared cold `push_grow` /
+`runtime.push_entry_grow` helpers with gated `>= 8 MiB` in-place tail extension
+at `arena_top`. Re-recorded `expected.json`: 0 exit-code diffs, 0 diagnostic
+diffs, 0 frontend/work-counter diffs; 18 non-emitting fixtures are unchanged and
+91 direct-backend fixtures update `emitted_functions` (+1 shared `push_grow`),
+`wasm_bytes`, and `wasm_sha256`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

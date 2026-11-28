@@ -432,6 +432,7 @@ recursive fn hasSelfTailCall(
     }
 }
 
+
 fn associativeIntOpcode(op_: Op, ty: Ty) -> u8 {
     if ty == squid_direct_types::u32_ || ty == squid_direct_types::i32_ {
         match op_ {
@@ -593,6 +594,7 @@ recursive fn scanScalarRecursion(g: Generator&, f: const Fn&, m: const Module&, 
         _ => { return false; },
     }
 }
+
 
 // Conservative call-graph-aware check: true when evaluating `id` cannot bump
 // `owner_top` or `stack_pointer` (allows `storage.push`/`reserve`/indexed
@@ -1094,6 +1096,7 @@ recursive fn bodyNoScopeAlloc(
     }
 }
 
+
 fn pushWorkerResult(g: Generator&, f: const Fn&, value: Val) {
     let spec = g.s.worker_specs[f.worker_spec];
     if spec.drop_param == 0xff {
@@ -1211,6 +1214,118 @@ fn sccMemberIndex(spec: const squid_direct_emit::WorkerSpec&, target: BindingRef
     return -1;
 }
 
+// True when an inlined helper body only performs operations compatible with
+// Mode-3 `WorkerM` (`entry_ptr` instead of `(slot, gen)`): scalar/control/update
+// ops plus `read`/`length`/`push` (NOT `reserve`/`extend`/`pop`/`truncate`/`copy`).
+recursive fn bodyOnlyUsesWorkerMOps(m: const Module&, id: u32, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, reference, panic, break_ => { return true; },
+        suite, block_, product, record, array => {
+            for ch in m.children(id) { if !bodyOnlyUsesWorkerMOps(m, ch, budget) { return false; } }
+            return true;
+        },
+        bind, construct => { return bodyOnlyUsesWorkerMOps(m, n.b, budget); },
+        pattern_bind => {
+            return bodyOnlyUsesWorkerMOps(m, n.b, budget) && bodyOnlyUsesWorkerMOps(m, n.c, budget);
+        },
+        return_, project, result_associated => { return bodyOnlyUsesWorkerMOps(m, n.a, budget); },
+        scalar, logical, associated => {
+            return bodyOnlyUsesWorkerMOps(m, n.a, budget) && bodyOnlyUsesWorkerMOps(m, n.b, budget);
+        },
+        call => {
+            let info = m.call(id);
+            for arg in info.arguments {
+                match m.types.node(m.typeOf(arg)).tag {
+                    unit, boolean, unsigned8, unsigned32, signed32, unsigned64, signed64, floating32, floating64 => {},
+                    _ => { return false; },
+                }
+                if !bodyOnlyUsesWorkerMOps(m, arg, budget) { return false; }
+            }
+            return true;
+        },
+        apply => {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
+                let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
+                if sp.present && (sp.value == "push" || sp.value == "at" || sp.value == "length") {
+                    return bodyOnlyUsesWorkerMOps(m, n.a, budget) && bodyOnlyUsesWorkerMOps(m, n.b, budget);
+                }
+            }
+            return false;
+        },
+        storage => {
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
+            if op_k != squid_check_storage_ops::Op.read &&
+                op_k != squid_check_storage_ops::Op.length &&
+                op_k != squid_check_storage_ops::Op.push {
+                return false;
+            }
+            for ch in m.children(id) { if !bodyOnlyUsesWorkerMOps(m, ch, budget) { return false; } }
+            return true;
+        },
+        array_op => {
+            let aop = m.arrayOperation(id);
+            match aop {
+                get, length, simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {},
+                _ => { return false; },
+            }
+            for ch in m.children(id) { if !bodyOnlyUsesWorkerMOps(m, ch, budget) { return false; } }
+            return true;
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            if !bodyOnlyUsesWorkerMOps(m, uinfo.root, budget) || !bodyOnlyUsesWorkerMOps(m, uinfo.value, budget) { return false; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == squid_check_core::UpdateKind.index && !bodyOnlyUsesWorkerMOps(m, sel.index, budget) { return false; }
+            }
+            return true;
+        },
+        if_stmt, if_value => {
+            return bodyOnlyUsesWorkerMOps(m, n.a, budget) &&
+                bodyOnlyUsesWorkerMOps(m, n.b, budget) &&
+                bodyOnlyUsesWorkerMOps(m, n.c, budget);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { if !bodyOnlyUsesWorkerMOps(m, inp, budget) { return false; } }
+            for arm in m.matchArms(id) {
+                if !bodyOnlyUsesWorkerMOps(m, arm.guard_, budget) || !bodyOnlyUsesWorkerMOps(m, arm.body, budget) { return false; }
+            }
+            return true;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            return bodyOnlyUsesWorkerMOps(m, linfo.first, budget) &&
+                bodyOnlyUsesWorkerMOps(m, linfo.end, budget) &&
+                bodyOnlyUsesWorkerMOps(m, linfo.body, budget);
+        },
+        _ => { return false; },
+    }
+}
+
+// True when `target` is guaranteed to be inlined by `inlineSmall` (even at nested
+// inline depth or under `--tail-calls`), is monomorphic with zero obligations, and
+// only performs WorkerR/WorkerM-compatible array operations.
+fn canInlineWorkerHelper(g: Generator&, target: BindingRef, arg_count: i64) -> bool {
+    if !g.hasUnit(target.unit) || arg_count > 16 { return false; }
+    if requiresEvidence(g, target) { return false; }
+    if !canInlineTarget(g, target, 2) { return false; }
+    let tm .= g.units[target.unit - 1];
+    let tbody .= tm.body(target.binding);
+    if !tbody || !tbody.is_function || tbody.exported { return false; }
+    if tm.bodyParameters(tbody).len != arg_count { return false; }
+    if tbody.scheme.variables.len != 0 || tbody.scheme.obligations.len != 0 { return false; }
+    if squid_direct_writer::tailCallsEnabled() {
+        var cbud: i64 = 64;
+        if bodyContainsCall(tm, tbody.root, cbud) { return false; }
+    }
+    var wbud: i64 = 256;
+    return bodyOnlyUsesWorkerMOps(tm, tbody.root, wbud);
+}
+
 // Track aliases and classify every use of array parameter `pi` across one SCC member.
 // `ret_pos`: -2 = unknown yet, -1 = sole return, 0..7 = tuple element index, -3 = conflict/not returned.
 recursive fn scanSccParamAliases(
@@ -1308,8 +1423,37 @@ recursive fn scanSccParamAliases(
                     return;
                 }
             }
-            // Sole-return SCC call `p := self_or_peer ... p ...`, or sole-return inlined helper (`p := emit_uint self v`).
+            // Direct `@simd.store* p idx vec`
+            if rn.tag == squid_check_core::Tag.array_op {
+                let aop = m.arrayOperation(rhs);
+                let is_sstore = aop == squid_backend_collection_ops::Op.simd_store ||
+                    aop == squid_backend_collection_ops::Op.simd_store_u8x16 ||
+                    aop == squid_backend_collection_ops::Op.simd_store_f64x2;
+                let ch = m.children(rhs);
+                if is_sstore && ch.len >= 3 && inBindingSet(same, same_len, localRef(m, ch[0])) {
+                    written = true;
+                    for ci in 1..ch.len {
+                        scanSccParamAliases(g, m, spec, pi, pty, own_param, ch[ci], same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                    }
+                    if !inBindingSet(same, same_len, n.a) { addBindingSet(same, same_len, n.a); changed = true; }
+                    return;
+                }
+            }
+            // Sole-return SCC call `p := self_or_peer ... p ...`, or sole-return inlined helper (`p := emit_uint self v`),
+            // or 1-op std/simd store wrapper (`p := simd.store_u8x16 idx vec self`).
             if rn.tag == squid_check_core::Tag.call {
+                let is_simd_w, arr_arg, _, _ = extractSimdOpArgs(g, m, rhs);
+                if is_simd_w && own_param && m.types.node(m.typeOf(rhs)).tag == squid_check_types::Tag.array &&
+                    inBindingSet(same, same_len, localRef(m, arr_arg)) {
+                    written = true;
+                    let info_s = m.call(rhs);
+                    for arg in info_s.arguments {
+                        if arg == arr_arg { continue; }
+                        scanSccParamAliases(g, m, spec, pi, pty, own_param, arg, same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                    }
+                    if !inBindingSet(same, same_len, n.a) { addBindingSet(same, same_len, n.a); changed = true; }
+                    return;
+                }
                 let info = m.call(rhs);
                 let target = g.resolve(m, info.target);
                 if sccMemberIndex(spec, target) >= 0 && pi < info.arguments.len && inBindingSet(same, same_len, localRef(m, info.arguments[pi])) {
@@ -1325,10 +1469,10 @@ recursive fn scanSccParamAliases(
                     return;
                 }
                 if own_param && m.types.node(m.typeOf(rhs)).tag == squid_check_types::Tag.array &&
-                    g.hasUnit(target.unit) && canInlineTarget(g, target, 0) {
+                    canInlineWorkerHelper(g, target, info.arguments.len) {
                     let tm .= g.units[target.unit - 1];
                     let tbody .= tm.body(target.binding);
-                    if tbody && tbody.is_function && !tbody.exported && tm.bodyParameters(tbody).len == info.arguments.len {
+                    if tbody {
                         let tparams = tm.bodyParameters(tbody);
                         var matched_arg: i64 = -1;
                         for arg, ai in info.arguments {
@@ -1457,10 +1601,11 @@ recursive fn scanSccParamAliases(
                     return;
                 }
                 // Tuple destructuring of a small inlined helper (e.g. `let (t1, l1) = push_ch text tlen ch`)
-                if g.hasUnit(target.unit) && canInlineTarget(g, target, 0) {
+                if m.types.node(m.typeOf(rhs)).tag != squid_check_types::Tag.never &&
+                    canInlineWorkerHelper(g, target, info.arguments.len) {
                     let tm .= g.units[target.unit - 1];
                     let tbody .= tm.body(target.binding);
-                    if tbody && tbody.is_function && !tbody.exported && tm.bodyParameters(tbody).len == info.arguments.len {
+                    if tbody {
                         let tparams = tm.bodyParameters(tbody);
                         var matched_arg: i64 = -1;
                         for arg, ai in info.arguments {
@@ -1544,8 +1689,11 @@ recursive fn scanSccParamAliases(
             }
             scanSccParamAliases(g, m, spec, pi, pty, own_param, linfo.body, same, same_len, changed, written, resized, escaped, ret_pos, budget);
             for carry in m.loopCarries(id) {
-                if inBindingSet(same, same_len, carry.incoming) && carry.backedge != 0 && !inBindingSet(same, same_len, carry.backedge) {
-                    // May still resolve on next fixed-point pass; caller verifies after fixpoint.
+                if inBindingSet(same, same_len, carry.incoming) && (carry.backedge == 0 || inBindingSet(same, same_len, carry.backedge)) {
+                    if carry.outgoing != 0 && !inBindingSet(same, same_len, carry.outgoing) {
+                        addBindingSet(same, same_len, carry.outgoing);
+                        changed = true;
+                    }
                 }
             }
         },
@@ -1602,8 +1750,10 @@ recursive fn scanSccParamAliases(
         array_op => {
             let aop = m.arrayOperation(id);
             let ch = m.children(id);
-            if (aop == squid_backend_collection_ops::Op.get || aop == squid_backend_collection_ops::Op.length) &&
-                ch.len > 0 && inBindingSet(same, same_len, localRef(m, ch[0])) {
+            let is_ro = aop == squid_backend_collection_ops::Op.get || aop == squid_backend_collection_ops::Op.length ||
+                aop == squid_backend_collection_ops::Op.simd_load || aop == squid_backend_collection_ops::Op.simd_load_u8x16 ||
+                aop == squid_backend_collection_ops::Op.simd_load_f64x2;
+            if is_ro && ch.len > 0 && inBindingSet(same, same_len, localRef(m, ch[0])) {
                 for ci in 1..ch.len {
                     scanSccParamAliases(g, m, spec, pi, pty, own_param, ch[ci], same, same_len, changed, written, resized, escaped, ret_pos, budget);
                 }
@@ -1638,13 +1788,25 @@ recursive fn scanSccParamAliases(
                 }
                 return;
             }
+            // 1-op std/simd load wrapper (read-only non-escaping, e.g. `simd.load_u8x16 idx src`).
+            let is_simd_r, arr_arg_r, _, _ = extractSimdOpArgs(g, m, id);
+            if is_simd_r && m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.array &&
+                inBindingSet(same, same_len, localRef(m, arr_arg_r)) {
+                for arg in info.arguments {
+                    if arg == arr_arg_r { continue; }
+                    scanSccParamAliases(g, m, spec, pi, pty, own_param, arg, same, same_len, changed, written, resized, escaped, ret_pos, budget);
+                }
+                return;
+            }
             // Read-only non-escaping inlined helper call (e.g. `skip text tlen pos`)
-            if g.hasUnit(target.unit) && canInlineTarget(g, target, 0) {
+            if m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.never &&
+                m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.array &&
+                canInlineWorkerHelper(g, target, info.arguments.len) {
                 let tm .= g.units[target.unit - 1];
                 let tbody .= tm.body(target.binding);
-                if tbody && tbody.is_function && !tbody.exported && tm.bodyParameters(tbody).len == info.arguments.len {
+                if tbody && tm.binding(tbody.binding).capability_parameters.own == 0 {
                     var nrb: i64 = 256;
-                    if noStorageResize(g, tm, tbody.root, nrb) && m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.array {
+                    if noStorageResize(g, tm, tbody.root, nrb) {
                         var has_alias_arg = false;
                         for arg in info.arguments {
                             if inBindingSet(same, same_len, localRef(m, arg)) { has_alias_arg = true; }
@@ -1818,18 +1980,37 @@ fn analyzeWorkerSCC(g: Generator&, id: u32) -> squid_direct_emit::WorkerSpec, bo
             }
         }
     }
-    // Must be recursive (0 reaches 0 in >= 1 step).
-    if reach[0] == 0 { return spec, false; }
     // Collect SCC of node 0 (capped at 4 members).
+    // Non-recursive helpers (`reach[0] == 0`) are also eligible for validated
+    // Mode 1/2/3 array-descriptor workers when they are not inlined leaf functions
+    // (either mutating/resizing an `own #[T]` param or looping over a `#[T]` param).
+    let is_recursive = reach[0] != 0;
+    if !is_recursive {
+        var ast_cnt: i64 = 0;
+        var has_lp = false;
+        countAstNodesAndLoops(m, body.root, ast_cnt, has_lp);
+        let own_mask0 = m.binding(key.id).capability_parameters.own;
+        var has_own_arr = false;
+        for pi in 0..param_count {
+            if pi < 64 && ((own_mask0 >> (pi as u64)) & 1) != 0 {
+                let pty = g.s.tys[inst.parameters.start + pi];
+                if tagOf(g, pty) == squid_direct_types::Tag.array { has_own_arr = true; break; }
+            }
+        }
+        if !has_own_arr && !has_lp { return spec, false; }
+        if !has_lp && canInlineTarget(g, BindingRef { key.unit, key.id }, 0) { return spec, false; }
+    }
     spec.unit = key.unit;
     spec.param_count = param_count as u32;
     spec.scc_bindings[0] = key.id;
     spec.scc_len = 1;
-    for i in 1..cands_len {
-        if reach[i] != 0 && reach[i * 8] != 0 {
-            if spec.scc_len >= 4 { return spec, false; }
-            spec.scc_bindings[spec.scc_len] = cands[i];
-            spec.scc_len += 1;
+    if is_recursive {
+        for i in 1..cands_len {
+            if reach[i] != 0 && reach[i * 8] != 0 {
+                if spec.scc_len >= 4 { return spec, false; }
+                spec.scc_bindings[spec.scc_len] = cands[i];
+                spec.scc_len += 1;
+            }
         }
     }
 
@@ -1860,12 +2041,12 @@ fn analyzeWorkerSCC(g: Generator&, id: u32) -> squid_direct_emit::WorkerSpec, bo
             addBindingSet(same, same_len, sp);
             for iter in 0..6 {
                 var changed = false;
-                var bud: i64 = 1024;
+                var bud: i64 = 2048;
                 scanSccParamAliases(g, m, spec, pi, pty, own_param, sb_body.root, same, same_len, changed, written, resized, escaped, ret_pos, bud);
                 if escaped || !changed { break; }
             }
             if !escaped {
-                var vbud: i64 = 512;
+                var vbud: i64 = 1024;
                 if !verifySccParamLoopCarries(m, sb_body.root, same, same_len, vbud) { escaped = true; }
             }
             if escaped { break; }
@@ -1883,13 +2064,17 @@ fn analyzeWorkerSCC(g: Generator&, id: u32) -> squid_direct_emit::WorkerSpec, bo
                 ret_ok = res_ty == pty;
                 wstart = 0;
             } else if tagOf(g, res_ty) == squid_direct_types::Tag.tuple {
-                let tn = g.types.node(res_ty);
-                if ret_pos < (tn.b as i64) && g.types.words[tn.a + ret_pos] == pty {
-                    ret_ok = true;
-                    for ei in 0..ret_pos {
-                        let el, lerr = g.types.layout(g.types.words[tn.a + ei]);
-                        if lerr != squid_direct_types::Error.none { ret_ok = false; break; }
-                        wstart += el.len as u32;
+                let res_boxed, rberr = g.types.boxed(res_ty);
+                if rberr != squid_direct_types::Error.none { g.dropFailure(); }
+                else if !res_boxed {
+                    let tn = g.types.node(res_ty);
+                    if ret_pos < (tn.b as i64) && g.types.words[tn.a + ret_pos] == pty {
+                        ret_ok = true;
+                        for ei in 0..ret_pos {
+                            let el, lerr = g.types.layout(g.types.words[tn.a + ei]);
+                            if lerr != squid_direct_types::Error.none { ret_ok = false; break; }
+                            wstart += el.len as u32;
+                        }
                     }
                 }
             }
@@ -2300,6 +2485,7 @@ recursive fn coreTypeHoldsOwnedUnshared(g: Generator&, m: const Module&, tid: TI
         _ => { return false; },
     }
 }
+
 // Whether no strict descendant (`check_self == true`) of Direct type `ty` is a
 // `copiedBox` that could be read via an interior `readFlat` pointer without holding
 // unshared owned storage (which `uniqueness` tracks as a loan preventing `own` spend).
@@ -2684,9 +2870,13 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
 }
 
 // Looks up or lazily registers a specialized recursive worker SCC for named instance `id`.
-fn resolveWorkerSpec(g: Generator&, id: u32) -> i64, i64 {
+fn resolveWorkerSpec(g: Generator&, id: u32, from_external: bool) -> i64, i64 {
     let key = g.s.instances[id].key;
-    if key.kind != squid_direct_emit::InstanceKind.named || g.s.instances[id].closure || g.s.instances[id].inferring {
+    if key.kind != squid_direct_emit::InstanceKind.named || key.parent != 0 || g.s.instances[id].closure || g.s.instances[id].inferring {
+        return -1, -1;
+    }
+    if g.s.parallel_readonly {
+        g.s.parallel_aborted = true;
         return -1, -1;
     }
     let existing_w, has_w = g.s.worker_map.get(id as u64);
@@ -2698,12 +2888,11 @@ fn resolveWorkerSpec(g: Generator&, id: u32) -> i64, i64 {
         }
         return -1, -1;
     }
-    let new_spec, ok_spec = analyzeWorkerSCC(g, id);
-    if !ok_spec { return -1, -1; }
-    if g.s.parallel_readonly {
-        g.s.parallel_aborted = true;
+    if from_external && g.s.instances[id].emitted {
         return -1, -1;
     }
+    let new_spec, ok_spec = analyzeWorkerSCC(g, id);
+    if !ok_spec { return -1, -1; }
     var spec = new_spec;
     let m .= g.units[key.unit - 1];
     var all_ok = true;
@@ -2712,7 +2901,8 @@ fn resolveWorkerSpec(g: Generator&, id: u32) -> i64, i64 {
             spec.scc_insts[0] = id;
         } else {
             let peer_inst, perr = g.namedWith(BindingRef { key.unit, spec.scc_bindings[si] }, key.ty, false, m, 0, 0);
-            if perr != squid_direct_types::Error.none || g.s.instances[peer_inst].inferring {
+            if perr != squid_direct_types::Error.none || g.s.instances[peer_inst].inferring ||
+                g.s.instances[peer_inst].emitted || g.s.instances[peer_inst].key.parent != 0 {
                 all_ok = false;
                 break;
             }
@@ -2773,7 +2963,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     }
     // Check if this named instance belongs to a specialized recursive worker SCC.
     if key.kind == squid_direct_emit::InstanceKind.named && key.parent == 0 && !g.s.instances[id].closure && !g.s.instances[id].inferring {
-        let spec_idx, scc_idx = resolveWorkerSpec(g, id);
+        let spec_idx, scc_idx = resolveWorkerSpec(g, id, false);
         if g.s.parallel_aborted { return squid_direct_types::Error.unsupported; }
         if spec_idx >= 0 && scc_idx >= 0 {
             // Emit the thin validating wrapper into g.s.instances[id].function, then the worker.
@@ -3257,6 +3447,7 @@ fn isArray(kind: Abi) -> bool {
         _ => { return false; },
     }
 }
+
 // A Foreign host callback parameter: its argument and result kinds.
 fn callbackAbi(g: const Generator&, ty: Ty) -> Abi, Abi, bool {
     let n = g.types.node(ty);

@@ -2777,8 +2777,8 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                     }
                 }
             }
-            if call_peer_idx < 0 && !g.s.parallel_readonly && !(g.s.has_rt && g.s.rt.has_fork) && !g.s.instances[f.instance_id].inferring {
-                let ext_spec, ext_peer = resolveWorkerSpec(g, instance);
+            if call_peer_idx < 0 && instance != f.instance_id && !g.s.parallel_readonly && !(g.s.has_rt && g.s.rt.has_fork) && !g.s.instances[f.instance_id].inferring {
+                let ext_spec, ext_peer = resolveWorkerSpec(g, instance, true);
                 if ext_spec >= 0 && ext_peer >= 0 {
                     let sp = g.s.worker_specs[ext_spec];
                     var ext_ok = true;
@@ -2953,7 +2953,10 @@ fn applyPrimitive(g: Generator&, f: Fn&, primitive: squid_check_core::Primitive,
         let src = g.s.vals[arguments.start];
         let cf, known = constU32(f, w(g, src, 0));
         if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
-        else { recordExtU32U64(f, w(g, popped, 0), w(g, src, 0)); }
+        else {
+            if isAnyConstU32(f, w(g, src, 0)) { recordConstU64(f, w(g, popped, 0), 0, 0xffffffff, 0); }
+            recordExtU32U64(f, w(g, popped, 0), w(g, src, 0));
+        }
     }
     return popped, perr;
 }
@@ -3028,7 +3031,10 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
             let op = tm.arrayOperation(id);
             if op == squid_backend_collection_ops::Op.fill && isSmallScalarPackedFillExpr(tm, id) {
                 if margin > 0 { margin = 0; }
-            } else if op != squid_backend_collection_ops::Op.length && op != squid_backend_collection_ops::Op.get { return false; }
+            } else if op != squid_backend_collection_ops::Op.length && op != squid_backend_collection_ops::Op.get &&
+                op != squid_backend_collection_ops::Op.simd_load && op != squid_backend_collection_ops::Op.simd_store &&
+                op != squid_backend_collection_ops::Op.simd_load_u8x16 && op != squid_backend_collection_ops::Op.simd_store_u8x16 &&
+                op != squid_backend_collection_ops::Op.simd_load_f64x2 && op != squid_backend_collection_ops::Op.simd_store_f64x2 { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -3037,7 +3043,7 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         storage => {
             let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
             if ok != squid_error::Error.none { return false; }
-            if op_kind != squid_check_storage_ops::Op.length && op_kind != squid_check_storage_ops::Op.read && op_kind != squid_check_storage_ops::Op.push && op_kind != squid_check_storage_ops::Op.pop && op_kind != squid_check_storage_ops::Op.truncate && op_kind != squid_check_storage_ops::Op.with_capacity && op_kind != squid_check_storage_ops::Op.reserve && op_kind != squid_check_storage_ops::Op.extend && op_kind != squid_check_storage_ops::Op.view { return false; }
+            if op_kind != squid_check_storage_ops::Op.length && op_kind != squid_check_storage_ops::Op.read && op_kind != squid_check_storage_ops::Op.push && op_kind != squid_check_storage_ops::Op.pop && op_kind != squid_check_storage_ops::Op.push_front && op_kind != squid_check_storage_ops::Op.pop_front && op_kind != squid_check_storage_ops::Op.insert && op_kind != squid_check_storage_ops::Op.remove && op_kind != squid_check_storage_ops::Op.truncate && op_kind != squid_check_storage_ops::Op.with_capacity && op_kind != squid_check_storage_ops::Op.reserve && op_kind != squid_check_storage_ops::Op.extend && op_kind != squid_check_storage_ops::Op.view { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -3904,7 +3910,10 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false)
             left.ty == squid_direct_types::u32_ && popped_ty == squid_direct_types::u64_ {
             let cf, known = constU32(f, w(g, left, 0));
             if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
-            else { recordExtU32U64(f, w(g, popped, 0), w(g, left, 0)); }
+            else {
+                if isAnyConstU32(f, w(g, left, 0)) { recordConstU64(f, w(g, popped, 0), 0, 0xffffffff, 0); }
+                recordExtU32U64(f, w(g, popped, 0), w(g, left, 0));
+            }
         }
         return popped, perr;
     }

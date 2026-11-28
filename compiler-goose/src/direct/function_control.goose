@@ -58,6 +58,9 @@ fn resolveBoundSizedLength(m: const Module&, node_id: u32) -> TId {
     }
     return 0;
 }
+fn isScalarOrAssocOp(n: squid_check_core::Node) -> bool {
+    return n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none);
+}
 recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: u32, invert: bool, depth: i64 = 0) {
     if cond_id == 0 || depth > 8 { return; }
     let cond = m.node(cond_id);
@@ -71,7 +74,29 @@ recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: 
         }
         return;
     }
-    if cond.tag == squid_check_core::Tag.scalar {
+    if isScalarOrAssocOp(cond) {
+        if invert && cond.op == squid_check_core::Op.equal {
+            // `!(a == b)` with `a <= b` proves `a < b` (symmetric for `b <= a`).
+            let la, oka = resolveBoundLocal(g, f, m, cond.a);
+            let lb, okb = resolveBoundLocal(g, f, m, cond.b);
+            if oka && okb {
+                if findCheckedLe(f, la, lb) >= 0 { recordCheckedBound(f, la, lb); }
+                if findCheckedLe(f, lb, la) >= 0 { recordCheckedBound(f, lb, la); }
+            }
+            return;
+        }
+        if (!invert && cond.op == squid_check_core::Op.less_equal) || (invert && cond.op == squid_check_core::Op.greater) {
+            let la, oka = resolveBoundLocal(g, f, m, cond.a);
+            let lb, okb = resolveBoundLocal(g, f, m, cond.b);
+            if oka && okb { recordCheckedLe(f, la, lb); }
+            return;
+        }
+        if (!invert && cond.op == squid_check_core::Op.greater_equal) || (invert && cond.op == squid_check_core::Op.less) {
+            let la, oka = resolveBoundLocal(g, f, m, cond.a);
+            let lb, okb = resolveBoundLocal(g, f, m, cond.b);
+            if oka && okb { recordCheckedLe(f, lb, la); }
+            return;
+        }
         var idx_node: u32 = 0;
         var bnd_node: u32 = 0;
         if !invert && cond.op == squid_check_core::Op.less {
@@ -902,6 +927,58 @@ fn scratchScalarType(m: const Module&, ty: u32) -> bool {
     return tag == squid_check_types::Tag.unsigned32 || tag == squid_check_types::Tag.floating32 || tag == squid_check_types::Tag.boolean;
 }
 
+fn isCheckUnboxedSeq(g: Generator&, f: const Fn&, m: const Module&, tid: TId) -> bool {
+    var cur = tid;
+    for _ in 0..4 {
+        let n = m.types.node(cur);
+        if n.tag != squid_check_types::Tag.nominal { return false; }
+        let kind = squid_check_storage_types::identity(n.a, n.b);
+        if !kind.present { return false; }
+        if kind.value == squid_check_storage_types::seq {
+            let args = m.types.nominalArguments(n);
+            return args.len == 1 && coreTypeUnboxed(g, f, m, args[0]);
+        }
+        if kind.value == squid_check_storage_types::shared {
+            let args = m.types.nominalArguments(n);
+            if args.len == 1 { cur = args[0]; continue; }
+        }
+        return false;
+    }
+    return false;
+}
+fn isGenericSeqNoAllocWrapper(tm: const Module&, root: u32) -> bool {
+    let inner = scratchReturned(tm, unwrapSingleBody(tm, root));
+    if inner != 0 && tm.node(inner).tag == squid_check_core::Tag.storage {
+        let op_kind, ok = squid_check_storage_ops::opFromCode(tm.node(inner).c);
+        if ok == squid_error::Error.none {
+            match op_kind {
+                push, push_front, insert, pop, pop_front, remove, length, read => { return true; },
+                _ => {},
+            }
+        }
+    }
+    let rn = tm.node(root);
+    if rn.tag == squid_check_core::Tag.suite || rn.tag == squid_check_core::Tag.block_ {
+        let ch = tm.children(root);
+        if ch.len == 2 && tm.node(ch[0]).tag == squid_check_core::Tag.bind {
+            let rhs = tm.node(ch[0]).b;
+            if rhs != 0 && tm.node(rhs).tag == squid_check_core::Tag.storage {
+                let op_kind, ok = squid_check_storage_ops::opFromCode(tm.node(rhs).c);
+                if ok == squid_error::Error.none &&
+                    (op_kind == squid_check_storage_ops::Op.pop || op_kind == squid_check_storage_ops::Op.pop_front || op_kind == squid_check_storage_ops::Op.remove) {
+                    let ret = scratchReturned(tm, ch[1]);
+                    if ret != 0 && tm.node(ret).tag == squid_check_core::Tag.product {
+                        let pch = tm.children(ret);
+                        if pch.len == 2 && localRef(tm, pch[0]) != 0 && localRef(tm, pch[1]) != 0 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
 fn scratchReturned(m: const Module&, id: u32) -> u32 {
     var current = id;
     for step in 0..8 {
@@ -4511,7 +4588,7 @@ fn resizedRhsOrigin(g: const Generator&, m: const Module&, id: u32) -> u32, bool
                 if ok != squid_error::Error.none { return 0, false; }
                 if op_kind == squid_check_storage_ops::Op.with_capacity || op_kind == squid_check_storage_ops::Op.copy { return 0, true; }
                 let ch = m.children(cur);
-                if ch.len > 0 && (op_kind == squid_check_storage_ops::Op.push || op_kind == squid_check_storage_ops::Op.reserve || op_kind == squid_check_storage_ops::Op.extend) {
+                if ch.len > 0 && (op_kind == squid_check_storage_ops::Op.push || op_kind == squid_check_storage_ops::Op.reserve || op_kind == squid_check_storage_ops::Op.extend || op_kind == squid_check_storage_ops::Op.push_front || op_kind == squid_check_storage_ops::Op.insert) {
                     let rb = localRef(m, ch[0]);
                     return rb, rb != 0;
                 }
@@ -4521,7 +4598,7 @@ fn resizedRhsOrigin(g: const Generator&, m: const Module&, id: u32) -> u32, bool
                 if m.node(n.a).tag == squid_check_core::Tag.project {
                     let proj_n = m.node(n.a);
                     let sp = m.fieldSpelling(m.projection(proj_n.b).field);
-                    if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend") {
+                    if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "insert") {
                         let rb = localRef(m, proj_n.a);
                         return rb, rb != 0;
                     }
@@ -4764,11 +4841,32 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             if receiver_local != 0 {
                 let spelling = m.fieldSpelling(proj.field);
                 if spelling.present && spelling.value == "length" { return true; }
+                if spelling.present && (spelling.value == "pop" || spelling.value == "pop_front") &&
+                    isCheckMutableContainer(m, m.typeOf(n.a)) {
+                    return addResizedSet(resized, resized_len, receiver_local);
+                }
             }
             return false;
         },
         scalar, associated, logical => {
-            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none {
+                let sp = m.fieldSpelling(n.c);
+                let recv_b = localRef(m, n.a);
+                if sp.present && recv_b != 0 && isCheckMutableContainer(m, m.typeOf(n.a)) {
+                    if sp.value == "length" || sp.value == "at" {
+                        return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
+                            scanLoopResize(g, m, n.b, resized, resized_len, left);
+                    }
+                    if sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" ||
+                        sp.value == "extend" || sp.value == "push_front" || sp.value == "pop_front" ||
+                        sp.value == "insert" || sp.value == "remove" {
+                        if !addResizedSet(resized, resized_len, recv_b) { return false; }
+                        return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
+                            scanLoopResize(g, m, n.b, resized, resized_len, left);
+                    }
+                }
+                return false;
+            }
             return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
                 scanLoopResize(g, m, n.b, resized, resized_len, left);
         },
@@ -4875,7 +4973,8 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
         array_op => {
             let op = m.arrayOperation(id);
             let ch = m.children(id);
-            if (op == squid_backend_collection_ops::Op.get || op == squid_backend_collection_ops::Op.length) && ch.len > 0 {
+            if (op == squid_backend_collection_ops::Op.get || op == squid_backend_collection_ops::Op.length ||
+                op == squid_backend_collection_ops::Op.simd_load || op == squid_backend_collection_ops::Op.simd_load_u8x16 || op == squid_backend_collection_ops::Op.simd_load_f64x2) && ch.len > 0 {
                 let b = localRef(m, ch[0]);
                 if b != 0 && isCheckReadContainer(m, m.typeOf(ch[0])) {
                     var seen = false;
@@ -4926,7 +5025,16 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
             }
         },
         call => {
-            for arg in m.call(id).arguments { collectLoopReadArrays(m, arg, out, out_len, budget); }
+            let ci = m.call(id);
+            for arg in ci.arguments {
+                let b = localRef(m, arg);
+                if b != 0 && isCheckReadContainer(m, m.typeOf(arg)) {
+                    var seen = false;
+                    for i in 0..out_len { if out[i] == b { seen = true; break; } }
+                    if !seen && out_len < 4 { out[out_len] = b; out_len += 1; }
+                }
+                collectLoopReadArrays(m, arg, out, out_len, budget);
+            }
         },
         update => {
             let u = m.updateInfo(id);
@@ -5140,6 +5248,38 @@ fn propagatePatternTuplePreserve(
     let pat = m.pattern(pat_id);
     if pat.tag != squid_check_core::PatternTag.product { return; }
     let rhs_n = m.node(rhs_id);
+    let pchildren = m.patternChildren(pat_id);
+    if rhs_n.tag == squid_check_core::Tag.project {
+        let sp = m.fieldSpelling(m.projection(rhs_n.b).field);
+        if sp.present && (sp.value == "pop" || sp.value == "pop_front") &&
+            isCheckMutableContainer(m, m.typeOf(rhs_n.a)) &&
+            pchildren.len == 2 && m.pattern(pchildren[0]).tag == squid_check_core::PatternTag.bind &&
+            exprPreservesHandle(g, m, rhs_n.a, same, same_len, 0, false, call_depth) {
+            addBindingSet(same, same_len, m.pattern(pchildren[0]).a);
+        }
+        return;
+    }
+    if rhs_n.tag == squid_check_core::Tag.associated && rhs_n.op == squid_check_core::Op.none {
+        let sp = m.fieldSpelling(rhs_n.c);
+        if sp.present && (sp.value == "pop" || sp.value == "pop_front" || sp.value == "remove") &&
+            isCheckMutableContainer(m, m.typeOf(rhs_n.a)) &&
+            pchildren.len == 2 && m.pattern(pchildren[0]).tag == squid_check_core::PatternTag.bind &&
+            exprPreservesHandle(g, m, rhs_n.a, same, same_len, 0, false, call_depth) {
+            addBindingSet(same, same_len, m.pattern(pchildren[0]).a);
+        }
+        return;
+    }
+    if rhs_n.tag == squid_check_core::Tag.apply && m.node(rhs_n.a).tag == squid_check_core::Tag.project {
+        let proj_n = m.node(rhs_n.a);
+        let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+        if sp.present && sp.value == "remove" &&
+            isCheckMutableContainer(m, m.typeOf(proj_n.a)) &&
+            pchildren.len == 2 && m.pattern(pchildren[0]).tag == squid_check_core::PatternTag.bind &&
+            exprPreservesHandle(g, m, proj_n.a, same, same_len, 0, false, call_depth) {
+            addBindingSet(same, same_len, m.pattern(pchildren[0]).a);
+        }
+        return;
+    }
     if rhs_n.tag != squid_check_core::Tag.call { return; }
     let info = m.call(rhs_id);
     let target = g.resolve(m, info.target);
@@ -5149,7 +5289,6 @@ fn propagatePatternTuplePreserve(
     if !body || !body.is_function || body.exported { return; }
     let params = tm.bodyParameters(body);
     if params.len != info.arguments.len { return; }
-    let pchildren = m.patternChildren(pat_id);
     for arg, ai in info.arguments {
         if exprPreservesHandle(g, m, arg, same, same_len, 0, false, call_depth) {
             for pc, pi in pchildren {
@@ -5266,6 +5405,16 @@ recursive fn exprPreservesHandle(
                 if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "insert") &&
                     isCheckMutableContainer(m, m.typeOf(proj_n.a)) {
                     return exprPreservesHandle(g, m, proj_n.a, same, same_len, depth + 1, allow_calls, call_depth);
+                }
+            }
+            return false;
+        },
+        associated => {
+            if n.op == squid_check_core::Op.none {
+                let sp = m.fieldSpelling(n.c);
+                if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "insert") &&
+                    isCheckMutableContainer(m, m.typeOf(n.a)) {
+                    return exprPreservesHandle(g, m, n.a, same, same_len, depth + 1, allow_calls, call_depth);
                 }
             }
             return false;
@@ -5426,6 +5575,715 @@ fn isTwoParamPushForwarder(tm: const Module&, body: const squid_check_core::Body
     if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push { return false; }
     let ch = tm.children(inner);
     return ch.len == 2 && localRef(tm, ch[0]) == params[0].binding && localRef(tm, ch[1]) == params[1].binding;
+}
+fn isTwoParamPushFrontForwarder(tm: const Module&, body: const squid_check_core::Body&) -> bool {
+    if !body.is_function { return false; }
+    let params = tm.bodyParameters(body);
+    if params.len != 2 { return false; }
+    let inner = scratchReturned(tm, unwrapSingleBody(tm, body.root));
+    if inner == 0 { return false; }
+    let n = tm.node(inner);
+    if n.tag != squid_check_core::Tag.storage { return false; }
+    let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+    if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push_front { return false; }
+    let ch = tm.children(inner);
+    return ch.len == 2 && localRef(tm, ch[0]) == params[0].binding && localRef(tm, ch[1]) == params[1].binding;
+}
+
+// Lowers `for i in start .. end: dst[i] := src[i]` on plain `#[T]` arrays to a
+// single bounds check + zero-loop overlapping v128 copy (4..16 disjoint 4B elems)
+// or Wasm `memory.copy`. Returns `true` when it completely emitted the loop.
+fn tryEmitArrayCopyRangeLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    outgoing: Vals,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> bool, Error {
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return false, squid_direct_types::Error.none;
+    }
+    var dst_val = neverVal();
+    var src_val = neverVal();
+    var step: u32 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != squid_check_core::PatternTag.bind { return false, squid_direct_types::Error.none; }
+        let iter_b = pat.a;
+        let carries = m.loopCarries(loop_id);
+        if carries.len != 1 || !carry_in_place[0] { return false, squid_direct_types::Error.none; }
+        let body_id = unwrapSingleBody(m, info.body);
+        if body_id == 0 { return false, squid_direct_types::Error.none; }
+        let bn = m.node(body_id);
+        var uid: u32 = 0;
+        if bn.tag == squid_check_core::Tag.update {
+            uid = body_id;
+        } else if bn.tag == squid_check_core::Tag.bind && bn.c < 2 && bn.a == carries[0].backedge && m.node(bn.b).tag == squid_check_core::Tag.update {
+            uid = bn.b;
+        }
+        if uid == 0 { return false, squid_direct_types::Error.none; }
+        let uinfo = m.updateInfo(uid);
+        let sels = m.updateSelectors(uid);
+        if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { return false, squid_direct_types::Error.none; }
+        if localRef(m, sels[0].index) != iter_b { return false, squid_direct_types::Error.none; }
+        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, squid_direct_types::Error.none; }
+        let dst_b = localRef(m, uinfo.root);
+        if dst_b != carries[0].iteration { return false, squid_direct_types::Error.none; }
+        let _, dst_cell = withCellType(g, f, dst_b);
+        if dst_cell { return false, squid_direct_types::Error.none; }
+        let dv, dok = bindGet(g, f, dst_b);
+        if !dok || tagOf(g, dv.ty) != squid_direct_types::Tag.array { return false, squid_direct_types::Error.none; }
+        let vn = m.node(uinfo.value);
+        var src_b: u32 = 0;
+        if vn.tag == squid_check_core::Tag.array_op && m.arrayOperation(uinfo.value) == squid_backend_collection_ops::Op.get {
+            let ch = m.children(uinfo.value);
+            if ch.len == 2 && localRef(m, ch[1]) == iter_b { src_b = localRef(m, ch[0]); }
+        } else if vn.tag == squid_check_core::Tag.storage {
+            let op_k, ok = squid_check_storage_ops::opFromCode(vn.c);
+            let ch = m.children(uinfo.value);
+            if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read && ch.len == 2 && localRef(m, ch[1]) == iter_b {
+                src_b = localRef(m, ch[0]);
+            }
+        }
+        if src_b == 0 { return false, squid_direct_types::Error.none; }
+        let _, src_cell = withCellType(g, f, src_b);
+        if src_cell { return false, squid_direct_types::Error.none; }
+        let sv, sok = bindGet(g, f, src_b);
+        if !sok || tagOf(g, sv.ty) != squid_direct_types::Tag.array || sv.ty != dv.ty { return false, squid_direct_types::Error.none; }
+        let elem_ty = g.types.node(dv.ty).a;
+        let plain, plerr = g.types.isPlainMem(elem_ty);
+        if plerr != squid_direct_types::Error.none || !plain || holdsContainer(g, elem_ty, 0) { return false, squid_direct_types::Error.none; }
+        let st, sterr = stride(g, f, elem_ty, loop_id);
+        if sterr != squid_direct_types::Error.none || st == 0 || st > 65536 { g.dropFailure(); return false, squid_direct_types::Error.none; }
+        if findDirectArray(f, dst_b) >= 0 || findDirectArray(f, src_b) >= 0 { return false, squid_direct_types::Error.none; }
+        dst_val = dv;
+        src_val = sv;
+        step = st;
+        matched = true;
+    }
+    if !matched { return false, squid_direct_types::Error.none; }
+
+    lget(g, index);
+    lget(g, end_local);
+    op(g, OP_i32_lt_u);
+    let do_copy = open(g, f, OP_if_);
+    checkMutableOwner(g, f, dst_val);
+    let dst_base, dst_len = ensureCheckedArray(g, f, dst_val);
+    let src_base, src_len = ensureCheckedArray(g, f, src_val);
+    let dst_ok = end_local == dst_len || findCheckedLe(f, end_local, dst_len) >= 0;
+    let src_ok = end_local == src_len || findCheckedLe(f, end_local, src_len) >= 0;
+    if !dst_ok || !src_ok {
+        if !dst_ok {
+            lget(g, end_local);
+            lget(g, dst_len);
+            op(g, OP_i32_gt_u);
+        }
+        if !src_ok {
+            lget(g, end_local);
+            lget(g, src_len);
+            op(g, OP_i32_gt_u);
+            if !dst_ok { op(g, OP_i32_or); }
+        }
+        trapBounds(g, f, loop_id);
+    }
+    let count = local32(g, f);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_sub);
+    lset(g, count);
+    let dst_ptr = emitOffsetAddress(g, f, dst_base, index, step);
+    let src_ptr = emitOffsetAddress(g, f, src_base, index, step);
+    if step == 4 {
+        // Disjoint 4..16 element copy: zero-loop overlapping v128 loads/stores (e.g. 44B = 3 v128 pairs!).
+        lget(g, count);
+        i32Const(g, 16);
+        op(g, OP_i32_le_u);
+        lget(g, dst_base);
+        lget(g, src_base);
+        op(g, OP_i32_ne);
+        op(g, OP_i32_and);
+        let small_cp = open(g, f, OP_if_);
+        lget(g, count);
+        i32Const(g, 4);
+        op(g, OP_i32_ge_u);
+        let ge4 = open(g, f, OP_if_);
+        let tail_off = local32(g, f);
+        lget(g, count);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        i32Const(g, 16);
+        op(g, OP_i32_sub);
+        lset(g, tail_off);
+        // [0..16)
+        lget(g, dst_ptr); lget(g, src_ptr); simdMemOp(g, SIMD_v128_load, 2, 0); simdMemOp(g, SIMD_v128_store, 2, 0);
+        // [16..32) when count > 8
+        lget(g, count); i32Const(g, 8); op(g, OP_i32_gt_u);
+        let gt8 = open(g, f, OP_if_);
+        lget(g, dst_ptr); lget(g, src_ptr); simdMemOp(g, SIMD_v128_load, 2, 16); simdMemOp(g, SIMD_v128_store, 2, 16);
+        // [32..48) when count > 12
+        lget(g, count); i32Const(g, 12); op(g, OP_i32_gt_u);
+        let gt12 = open(g, f, OP_if_);
+        lget(g, dst_ptr); lget(g, src_ptr); simdMemOp(g, SIMD_v128_load, 2, 32); simdMemOp(g, SIMD_v128_store, 2, 32);
+        popCheckedArraysAt(f, gt12);
+        close(g, f);
+        popCheckedArraysAt(f, gt8);
+        close(g, f);
+        // Overlapping trailing [bytes-16 .. bytes)
+        lget(g, dst_ptr); lget(g, tail_off); op(g, OP_i32_add);
+        lget(g, src_ptr); lget(g, tail_off); op(g, OP_i32_add);
+        simdMemOp(g, SIMD_v128_load, 2, 0); simdMemOp(g, SIMD_v128_store, 2, 0);
+        popCheckedArraysAt(f, ge4);
+        op(g, OP_else_);
+        let dp = local32(g, f);
+        let sp = local32(g, f);
+        let rem = local32(g, f);
+        lget(g, dst_ptr); lset(g, dp);
+        lget(g, src_ptr); lset(g, sp);
+        lget(g, count); lset(g, rem);
+        let s_exit = open(g, f, OP_block);
+        let s_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, s_exit);
+        lget(g, dp); lget(g, sp); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+        op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, 0);
+        lget(g, dp); i32Const(g, 4); op(g, OP_i32_add); lset(g, dp);
+        lget(g, sp); i32Const(g, 4); op(g, OP_i32_add); lset(g, sp);
+        lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, s_top);
+        close(g, f); close(g, f);
+        close(g, f);
+        popCheckedArraysAt(f, small_cp);
+        op(g, OP_else_);
+        let bytes = emitScaledBytes(g, f, count, step);
+        lget(g, dst_ptr);
+        lget(g, src_ptr);
+        lget(g, bytes);
+        memoryCopyOp(g);
+        close(g, f);
+    } else {
+        let bytes = emitScaledBytes(g, f, count, step);
+        lget(g, dst_ptr);
+        lget(g, src_ptr);
+        lget(g, bytes);
+        memoryCopyOp(g);
+    }
+    lget(g, end_local);
+    lset(g, index);
+    popCheckedArraysAt(f, do_copy);
+    close(g, f);
+    let aerr = assign(g, f, iteration, outgoing, loop_id);
+    if aerr != squid_direct_types::Error.none { return true, aerr; }
+    f.checked_elems_len = 0;
+    return true, squid_direct_types::Error.none;
+}
+
+// Match `base + x + delta` / `base + x - delta` / `x + delta` / `x - delta` / `x` for SIMD window pre-checking.
+recursive fn matchSimdWindowExpr(m: const Module&, id: u32, x_b: u32) -> bool, u32, i32 {
+    if id == 0 { return false, 0, 0; }
+    let r = localRef(m, id);
+    if r == x_b { return true, 0, 0; }
+    let n = m.node(id);
+    if n.tag != squid_check_core::Tag.scalar && !(n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none) {
+        return false, 0, 0;
+    }
+    if n.op == squid_check_core::Op.add {
+        let ra = localRef(m, n.a);
+        let rb = localRef(m, n.b);
+        if ra == x_b && rb != 0 && rb != x_b { return true, rb, 0; }
+        if rb == x_b && ra != 0 && ra != x_b { return true, ra, 0; }
+        if m.node(n.b).tag == squid_check_core::Tag.constant && m.node(n.b).a <= 16 {
+            let ok, base_b, d = matchSimdWindowExpr(m, n.a, x_b);
+            if ok && d + (m.node(n.b).a as i32) <= 16 { return true, base_b, d + (m.node(n.b).a as i32); }
+        }
+        if m.node(n.a).tag == squid_check_core::Tag.constant && m.node(n.a).a <= 16 {
+            let ok, base_b, d = matchSimdWindowExpr(m, n.b, x_b);
+            if ok && d + (m.node(n.a).a as i32) <= 16 { return true, base_b, d + (m.node(n.a).a as i32); }
+        }
+        // `base + (x + c)` or `base + (x - c)`
+        if ra != 0 && ra != x_b {
+            let ok, sub_b, d = matchSimdWindowExpr(m, n.b, x_b);
+            if ok && sub_b == 0 { return true, ra, d; }
+        }
+        if rb != 0 && rb != x_b {
+            let ok, sub_b, d = matchSimdWindowExpr(m, n.a, x_b);
+            if ok && sub_b == 0 { return true, rb, d; }
+        }
+    } else if n.op == squid_check_core::Op.sub {
+        if m.node(n.b).tag == squid_check_core::Tag.constant && m.node(n.b).a <= 16 {
+            let ok, base_b, d = matchSimdWindowExpr(m, n.a, x_b);
+            if ok && d - (m.node(n.b).a as i32) >= -16 { return true, base_b, d - (m.node(n.b).a as i32); }
+        }
+    }
+    return false, 0, 0;
+}
+
+fn extractSimdOpArgs(g: const Generator&, m: const Module&, id: u32) -> bool, u32, u32, u32 {
+    if id == 0 { return false, 0, 0, 0; }
+    let n = m.node(id);
+    if n.tag == squid_check_core::Tag.array_op {
+        let aop = m.arrayOperation(id);
+        let ch = m.children(id);
+        var lc: u32 = 0;
+        match aop {
+            simd_load, simd_store => { lc = 4; },
+            simd_load_u8x16, simd_store_u8x16 => { lc = 16; },
+            simd_load_f64x2, simd_store_f64x2 => { lc = 2; },
+            _ => { return false, 0, 0, 0; },
+        }
+        if ch.len >= 2 { return true, ch[0], ch[1], lc; }
+        return false, 0, 0, 0;
+    }
+    if n.tag == squid_check_core::Tag.call {
+        let ci = m.call(id);
+        let target = g.resolve(m, ci.target);
+        if !g.hasUnit(target.unit) { return false, 0, 0, 0; }
+        let tm .= g.units[target.unit - 1];
+        let tbody .= tm.body(target.binding);
+        if !tbody || !tbody.is_function { return false, 0, 0, 0; }
+        let params = tm.bodyParameters(tbody);
+        if params.len != ci.arguments.len { return false, 0, 0, 0; }
+        let inner = scratchReturned(tm, unwrapSingleBody(tm, tbody.root));
+        if inner == 0 || tm.node(inner).tag != squid_check_core::Tag.array_op { return false, 0, 0, 0; }
+        let aop = tm.arrayOperation(inner);
+        var lc: u32 = 0;
+        match aop {
+            simd_load, simd_store => { lc = 4; },
+            simd_load_u8x16, simd_store_u8x16 => { lc = 16; },
+            simd_load_f64x2, simd_store_f64x2 => { lc = 2; },
+            _ => { return false, 0, 0, 0; },
+        }
+        let ich = tm.children(inner);
+        if ich.len < 2 { return false, 0, 0, 0; }
+        let arr_pb = localRef(tm, ich[0]);
+        let idx_pb = localRef(tm, ich[1]);
+        var arr_arg: u32 = 0;
+        var idx_arg: u32 = 0;
+        for p, pi in params {
+            if p.binding == arr_pb { arr_arg = ci.arguments[pi]; }
+            if p.binding == idx_pb { idx_arg = ci.arguments[pi]; }
+        }
+        if arr_arg != 0 && idx_arg != 0 { return true, arr_arg, idx_arg, lc; }
+    }
+    return false, 0, 0, 0;
+}
+
+recursive fn stmtAlwaysBreaks(m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    let n = m.node(id);
+    if n.tag == squid_check_core::Tag.break_ { return true; }
+    if n.tag == squid_check_core::Tag.suite || n.tag == squid_check_core::Tag.block_ {
+        let ch = m.children(id);
+        return ch.len > 0 && stmtAlwaysBreaks(m, ch[ch.len - 1]);
+    }
+    return false;
+}
+
+// Pre-loop speculative specialization for `for ever:` SIMD loops of the form:
+//   if x + C > limit: break
+//   ... simd_load/store(base + x + delta, arr) ...
+//   x := x + S
+// Proves all SIMD windows in-bounds once before OP_loop, emitting zero bounds checks inside the hot loop.
+recursive fn tryEmitForeverSimdWindowLoop(
+    g: Generator&,
+    f: Fn&,
+    id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    outgoing: Vals,
+    slots: Words,
+    carry_in_place: const bool[64]&,
+    range: CheckedRange,
+    reciprocal_inputs: u32,
+) -> bool, Error {
+    if g.runtime_().has_fork || f.in_specialized_loop || info.kind != squid_check_core::LoopKind.forever {
+        return false, squid_direct_types::Error.none;
+    }
+    var x_loc: u32 = 0;
+    var lim_loc: u32 = 0;
+    var c_eff: u32 = 0;
+    var win_arrs: Val[8] = [Val {}; 8];
+    var win_bases: u32[8] = [0xffffffff; 8];
+    var win_min_d: i32[8] = [0; 8];
+    var win_max_end: i32[8] = [0; 8];
+    var win_count: i64 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let bn = m.node(info.body);
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ {
+            return false, squid_direct_types::Error.none;
+        }
+        let ch = m.children(info.body);
+        if ch.len < 3 { return false, squid_direct_types::Error.none; }
+        let g0 = m.node(ch[0]);
+        if g0.tag != squid_check_core::Tag.if_stmt || g0.c != 0 || !stmtAlwaysBreaks(m, g0.b) {
+            return false, squid_direct_types::Error.none;
+        }
+        let cn = m.node(g0.a);
+        if !isScalarOrAssocOp(cn) { return false, squid_direct_types::Error.none; }
+        var x_expr: u32 = 0;
+        var lim_expr: u32 = 0;
+        var extra_c: u32 = 0;
+        if cn.op == squid_check_core::Op.greater {
+            x_expr = cn.a; lim_expr = cn.b; extra_c = 0;
+        } else if cn.op == squid_check_core::Op.greater_equal {
+            x_expr = cn.a; lim_expr = cn.b; extra_c = 1;
+        } else if cn.op == squid_check_core::Op.less {
+            x_expr = cn.b; lim_expr = cn.a; extra_c = 0;
+        } else if cn.op == squid_check_core::Op.less_equal {
+            x_expr = cn.b; lim_expr = cn.a; extra_c = 1;
+        } else {
+            return false, squid_direct_types::Error.none;
+        }
+        var x_b: u32 = 0;
+        var c_val: u32 = 0;
+        let xr = localRef(m, x_expr);
+        if xr != 0 {
+            x_b = xr;
+            c_val = 0;
+        } else {
+            let xn = m.node(x_expr);
+            if isScalarOrAssocOp(xn) && xn.op == squid_check_core::Op.add {
+                if localRef(m, xn.a) != 0 && m.node(xn.b).tag == squid_check_core::Tag.constant && m.node(xn.b).a <= 256 {
+                    x_b = localRef(m, xn.a);
+                    c_val = m.node(xn.b).a;
+                } else if localRef(m, xn.b) != 0 && m.node(xn.a).tag == squid_check_core::Tag.constant && m.node(xn.a).a <= 256 {
+                    x_b = localRef(m, xn.b);
+                    c_val = m.node(xn.a).a;
+                }
+            }
+        }
+        if x_b == 0 { return false, squid_direct_types::Error.none; }
+        c_eff = c_val + extra_c;
+        let lim_b = localRef(m, lim_expr);
+        if lim_b == 0 { return false, squid_direct_types::Error.none; }
+        let carries = m.loopCarries(id);
+        var x_ci: i64 = -1;
+        for carry, ci in carries {
+            if carry.iteration == x_b { x_ci = ci; }
+            if carry.iteration == lim_b || carry.backedge == lim_b { return false, squid_direct_types::Error.none; }
+        }
+        if x_ci < 0 { return false, squid_direct_types::Error.none; }
+        let x_val = g.s.vals[iteration.start + x_ci];
+        if tagOf(g, x_val.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
+        let _, lim_cell = withCellType(g, f, lim_b);
+        if lim_cell { return false, squid_direct_types::Error.none; }
+        let lv, lok = bindGet(g, f, lim_b);
+        if !lok || tagOf(g, lv.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
+        // Confirm x only advances by positive constant S <= 256 at its single backedge assignment.
+        let x_back = carries[x_ci].backedge;
+        var found_step = false;
+        var simd_ops: i64 = 0;
+        for si in 1..ch.len {
+            let sn = m.node(ch[si]);
+            var rhs: u32 = 0;
+            if sn.tag == squid_check_core::Tag.bind && sn.c < 2 {
+                if sn.a == x_back {
+                    let an = m.node(sn.b);
+                    if isScalarOrAssocOp(an) && an.op == squid_check_core::Op.add {
+                        if localRef(m, an.a) == x_b && m.node(an.b).tag == squid_check_core::Tag.constant && m.node(an.b).a >= 1 && m.node(an.b).a <= 256 {
+                            found_step = true;
+                        } else if localRef(m, an.b) == x_b && m.node(an.a).tag == squid_check_core::Tag.constant && m.node(an.a).a >= 1 && m.node(an.a).a <= 256 {
+                            found_step = true;
+                        }
+                    }
+                    continue;
+                }
+                rhs = sn.b;
+            } else {
+                rhs = ch[si];
+            }
+            let is_simd, arr_n, idx_n, lc = extractSimdOpArgs(g, m, rhs);
+            if !is_simd { continue; }
+            let arr_b = localRef(m, arr_n);
+            if arr_b == 0 { continue; }
+            var bad_arr = false;
+            for carry, ci in carries {
+                if carry.iteration == arr_b && (ci >= 64 || !carry_in_place[ci]) { bad_arr = true; break; }
+            }
+            if bad_arr { continue; }
+            let _, arr_cell = withCellType(g, f, arr_b);
+            if arr_cell { continue; }
+            let av, aok = bindGet(g, f, arr_b);
+            if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
+            let ok_w, base_b, delta = matchSimdWindowExpr(m, idx_n, x_b);
+            if !ok_w { continue; }
+            var base_loc: u32 = 0xffffffff;
+            if base_b != 0 {
+                var base_is_carry = false;
+                for carry in carries {
+                    if carry.iteration == base_b || carry.backedge == base_b { base_is_carry = true; break; }
+                }
+                if base_is_carry { continue; }
+                let _, bcell = withCellType(g, f, base_b);
+                if bcell { continue; }
+                let bv, bok = bindGet(g, f, base_b);
+                if !bok || tagOf(g, bv.ty) != squid_direct_types::Tag.u32_ { continue; }
+                base_loc = w(g, bv, 0);
+            }
+            let aslot = w(g, av, 0);
+            let agen = w(g, av, 1);
+            let end_d = delta + (lc as i32);
+            var gi: i64 = -1;
+            for wi in 0..win_count {
+                if w(g, win_arrs[wi], 0) == aslot && w(g, win_arrs[wi], 1) == agen && win_bases[wi] == base_loc {
+                    gi = wi;
+                    break;
+                }
+            }
+            if gi >= 0 {
+                if delta < win_min_d[gi] { win_min_d[gi] = delta; }
+                if end_d > win_max_end[gi] { win_max_end[gi] = end_d; }
+            } else if win_count < 8 {
+                win_arrs[win_count] = av;
+                win_bases[win_count] = base_loc;
+                win_min_d[win_count] = delta;
+                win_max_end[win_count] = end_d;
+                win_count += 1;
+            } else {
+                return false, squid_direct_types::Error.none;
+            }
+            simd_ops += 1;
+        }
+        if !found_step || simd_ops < 2 || win_count == 0 { return false, squid_direct_types::Error.none; }
+        x_loc = w(g, x_val, 0);
+        lim_loc = w(g, lv, 0);
+        matched = true;
+    }
+    if !matched { return false, squid_direct_types::Error.none; }
+
+    // Ensure CheckedArray for every unique window array before the guard.
+    var win_lens: u32[8] = [0; 8];
+    for wi in 0..win_count {
+        let _, alen = ensureCheckedArray(g, f, win_arrs[wi]);
+        win_lens[wi] = alen;
+    }
+
+    // Compute `proven`:
+    //   lim_loc <= 0x3fffffff && lim_loc >= c_eff && x_loc <= lim_loc - c_eff
+    //   && (for each window: x_loc >= -min_d (if min_d < 0) && base <= len && (lim_loc - c_eff) + max_end <= len - base)
+    let x_bound = local32(g, f);
+    lget(g, lim_loc);
+    i32Const(g, c_eff);
+    op(g, OP_i32_sub);
+    lset(g, x_bound);
+
+    lget(g, lim_loc);
+    i32Const(g, 0x3fffffff);
+    op(g, OP_i32_le_u);
+    lget(g, lim_loc);
+    i32Const(g, c_eff);
+    op(g, OP_i32_ge_u);
+    op(g, OP_i32_and);
+    lget(g, x_loc);
+    lget(g, x_bound);
+    op(g, OP_i32_le_u);
+    op(g, OP_i32_and);
+
+    for wi in 0..win_count {
+        if win_min_d[wi] < 0 {
+            lget(g, x_loc);
+            i32Const(g, (0 - win_min_d[wi]) as u32);
+            op(g, OP_i32_ge_u);
+            op(g, OP_i32_and);
+        }
+        let max_need = local32(g, f);
+        lget(g, x_bound);
+        if win_max_end[wi] > 0 {
+            i32Const(g, win_max_end[wi] as u32);
+            op(g, OP_i32_add);
+        }
+        lset(g, max_need);
+        if win_bases[wi] != 0xffffffff {
+            lget(g, win_bases[wi]);
+            lget(g, win_lens[wi]);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+            lget(g, max_need);
+            lget(g, win_lens[wi]);
+            lget(g, win_bases[wi]);
+            op(g, OP_i32_sub);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+        } else {
+            lget(g, max_need);
+            lget(g, win_lens[wi]);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+        }
+    }
+
+    let prev_spec = f.in_specialized_loop;
+    f.in_specialized_loop = true;
+    let sw_if = open(g, f, OP_if_);
+    for wi in 0..win_count {
+        recordCheckedSimdWindow(f, w(g, win_arrs[wi], 0), w(g, win_arrs[wi], 1), win_bases[wi], x_loc, win_min_d[wi], win_max_end[wi]);
+    }
+    let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false, reciprocal_inputs);
+    if ferr != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; return true, ferr; }
+    popCheckedArraysAt(f, sw_if);
+    op(g, OP_else_);
+    let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false, reciprocal_inputs);
+    f.in_specialized_loop = prev_spec;
+    if serr != squid_direct_types::Error.none { return true, serr; }
+    close(g, f);
+    return true, squid_direct_types::Error.none;
+}
+
+// Pre-loop speculative specialization for `for ever:` loops of the form:
+//   if r == n: ... break
+//   ... (indexes arrays with r or nested `i < r`) ...
+//   r := r + 1
+// Proves `r <= n <= A.len` once before OP_loop so `r != n` yields `r < n <= A.len`
+// and nested `if i >= r: break` yields `i < r < n <= A.len` and `i + 1 < A.len`.
+recursive fn tryEmitForeverEqBoundLoop(
+    g: Generator&,
+    f: Fn&,
+    id: u32,
+    info: squid_check_core::LoopInfo,
+    iteration: Vals,
+    outgoing: Vals,
+    slots: Words,
+    carry_in_place: const bool[64]&,
+    range: CheckedRange,
+    reciprocal_inputs: u32,
+) -> bool, Error {
+    if g.runtime_().has_fork || f.in_specialized_loop || f.spec_loop_depth > 0 || info.kind != squid_check_core::LoopKind.forever {
+        return false, squid_direct_types::Error.none;
+    }
+    var r_loc: u32 = 0;
+    var n_loc: u32 = 0;
+    var arrs: Val[4] = [Val {}; 4];
+    var arr_count: i64 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let bn = m.node(info.body);
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ {
+            return false, squid_direct_types::Error.none;
+        }
+        let ch = m.children(info.body);
+        if ch.len < 2 { return false, squid_direct_types::Error.none; }
+        let g0 = m.node(ch[0]);
+        if g0.tag != squid_check_core::Tag.if_stmt || g0.c != 0 || !stmtAlwaysBreaks(m, g0.b) {
+            return false, squid_direct_types::Error.none;
+        }
+        let cn = m.node(g0.a);
+        if !isScalarOrAssocOp(cn) || cn.op != squid_check_core::Op.equal {
+            return false, squid_direct_types::Error.none;
+        }
+        let ra = localRef(m, cn.a);
+        let rb = localRef(m, cn.b);
+        if ra == 0 || rb == 0 { return false, squid_direct_types::Error.none; }
+        let carries = m.loopCarries(id);
+        var r_b: u32 = 0;
+        var n_b: u32 = 0;
+        var r_ci: i64 = -1;
+        for carry, ci in carries {
+            if carry.iteration == ra { r_b = ra; n_b = rb; r_ci = ci; break; }
+            if carry.iteration == rb { r_b = rb; n_b = ra; r_ci = ci; break; }
+        }
+        if r_ci < 0 { return false, squid_direct_types::Error.none; }
+        for carry in carries {
+            if carry.iteration == n_b || carry.backedge == n_b { return false, squid_direct_types::Error.none; }
+        }
+        let r_val = g.s.vals[iteration.start + r_ci];
+        if tagOf(g, r_val.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
+        let _, n_cell = withCellType(g, f, n_b);
+        if n_cell { return false, squid_direct_types::Error.none; }
+        let nv, nok = bindGet(g, f, n_b);
+        if !nok || tagOf(g, nv.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
+        // Confirm r_back is `r_b + 1` at the end of the body.
+        let r_back = carries[r_ci].backedge;
+        let last_n = m.node(ch[ch.len - 1]);
+        if last_n.tag != squid_check_core::Tag.bind || last_n.c >= 2 || last_n.a != r_back {
+            return false, squid_direct_types::Error.none;
+        }
+        let inc_n = m.node(last_n.b);
+        if !isScalarOrAssocOp(inc_n) || inc_n.op != squid_check_core::Op.add {
+            return false, squid_direct_types::Error.none;
+        }
+        let is_inc1 = (localRef(m, inc_n.a) == r_b && m.node(inc_n.b).tag == squid_check_core::Tag.constant && m.node(inc_n.b).a == 1) ||
+            (localRef(m, inc_n.b) == r_b && m.node(inc_n.a).tag == squid_check_core::Tag.constant && m.node(inc_n.a).a == 1);
+        if !is_inc1 { return false, squid_direct_types::Error.none; }
+        // Collect arrays used in the loop body (including non-resizing carries).
+        var used_b: u32[16] = [0; 16];
+        var used_len: i64 = 0;
+        var ubud: i64 = 256;
+        collectLoopArrayUses(m, info.body, used_b, used_len, ubud);
+        for carry, ci in carries {
+            if ci < 64 && carry_in_place[ci] {
+                let iv = g.s.vals[iteration.start + ci];
+                if tagOf(g, iv.ty) == squid_direct_types::Tag.array && arr_count < 4 {
+                    var seen = false;
+                    for ai in 0..arr_count {
+                        if w(g, arrs[ai], 0) == w(g, iv, 0) && w(g, arrs[ai], 1) == w(g, iv, 1) { seen = true; break; }
+                    }
+                    if !seen { arrs[arr_count] = iv; arr_count += 1; }
+                }
+            }
+        }
+        for ui in 0..used_len {
+            if arr_count >= 4 { break; }
+            let ub = used_b[ui];
+            var bad = false;
+            for carry, ci in carries {
+                if carry.iteration == ub && (ci >= 64 || !carry_in_place[ci]) { bad = true; break; }
+            }
+            if bad { continue; }
+            let av, aok = bindGet(g, f, ub);
+            if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
+            var seen = false;
+            for ai in 0..arr_count {
+                if w(g, arrs[ai], 0) == w(g, av, 0) && w(g, arrs[ai], 1) == w(g, av, 1) { seen = true; break; }
+            }
+            if !seen { arrs[arr_count] = av; arr_count += 1; }
+        }
+        if arr_count == 0 { return false, squid_direct_types::Error.none; }
+        r_loc = w(g, r_val, 0);
+        n_loc = w(g, nv, 0);
+        matched = true;
+    }
+    if !matched { return false, squid_direct_types::Error.none; }
+
+    var arr_lens: u32[4] = [0; 4];
+    for ai in 0..arr_count {
+        let _, alen = ensureCheckedArray(g, f, arrs[ai]);
+        arr_lens[ai] = alen;
+    }
+
+    // Speculative guard: `r_loc <= n_loc && n_loc <= arr_lens[0] && ...`
+    lget(g, r_loc);
+    lget(g, n_loc);
+    op(g, OP_i32_le_u);
+    for ai in 0..arr_count {
+        lget(g, n_loc);
+        lget(g, arr_lens[ai]);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
+    }
+    let prev_spec = f.in_specialized_loop;
+    let prev_sd = f.spec_loop_depth;
+    f.in_specialized_loop = true;
+    f.spec_loop_depth = prev_sd + 1;
+    let eq_if = open(g, f, OP_if_);
+    recordCheckedLe(f, r_loc, n_loc);
+    for ai in 0..arr_count { recordCheckedLe(f, n_loc, arr_lens[ai]); }
+    let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false, reciprocal_inputs);
+    if ferr != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.spec_loop_depth = prev_sd; return true, ferr; }
+    popCheckedArraysAt(f, eq_if);
+    op(g, OP_else_);
+    let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false, reciprocal_inputs);
+    f.in_specialized_loop = prev_spec;
+    f.spec_loop_depth = prev_sd;
+    if serr != squid_direct_types::Error.none { return true, serr; }
+    close(g, f);
+    return true, squid_direct_types::Error.none;
 }
 
 // Recognize `for item in src: dest := self.push item` (or `dest := @storage.push self item`
@@ -5962,7 +6820,10 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
         update => {
             let change = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            if sels.len == 0 || sels[0].kind != squid_check_core::UpdateKind.index { return false; }
+            if sels.len == 0 { return false; }
+            if sels[0].kind != squid_check_core::UpdateKind.index {
+                if !coreTypeUnboxed(g, f, m, m.typeOf(change.root)) { return false; }
+            }
             if !coreTypeUnboxed(g, f, m, m.typeOf(change.value)) { return false; }
             if !bodyNoAlloc(g, f, m, change.root, left, call_depth) || !bodyNoAlloc(g, f, m, change.value, left, call_depth) { return false; }
             for sel in sels {
@@ -5998,9 +6859,24 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
                 if g.hasUnit(target.unit) {
                     let tm .= g.units[target.unit - 1];
                     let tbody .= tm.body(target.binding);
-                    if tbody && tbody.is_function && !tbody.exported && tbody.scheme.variables.len == 0 && tm.bodyParameters(tbody).len == call.arguments.len {
-                        let cf = Fn { unit: target.unit, .. };
-                        callee_ok = bodyNoAlloc(g, cf, tm, tbody.root, left, call_depth + 1);
+                    if tbody && tbody.is_function && !tbody.exported && tm.bodyParameters(tbody).len == call.arguments.len {
+                        if tbody.scheme.variables.len == 0 {
+                            let cf = Fn { unit: target.unit, .. };
+                            callee_ok = bodyNoAlloc(g, cf, tm, tbody.root, left, call_depth + 1);
+                        } else {
+                            let inner = scratchReturned(tm, unwrapSingleBody(tm, tbody.root));
+                            if inner != 0 && tm.node(inner).tag == squid_check_core::Tag.array_op {
+                                match tm.arrayOperation(inner) {
+                                    simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
+                                        callee_ok = true;
+                                    },
+                                    _ => {},
+                                }
+                            } else if call.arguments.len > 0 && isCheckUnboxedSeq(g, f, m, m.typeOf(call.arguments[0])) &&
+                                isGenericSeqNoAllocWrapper(tm, tbody.root) {
+                                callee_ok = true;
+                            }
+                        }
                     }
                 }
             }
@@ -6025,6 +6901,12 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
                     }
                     return true;
                 },
+                simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
+                    for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left, call_depth) { return false; }
+                    }
+                    return true;
+                },
                 _ => { return false; },
             }
         },
@@ -6041,6 +6923,14 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
                 read => {
                     if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
                     for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left, call_depth) { return false; }
+                    }
+                    return true;
+                },
+                push, pop, push_front, pop_front, insert, remove => {
+                    let ch = m.children(id);
+                    if ch.len == 0 || !isCheckUnboxedSeq(g, f, m, m.typeOf(ch[0])) { return false; }
+                    for child in ch {
                         if !bodyNoAlloc(g, f, m, child, left, call_depth) { return false; }
                     }
                     return true;
@@ -6117,7 +7007,7 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[16]&, len:
         array_op => {
             let ch = m.children(id);
             match m.arrayOperation(id) {
-                get, length => {
+                get, length, simd_load, simd_load_u8x16, simd_load_f64x2 => {
                     if ch.len > 0 { addLoopArrayCandidate(out, len, localRef(m, ch[0])); }
                 },
                 _ => {},
@@ -10521,6 +11411,8 @@ fn emitLoopReciprocalU64(g: Generator&, f: Fn&, divisor: u32, from_u32: bool) {
     let cnt = local32(g, f);
     let carry = local(g, f, VT_i64);
     let rem2 = local(g, f, VT_i64);
+    i64Const(g, 0);
+    lset(g, m_low);
     lget(g, divisor);
     if from_u32 { op(g, OP_i64_extend_i32_u); }
     ltee(g, d);
@@ -10612,7 +11504,10 @@ fn emitLoopReciprocalU64(g: Generator&, f: Fn&, divisor: u32, from_u32: bool) {
     lget(g, m_low);
     i64Const(g, 1);
     op(g, OP_i64_add);
-    ltee(g, m_low);
+    lset(g, m_low);
+    close(g, f);
+    close(g, f);
+    lget(g, m_low);
     i64Const(g, 0xffffffff);
     op(g, OP_i64_and);
     lset(g, m_lo);
@@ -10620,8 +11515,6 @@ fn emitLoopReciprocalU64(g: Generator&, f: Fn&, divisor: u32, from_u32: bool) {
     i64Const(g, 32);
     op(g, OP_i64_shr_u);
     lset(g, m_hi);
-    close(g, f);
-    close(g, f);
     f.loop_reciprocals_u64[f.loop_reciprocals_u64_len] = LoopReciprocalU64 { divisor, from_u32, m_lo, m_hi, sh1, sh2, true };
     f.loop_reciprocals_u64_len += 1;
 }
@@ -10634,8 +11527,7 @@ fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, 
         let _, is_cell = withCellType(g, f, b);
         if found && !is_cell && value.ty == squid_direct_types::u64_ {
             let loc = w(g, value, 0);
-            let _, is_c = constU64(f, loc);
-            if loc < input_locals && !is_c { return loc, false; }
+            if loc < input_locals && !isAnyConstU64(f, loc) { return loc, false; }
         }
         return 0xffffffff, false;
     }
@@ -10660,8 +11552,7 @@ fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, 
             let _, is_cell = withCellType(g, f, sb);
             if found && !is_cell && value.ty == squid_direct_types::u32_ {
                 let loc = w(g, value, 0);
-                let _, is_c = constU32(f, loc);
-                if loc < input_locals && !is_c { return loc, true; }
+                if loc < input_locals && !isAnyConstU32(f, loc) { return loc, true; }
             }
         }
     }
@@ -10713,6 +11604,12 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         scalar, associated, logical => {
             let divisor = invariantDivisor(g, f, m, id, input_locals);
             if divisor != 0xffffffff { emitLoopReciprocal(g, f, divisor, divisor == mandatory, index, end); }
+            if (n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) &&
+                (n.op == squid_check_core::Op.div || n.op == squid_check_core::Op.rem) &&
+                n.b != 0 && m.types.node(m.typeOf(n.b)).tag == squid_check_types::Tag.unsigned64 {
+                let u64_div, from_u32 = invariantU64DivisorExpr(g, f, m, n.b, input_locals);
+                if u64_div != 0xffffffff { emitLoopReciprocalU64(g, f, u64_div, from_u32); }
+            }
             collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget);
             collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
         },
@@ -10728,6 +11625,22 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         },
         call => {
             let ci = m.call(id);
+            let target = g.resolve(m, ci.target);
+            if g.hasUnit(target.unit) {
+                let tm .= g.units[target.unit - 1];
+                let tbody .= tm.body(target.binding);
+                if tbody && tbody.is_function && !tbody.exported {
+                    let params = tm.bodyParameters(tbody);
+                    if params.len == ci.arguments.len {
+                        for arg, ai in ci.arguments {
+                            let u64_div, from_u32 = invariantU64DivisorExpr(g, f, m, arg, input_locals);
+                            if u64_div != 0xffffffff && calleeUsesParamAsU64Divisor(tm, tbody.root, params[ai].binding, 0) {
+                                emitLoopReciprocalU64(g, f, u64_div, from_u32);
+                            }
+                        }
+                    }
+                }
+            }
             for arg in ci.arguments { collectLoopReciprocals(g, f, arg, input_locals, mandatory, index, end, budget); }
         },
         match_ => {
@@ -10870,7 +11783,7 @@ recursive fn emitLoopCore(
         if f.worker_spec >= 0 && g.s.worker_specs[f.worker_spec].no_scope_alloc {
             release = false;
         } else {
-            var no_alloc_budget: i64 = 512;
+            var no_alloc_budget: i64 = 2048;
             if bodyNoAlloc(g, f, m, info.body, no_alloc_budget) {
                 release = false;
             }
@@ -11432,6 +12345,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
     }
+    var copy_range_done = false;
     if body_no_resize && info.kind == squid_check_core::LoopKind.range {
         let matmul2_err = tryEmitBlockedMatmulRowLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if matmul2_err != squid_direct_types::Error.none { return neverVal(), matmul2_err; }
@@ -11441,18 +12355,23 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if v3_err != squid_direct_types::Error.none { return neverVal(), v3_err; }
         let aos_err = tryEmitAosF32RecordLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if aos_err != squid_direct_types::Error.none { return neverVal(), aos_err; }
-        let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if vec_err != squid_direct_types::Error.none { return neverVal(), vec_err; }
-        let ainit_err = tryEmitAffineInitLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if ainit_err != squid_direct_types::Error.none { return neverVal(), ainit_err; }
-        let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if red_err != squid_direct_types::Error.none { return neverVal(), red_err; }
-        let v3r_err = tryEmitVec3MaybeReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if v3r_err != squid_direct_types::Error.none { return neverVal(), v3r_err; }
-        let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if esc_err != squid_direct_types::Error.none { return neverVal(), esc_err; }
-        let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
-        if aff_err != squid_direct_types::Error.none { return neverVal(), aff_err; }
+        let cp_done, cp_err = tryEmitArrayCopyRangeLoop(g, f, id, info, iteration, outgoing, carry_in_place, index, w(g, end, 0));
+        if cp_err != squid_direct_types::Error.none { return neverVal(), cp_err; }
+        copy_range_done = cp_done;
+        if !copy_range_done {
+            let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
+            if vec_err != squid_direct_types::Error.none { return neverVal(), vec_err; }
+            let ainit_err = tryEmitAffineInitLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+            if ainit_err != squid_direct_types::Error.none { return neverVal(), ainit_err; }
+            let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+            if red_err != squid_direct_types::Error.none { return neverVal(), red_err; }
+            let v3r_err = tryEmitVec3MaybeReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+            if v3r_err != squid_direct_types::Error.none { return neverVal(), v3r_err; }
+            let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+            if esc_err != squid_direct_types::Error.none { return neverVal(), esc_err; }
+            let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
+            if aff_err != squid_direct_types::Error.none { return neverVal(), aff_err; }
+        }
     }
     if !body_no_resize && selective_resize && info.kind == squid_check_core::LoopKind.range && !g.runtime_().has_fork {
         let fp_err = tryEmitFastPushRangeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
@@ -11494,7 +12413,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
 
     // 4A: Deferred NaN canonicalization on pure-FP counted loops (`0..end-1` fast, final iter canonical).
-    var emitted_loop = false;
+    var emitted_loop = copy_range_done;
     if body_no_resize && !f.defer_f32_nan && !g.runtime_().has_fork && info.kind == squid_check_core::LoopKind.range &&
         canDeferLoopF32Nan(g, f, g.units[f.unit - 1], id, info) {
         let end_loc = w(g, end, 0);
@@ -11807,6 +12726,16 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
 
+    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && info.kind == squid_check_core::LoopKind.forever && !copy_tail_done {
+        let sw_done, sw_err = tryEmitForeverSimdWindowLoop(g, f, id, info, iteration, outgoing, slots, carry_in_place, range, reciprocal_inputs);
+        if sw_err != squid_direct_types::Error.none { return neverVal(), sw_err; }
+        if sw_done { emitted_loop = true; }
+    }
+    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && info.kind == squid_check_core::LoopKind.forever && !copy_tail_done {
+        let eq_done, eq_err = tryEmitForeverEqBoundLoop(g, f, id, info, iteration, outgoing, slots, carry_in_place, range, reciprocal_inputs);
+        if eq_err != squid_direct_types::Error.none { return neverVal(), eq_err; }
+        if eq_done { emitted_loop = true; }
+    }
     if !emitted_loop {
         var end_loc: u32 = 0;
         if has_index { end_loc = w(g, end, 0); }

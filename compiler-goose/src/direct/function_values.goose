@@ -641,6 +641,46 @@ fn emitU64StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, le
         }
         return true;
     }
+    if f.loop_reciprocals_u64_len > 0 && right.len == 1 {
+        let d_loc = w(g, right, 0);
+        let ext_u32, has_ext = findExtU32U64(f, d_loc);
+        for at in 0..f.loop_reciprocals_u64_len {
+            let rec = f.loop_reciprocals_u64[at];
+            let matched = (!rec.from_u32 && rec.divisor == d_loc) ||
+                (rec.from_u32 && has_ext && rec.divisor == ext_u32);
+            if !matched { continue; }
+            if rec.check_at_use {
+                lget(g, d_loc);
+                op(g, OP_i64_eqz);
+                trap(g, f);
+            }
+            let xv = local(g, f, VT_i64);
+            pushScalarOperand(g, f, left_id, left);
+            lset(g, xv);
+            let t = local(g, f, VT_i64);
+            emitMulHi64(g, f, xv, rec.m_lo as u64, rec.m_hi as u64, true);
+            lset(g, t);
+            lget(g, xv);
+            lget(g, t);
+            op(g, OP_i64_sub);
+            lget(g, rec.sh1);
+            op(g, OP_i64_shr_u);
+            lget(g, t);
+            op(g, OP_i64_add);
+            lget(g, rec.sh2);
+            op(g, OP_i64_shr_u);
+            if remainder {
+                lget(g, d_loc);
+                op(g, OP_i64_mul);
+                let prod = local(g, f, VT_i64);
+                lset(g, prod);
+                lget(g, xv);
+                lget(g, prod);
+                op(g, OP_i64_sub);
+            }
+            return true;
+        }
+    }
     return false;
 }
 
@@ -814,11 +854,23 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     }
     if has_right && left.ty == squid_direct_types::u32_ &&
         emitU32StrengthReduction(g, f, machine, n.a, left, n.b, right) {
-        return pop(g, f, result, id);
+        let popped, perr = pop(g, f, result, id);
+        if perr == squid_direct_types::Error.none && result == squid_direct_types::u32_ {
+            let la_c = m.node(n.a).tag == squid_check_core::Tag.constant || (left.len == 1 && isAnyConstU32(f, w(g, left, 0)));
+            let ra_c = m.node(n.b).tag == squid_check_core::Tag.constant || (right.len == 1 && isAnyConstU32(f, w(g, right, 0)));
+            if la_c && ra_c { recordConstU32(f, w(g, popped, 0), 0, 0xffffffff, 0); }
+        }
+        return popped, perr;
     }
     if has_right && left.ty == squid_direct_types::u64_ &&
         emitU64StrengthReduction(g, f, machine, n.a, left, n.b, right) {
-        return pop(g, f, result, id);
+        let popped, perr = pop(g, f, result, id);
+        if perr == squid_direct_types::Error.none && result == squid_direct_types::u64_ {
+            let la_c = m.node(n.a).tag == squid_check_core::Tag.constant || (left.len == 1 && isAnyConstU64(f, w(g, left, 0)));
+            let ra_c = m.node(n.b).tag == squid_check_core::Tag.constant || (right.len == 1 && isAnyConstU64(f, w(g, right, 0)));
+            if la_c && ra_c { recordConstU64(f, w(g, popped, 0), 0, 0xffffffff, 0); }
+        }
+        return popped, perr;
     }
     pushScalarOperand(g, f, n.a, left);
     if has_right { pushScalarOperand(g, f, n.b, right); }
@@ -830,8 +882,18 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     if machine == squid_check_core::Op.numeric_convert && left.ty == squid_direct_types::u32_ && result == squid_direct_types::u64_ {
         let cf, known = u32OperandConstant(g, f, n.a, left);
         if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
-        else if left.len == 1 { recordExtU32U64(f, w(g, popped, 0), w(g, left, 0)); }
+        else if left.len == 1 {
+            if isAnyConstU32(f, w(g, left, 0)) { recordConstU64(f, w(g, popped, 0), 0, 0xffffffff, 0); }
+            recordExtU32U64(f, w(g, popped, 0), w(g, left, 0));
+        }
+    } else if has_right && result == squid_direct_types::u64_ && left.ty == squid_direct_types::u64_ {
+        let la_c = m.node(n.a).tag == squid_check_core::Tag.constant || (left.len == 1 && isAnyConstU64(f, w(g, left, 0)));
+        let ra_c = m.node(n.b).tag == squid_check_core::Tag.constant || (right.len == 1 && isAnyConstU64(f, w(g, right, 0)));
+        if la_c && ra_c { recordConstU64(f, w(g, popped, 0), 0, 0xffffffff, 0); }
     } else if has_right && result == squid_direct_types::u32_ && left.ty == squid_direct_types::u32_ {
+        let la_c = m.node(n.a).tag == squid_check_core::Tag.constant || (left.len == 1 && isAnyConstU32(f, w(g, left, 0)));
+        let ra_c = m.node(n.b).tag == squid_check_core::Tag.constant || (right.len == 1 && isAnyConstU32(f, w(g, right, 0)));
+        if la_c && ra_c { recordConstU32(f, w(g, popped, 0), 0, 0xffffffff, 0); }
         if machine == squid_check_core::Op.bit_and {
             let rc, rk = u32OperandConstant(g, f, n.b, right);
             if rk {
@@ -846,35 +908,52 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
         } else if machine == squid_check_core::Op.add {
             let rc, rk = u32OperandConstant(g, f, n.b, right);
             let lc, lk = u32OperandConstant(g, f, n.a, left);
-            if rk && rc.value >= 1 && rc.value <= 4 && left.len == 1 {
+            if rk && rc.value >= 1 && rc.value <= 16 && left.len == 1 {
                 let ll = w(g, left, 0);
                 let prev = findCheckedAdd(f, ll);
-                if prev >= 0 && f.checked_adds[prev].c + rc.value <= 4 {
-                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + rc.value);
-                } else {
-                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, ll, rc.value);
+                if prev >= 0 && !f.checked_adds[prev].neg && f.checked_adds[prev].c + rc.value <= 16 {
+                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + rc.value, false);
+                } else if rc.value <= 4 || hasCheckedSimdIdx(f, ll) {
+                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, ll, rc.value, false);
                 }
-            } else if lk && lc.value >= 1 && lc.value <= 4 && right.len == 1 {
+            } else if lk && lc.value >= 1 && lc.value <= 16 && right.len == 1 {
                 let rl = w(g, right, 0);
                 let prev = findCheckedAdd(f, rl);
-                if prev >= 0 && f.checked_adds[prev].c + lc.value <= 4 {
-                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + lc.value);
-                } else {
-                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, rl, lc.value);
+                if prev >= 0 && !f.checked_adds[prev].neg && f.checked_adds[prev].c + lc.value <= 16 {
+                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + lc.value, false);
+                } else if lc.value <= 4 || hasCheckedSimdIdx(f, rl) {
+                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, rl, lc.value, false);
                 }
-            } else if !rk && !lk && left.len == 1 && right.len == 1 && !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff {
+            } else if !rk && !lk && left.len == 1 && right.len == 1 {
                 let ll = w(g, left, 0);
                 let rl = w(g, right, 0);
-                if rl == f.checked_range.index {
-                    recordCheckedAdd(f, w(g, popped, 0), ll, rl, 0);
-                } else if ll == f.checked_range.index {
-                    recordCheckedAdd(f, w(g, popped, 0), rl, ll, 0);
+                if !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff && rl == f.checked_range.index {
+                    recordCheckedAdd(f, w(g, popped, 0), ll, rl, 0, false);
+                } else if !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff && ll == f.checked_range.index {
+                    recordCheckedAdd(f, w(g, popped, 0), rl, ll, 0, false);
+                } else if f.checked_simd_len > 0 {
+                    if hasCheckedSimdIdx(f, rl) {
+                        recordCheckedAdd(f, w(g, popped, 0), ll, rl, 0, false);
+                    } else if hasCheckedSimdIdx(f, ll) {
+                        recordCheckedAdd(f, w(g, popped, 0), rl, ll, 0, false);
+                    }
                 }
             }
         } else if machine == squid_check_core::Op.sub {
             let rc, rk = u32OperandConstant(g, f, n.b, right);
-            if rk && rc.value == 1 && left.len == 1 {
-                recordCheckedSub1(f, w(g, popped, 0), w(g, left, 0));
+            if rk && left.len == 1 {
+                let ll = w(g, left, 0);
+                if rc.value == 1 {
+                    recordCheckedSub1(f, w(g, popped, 0), ll);
+                }
+                if f.checked_simd_len > 0 && rc.value >= 1 && rc.value <= 16 {
+                    let prev = findCheckedAdd(f, ll);
+                    if prev >= 0 && !f.checked_adds[prev].neg && f.checked_adds[prev].c == 0 {
+                        recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, rc.value, true);
+                    } else if hasCheckedSimdIdx(f, ll) {
+                        recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, ll, rc.value, true);
+                    }
+                }
             }
         }
     }

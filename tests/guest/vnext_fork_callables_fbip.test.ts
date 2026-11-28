@@ -398,13 +398,15 @@ io run_big (iters: U32): U32 => test_fbip_big_record iters
     }
     throw new Error("Could not find named.dot in Wasm name section");
   }
-  const callsInDot = (wasm: Uint8Array): string[] => {
-    const { body: dotBody, names } = findDotBody(wasm);
+  function scanBody(body: Uint8Array, names: Map<number, string>): {
+    calls: { idx: number; name: string }[];
+    traps: number;
+  } {
     let q = 0;
     const readBU = () => {
       let v = 0, s = 0;
       while (true) {
-        const b = dotBody[q++];
+        const b = body[q++];
         v |= (b & 127) << s;
         if (!(b & 128)) return v;
         s += 7;
@@ -415,90 +417,43 @@ io run_big (iters: U32): U32 => test_fbip_big_record iters
       readBU();
       q++;
     }
-    const calls: string[] = [];
-    while (q < dotBody.length) {
-      const op = dotBody[q++];
-      if (op === 0x10) {
+    const calls: { idx: number; name: string }[] = [];
+    let traps = 0;
+    while (q < body.length) {
+      const op = body[q++];
+      if (op === 0x00) traps++;
+      else if (op === 0x10) {
         const callee = readBU();
-        calls.push(names.get(callee) ?? `#${callee}`);
+        calls.push({ idx: callee, name: names.get(callee) ?? `#${callee}` });
       } else if (op === 0x02 || op === 0x03 || op === 0x04) q++;
       else if (op === 0x0c || op === 0x0d || op === 0x20 || op === 0x21 || op === 0x22 || op === 0x23 || op === 0x24 || op === 0x41) {
-        while ((dotBody[q++] & 0x80) !== 0) {}
+        while ((body[q++] & 0x80) !== 0) {}
       } else if (op === 0x28 || op === 0x36) {
-        while ((dotBody[q++] & 0x80) !== 0) {}
-        while ((dotBody[q++] & 0x80) !== 0) {}
+        while ((body[q++] & 0x80) !== 0) {}
+        while ((body[q++] & 0x80) !== 0) {}
       } else if (op === 0x43) q += 4;
     }
-    return calls;
-  };
+    return { calls, traps };
+  }
+  function analyzeDot(wasm: Uint8Array): { calls: string[]; traps: number } {
+    const { bodies, names } = parseWasmFunctions(wasm);
+    const { body: dotBody } = findDotBody(wasm);
+    const outer = scanBody(dotBody, names);
+    const allCalls: string[] = [];
+    let traps = outer.traps;
+    for (const c of outer.calls) {
+      if (c.name === "worker" && c.idx < bodies.length) {
+        const inner = scanBody(bodies[c.idx], names);
+        traps += inner.traps;
+        for (const ic of inner.calls) allCalls.push(ic.name);
+      } else {
+        allCalls.push(c.name);
+      }
+    }
+    return { calls: allCalls, traps };
+  }
   let linkedCalls: string[] = [];
   let unlinkedCalls: string[] = [];
-  await compileAndRun(
-    `
-func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 =>
-  let acc = 0
-  for i in 0..a.length:
-    acc := self + a[i] * b[i]
-  return acc
-io main (): U32 =>
-  let a: #[4; U32] = #[1, 2, 3, 4]
-  let b: #[4; U32] = #[10, 20, 30, 40]
-  return dot a b
-`,
-    (guest, bytes) => {
-      equal(guest.call("main", null), 300);
-      linkedCalls = callsInDot(bytes);
-    },
-  );
-  await compileAndRun(
-    `
-func dot (a: #[U32]) -> (b: #[U32]): U32 =>
-  let acc = 0
-  for i in 0..a.length:
-    acc := self + a[i] * b[i]
-  return acc
-io main (): U32 =>
-  let a = #[1, 2, 3, 4]
-  let b = #[10, 20, 30, 40]
-  let f = dot
-  return f a b
-`,
-    (guest, bytes) => {
-      equal(guest.call("main", null), 300);
-      unlinkedCalls = callsInDot(bytes);
-    },
-  );
-  function trapsInDot(wasm: Uint8Array): number {
-    const { body: dotBody } = findDotBody(wasm);
-    let q = 0;
-    const readBU = () => {
-      let v = 0, s = 0;
-      while (true) {
-        const b = dotBody[q++];
-        v |= (b & 127) << s;
-        if (!(b & 128)) return v;
-        s += 7;
-      }
-    };
-    const decls = readBU();
-    for (let i = 0; i < decls; i++) {
-      readBU();
-      q++;
-    }
-    let traps = 0;
-    while (q < dotBody.length) {
-      const op = dotBody[q++];
-      if (op === 0x00) traps++;
-      else if (op === 0x02 || op === 0x03 || op === 0x04) q++;
-      else if (op === 0x0c || op === 0x0d || op === 0x10 || op === 0x20 || op === 0x21 || op === 0x22 || op === 0x23 || op === 0x24 || op === 0x41) {
-        while ((dotBody[q++] & 0x80) !== 0) {}
-      } else if (op === 0x28 || op === 0x36) {
-        while ((dotBody[q++] & 0x80) !== 0) {}
-        while ((dotBody[q++] & 0x80) !== 0) {}
-      } else if (op === 0x43) q += 4;
-    }
-    return traps;
-  }
   let linkedTraps = -1;
   let unlinkedTraps = -1;
   await compileAndRun(
@@ -513,7 +468,12 @@ io main (): U32 =>
   let b: #[4; U32] = #[10, 20, 30, 40]
   return dot a b
 `,
-    (_guest, bytes) => { linkedTraps = trapsInDot(bytes); },
+    (guest, bytes) => {
+      equal(guest.call("main", null), 300);
+      const info = analyzeDot(bytes);
+      linkedCalls = info.calls;
+      linkedTraps = info.traps;
+    },
   );
   await compileAndRun(
     `
@@ -528,7 +488,12 @@ io main (): U32 =>
   let f = dot
   return f a b
 `,
-    (_guest, bytes) => { unlinkedTraps = trapsInDot(bytes); },
+    (guest, bytes) => {
+      equal(guest.call("main", null), 300);
+      const info = analyzeDot(bytes);
+      unlinkedCalls = info.calls;
+      unlinkedTraps = info.traps;
+    },
   );
   if (
     linkedCalls.some((c) => c !== "runtime.check") ||

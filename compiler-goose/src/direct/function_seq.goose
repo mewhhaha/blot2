@@ -3303,6 +3303,13 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, root); lget(g, fleaf); lget(g, epoch); callf(g, concat_fn); lset(g, merged);
     close(g, nf);
     op(g, OP_else_);
+    // Fast left-end prepend path (`fstart == 0 && fold == 0 && fleaf != 0`): skips split_fn & empty concat!
+    lget(g, fold); op(g, OP_i32_eqz);
+    lget(g, fstart); op(g, OP_i32_eqz); op(g, OP_i32_and);
+    lget(g, fleaf); i32Const(g, 0); op(g, OP_i32_ne); op(g, OP_i32_and);
+    let left_end = open(g, nf, OP_if_);
+    lget(g, fleaf); lget(g, root); lget(g, epoch); callf(g, concat_fn); lset(g, merged);
+    op(g, OP_else_);
     lget(g, root); lget(g, fstart); lget(g, epoch); callf(g, split_fn);
     lset(g, rest); lset(g, left);
     lget(g, fold);
@@ -3315,6 +3322,7 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, left); lget(g, fleaf); lget(g, epoch); callf(g, concat_fn);
     lget(g, right); lget(g, epoch); callf(g, concat_fn);
     lset(g, merged);
+    close(g, nf);
     close(g, nf);
     close(g, nf);
     lget(g, hdr); lget(g, merged); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_ROOT);
@@ -3982,12 +3990,15 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     seqPushVal(g, res_val); op(g, OP_return_);
     close(g, nf);
 
-    // Otherwise flush old focus before opening shadow focus at p
+    // Otherwise flush old focus before opening shadow focus at p, saving old_foc for reuse.
+    let saved_foc = local32(g, nf);
+    i32Const(g, 0); lset(g, saved_foc);
+    lget(g, foc); lset(g, saved_foc);
     lget(g, hdr); lget(g, epoch); callf(g, flush_fn);
     close(g, nf);
 
     // Front-leaf batch refill for `pop_front` (`p == 0 && rev == 0 && FLAT`):
-    // Walks the leftmost spine of `root` once, bulk-copies `leaf[1..llen]` into a fresh FocusGap
+    // Walks the leftmost spine of `root` once, bulk-copies `leaf[1..llen]` into a reused/fresh FocusGap
     // with `fold = llen`, and arms `SEQ_HDR_FAST_PREPEND_EP` so the next `llen - 1` `pop_front`s
     // run completely inline with zero calls and zero tree walks!
     if sp.leaf_kind == SEQ_KIND_FLAT && sp.elem_bytes != 0 {
@@ -4019,7 +4030,23 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             return 0, l0err;
         }
         let _ = copy(g, nf, loaded_0, res_val, 0);
+        let reused_f = local32(g, nf);
+        i32Const(g, 0); lset(g, reused_f);
+        lget(g, saved_foc);
+        let chk_rf = open(g, nf, OP_if_);
+        lget(g, saved_foc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_CAP);
+        i32Const(g, 0); op(g, OP_i32_ne);
+        lget(g, saved_foc); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_FOC_EPOCH); lget(g, epoch); op(g, OP_i32_eq);
+        op(g, OP_i32_and);
+        let can_rf = open(g, nf, OP_if_);
+        lget(g, saved_foc); lset(g, foc);
+        i32Const(g, 1); lset(g, reused_f);
+        close(g, nf);
+        close(g, nf);
+        lget(g, reused_f); op(g, OP_i32_eqz);
+        let need_af = open(g, nf, OP_if_);
         i32Const(g, sp.focus_bytes); callf(g, g.s.seq_alloc_fn); lset(g, foc);
+        close(g, nf);
         let rem_cnt = local32(g, nf);
         lget(g, llen); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem_cnt);
         let new_ge = local32(g, nf);

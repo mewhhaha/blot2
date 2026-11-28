@@ -288,6 +288,54 @@ struct SparkVecPlan {
     iter_value_used: bool = false,
     uses_f32_canon: bool = false,
     nan_vlocal: u32 = 0xffffffff,
+    const_words: u32[8] = [0; 8],
+    const_vlocs: u32[8] = [0xffffffff; 8],
+    const_len: i64 = 0,
+}
+
+fn findHoistedVecConst(plan: const SparkVecPlan&, word: u32) -> i64 {
+    for i in 0..plan.const_len {
+        if plan.const_words[i] == word { return i; }
+    }
+    return -1;
+}
+fn addHoistedVecConst(plan: SparkVecPlan&, word: u32) {
+    if plan.const_len >= 8 || findHoistedVecConst(plan, word) >= 0 { return; }
+    plan.const_words[plan.const_len] = word;
+    plan.const_vlocs[plan.const_len] = 0xffffffff;
+    plan.const_len += 1;
+}
+recursive fn collectVecExprConsts(g: Generator&, plan: SparkVecPlan&, m: const Module&, env: const Env&, id: u32, depth: i64 = 0) {
+    if id == 0 || depth > 16 || plan.const_len >= 8 { return; }
+    let n = m.node(id);
+    match n.tag {
+        constant => {
+            let ty, _ = lowerInEnv(g, m, m.typeOf(id), env);
+            if tagOf(g, ty) == squid_direct_types::Tag.boolean {
+                addHoistedVecConst(plan, if n.a != 0 { 0xffffffff } else { 0 });
+            } else {
+                addHoistedVecConst(plan, n.a);
+            }
+        },
+        scalar, associated, logical => {
+            collectVecExprConsts(g, plan, m, env, n.a, depth + 1);
+            collectVecExprConsts(g, plan, m, env, n.b, depth + 1);
+        },
+        if_value => {
+            collectVecExprConsts(g, plan, m, env, n.a, depth + 1);
+            collectVecExprConsts(g, plan, m, env, n.b, depth + 1);
+            collectVecExprConsts(g, plan, m, env, n.c, depth + 1);
+        },
+        project, return_ => { collectVecExprConsts(g, plan, m, env, n.a, depth + 1); },
+        construct, bind => { collectVecExprConsts(g, plan, m, env, n.b, depth + 1); },
+        suite, block_, product, record => {
+            for c in m.children(id) { collectVecExprConsts(g, plan, m, env, c, depth + 1); }
+        },
+        call => {
+            for a in m.call(id).arguments { collectVecExprConsts(g, plan, m, env, a, depth + 1); }
+        },
+        _ => {},
+    }
 }
 
 fn sameOffsetExpr(m: const Module&, a: u32, b: u32) -> bool {
@@ -1353,10 +1401,16 @@ recursive fn emitVecExpr(
         constant => {
             squid_direct_relocations::unpatchableOperand(m.unit, id);
             let ty, _ = lowerInEnv(g, m, m.typeOf(id), env);
-            if tagOf(g, ty) == squid_direct_types::Tag.boolean {
-                if n.a != 0 { v128Const4(g, 0xffffffff); } else { v128Const4(g, 0); }
+            let word = if tagOf(g, ty) == squid_direct_types::Tag.boolean {
+                if n.a != 0 { 0xffffffff } else { 0 }
             } else {
-                v128Const4(g, n.a);
+                n.a
+            };
+            let ci = findHoistedVecConst(plan, word);
+            if ci >= 0 && plan.const_vlocs[ci] != 0xffffffff {
+                lget(g, plan.const_vlocs[ci]);
+            } else {
+                v128Const4(g, word);
             }
             return squid_direct_types::Error.none;
         },
@@ -3981,6 +4035,19 @@ fn tryEmitVectorEscapeLoop(
         lset(g, vl);
         plan.hoisted[hi].vlocal = vl;
     }
+    // Pre-hoist loop-invariant v128 constants (e.g., `4.0f32`, `2.0f32`) out of the inner escape loop!
+    {
+        let m_c .= g.units[f.unit - 1];
+        for bi in 0..pre_exit_len { collectVecExprConsts(g, plan, m_c, f.env, pre_exit_expr[bi], 0); }
+        collectVecExprConsts(g, plan, m_c, f.env, exit_cond_id, 0);
+        for bi in 0..post_exit_len { collectVecExprConsts(g, plan, m_c, f.env, post_exit_expr[bi], 0); }
+    }
+    for ci in 0..plan.const_len {
+        let vl = local(g, f, VT_v128);
+        v128Const4(g, plan.const_words[ci]);
+        lset(g, vl);
+        plan.const_vlocs[ci] = vl;
+    }
 
     let total_loc = w(g, g.s.vals[iteration.start + total_ci], 0);
     let prev_defer = f.defer_f32_nan;
@@ -4098,11 +4165,10 @@ fn tryEmitVectorEscapeLoop(
                 assert(lidx >= 0);
                 lset(g, plan.locals[lidx].vlocal);
             }
+            lget(g, cur_act);
             let c_err = emitVecExpr(g, f, plan, g.units[f.unit - 1], f.env, exit_cond_id, false);
             if c_err != squid_direct_types::Error.none { f.defer_f32_nan = prev_defer; return c_err; }
-            simdOp(g, SIMD_v128_not);
-            lget(g, cur_act);
-            simdOp(g, SIMD_v128_and);
+            simdOp(g, SIMD_v128_andnot);
             lset(g, cur_act);
 
             for bi in 0..post_exit_len {
@@ -4266,11 +4332,10 @@ fn tryEmitVectorEscapeLoop(
     }
 
     // active_v = active_v & ~escaped_v; if !any_true(active_v): break!
+    lget(g, active_v);
     let cerr = emitVecExpr(g, f, plan, g.units[f.unit - 1], f.env, exit_cond_id, false);
     if cerr != squid_direct_types::Error.none { f.defer_f32_nan = prev_defer; return cerr; }
-    simdOp(g, SIMD_v128_not);
-    lget(g, active_v);
-    simdOp(g, SIMD_v128_and);
+    simdOp(g, SIMD_v128_andnot);
     ltee(g, active_v);
     simdOp(g, SIMD_v128_any_true);
     op(g, OP_i32_eqz);
@@ -6455,6 +6520,7 @@ recursive fn emitPushColumnFill(
 
 struct FastPushPlan {
     matched: bool = false,
+    is_push_front: bool = false,
     iter_b: u32 = 0,
     dest: Val = Val {},
     dtag: squid_direct_types::Tag = squid_direct_types::Tag.unit,
@@ -6517,9 +6583,10 @@ fn analyzeFastPushRangeLoop(
     var recv_b: u32 = 0;
     if bn.tag == squid_check_core::Tag.storage {
         let op_kind, ok = squid_check_storage_ops::opFromCode(bn.c);
-        if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push {
+        if ok != squid_error::Error.none || (op_kind != squid_check_storage_ops::Op.push && !(op_kind == squid_check_storage_ops::Op.push_front && plan.dtag == squid_direct_types::Tag.seq)) {
             return plan;
         }
+        plan.is_push_front = op_kind == squid_check_storage_ops::Op.push_front;
         let ch = m.children(push_id);
         if ch.len != 2 { return plan; }
         recv_b = localRef(m, ch[0]);
@@ -6535,7 +6602,33 @@ fn analyzeFastPushRangeLoop(
         if !has_target || !g.hasUnit(target.unit) { return plan; }
         let tm .= g.units[target.unit - 1];
         let tbody .= tm.body(target.binding);
-        if !tbody || !isTwoParamPushForwarder(tm, tbody) { return plan; }
+        if !tbody { return plan; }
+        if isTwoParamPushForwarder(tm, tbody) {
+            plan.is_push_front = false;
+        } else if plan.dtag == squid_direct_types::Tag.seq && isTwoParamPushFrontForwarder(tm, tbody) {
+            plan.is_push_front = true;
+        } else {
+            return plan;
+        }
+        plan.method_target = target;
+        plan.val_expr_id = bn.b;
+    } else if bn.tag == squid_check_core::Tag.associated && bn.op == squid_check_core::Op.none && bn.b != 0 {
+        recv_b = localRef(m, bn.a);
+        if recv_b == 0 { return plan; }
+        let identity, has_id = g.receiverIdentity(plan.dest.ty);
+        if !has_id { return plan; }
+        let target, has_target = g.dispatchTarget(m, identity, bn.c, squid_check_types::Operator.none);
+        if !has_target || !g.hasUnit(target.unit) { return plan; }
+        let tm .= g.units[target.unit - 1];
+        let tbody .= tm.body(target.binding);
+        if !tbody { return plan; }
+        if isTwoParamPushForwarder(tm, tbody) {
+            plan.is_push_front = false;
+        } else if plan.dtag == squid_direct_types::Tag.seq && isTwoParamPushFrontForwarder(tm, tbody) {
+            plan.is_push_front = true;
+        } else {
+            return plan;
+        }
         plan.method_target = target;
         plan.val_expr_id = bn.b;
     } else if bn.tag == squid_check_core::Tag.call {
@@ -6545,7 +6638,14 @@ fn analyzeFastPushRangeLoop(
         if !g.hasUnit(target.unit) { return plan; }
         let tm .= g.units[target.unit - 1];
         let tbody .= tm.body(target.binding);
-        if !tbody || !isTwoParamPushForwarder(tm, tbody) { return plan; }
+        if !tbody { return plan; }
+        if isTwoParamPushForwarder(tm, tbody) {
+            plan.is_push_front = false;
+        } else if plan.dtag == squid_direct_types::Tag.seq && isTwoParamPushFrontForwarder(tm, tbody) {
+            plan.is_push_front = true;
+        } else {
+            return plan;
+        }
         recv_b = localRef(m, cinfo.arguments[0]);
         plan.val_expr_id = cinfo.arguments[1];
         plan.method_target = target;
@@ -6934,7 +7034,40 @@ recursive fn emitFastPushSeqBackend(
         lget(g, leaf); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_CAP);
         let ldata = local32(g, f);
         lget(g, leaf); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, ldata);
-        if !plan.is_rec_lit {
+        if plan.is_push_front {
+            if plan.scalar_is_inv {
+                let ferr = emitConstSimdFill(g, f, ldata, lcap_loc, sc_inv_val, sc_inv_vsplat, plan.elem_step, loop_id);
+                if ferr != squid_direct_types::Error.none { return ferr; }
+            } else if plan.scalar_is_aff && plan.elem_step == 4 {
+                // Reverse chunk order: slot k holds a * (cur_i + lcap - 1 - k) + b = (-a) * (-(cur_i + lcap - 1) + k) + b.
+                let rev_start = local32(g, f);
+                i32Const(g, 0);
+                lget(g, cur_i); i32Const(g, lcap - 1); op(g, OP_i32_add);
+                op(g, OP_i32_sub);
+                lset(g, rev_start);
+                emitAffineI32SimdFill(g, f, ldata, rev_start, lcap_loc, 0 - plan.scalar_aff_a, plan.scalar_aff_b);
+            } else {
+                let ptr = local32(g, f);
+                lget(g, ldata); lset(g, ptr);
+                let rev_i = local32(g, f);
+                lget(g, cur_i); i32Const(g, lcap - 1); op(g, OP_i32_add); lset(g, rev_i);
+                let rem = local32(g, f);
+                i32Const(g, lcap); lset(g, rem);
+                if plan.iter_b != 0 { bindPut(g, f, plan.iter_b, valOf1(g, squid_direct_types::u32_, rev_i)); }
+                let rt_exit = open(g, f, OP_block);
+                let rt_top = open(g, f, OP_loop);
+                lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, rt_exit);
+                let ev, eerr = expr(g, f, plan.val_expr_id);
+                if eerr != squid_direct_types::Error.none { return eerr; }
+                let werr = writeElement(g, f, ptr, 0, ev, loop_id);
+                if werr != squid_direct_types::Error.none { return werr; }
+                lget(g, ptr); i32Const(g, plan.elem_step); op(g, OP_i32_add); lset(g, ptr);
+                lget(g, rev_i); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rev_i);
+                lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+                br(g, f, OP_br, rt_top);
+                close(g, f); close(g, f);
+            }
+        } else if !plan.is_rec_lit {
             let ferr = emitPushColumnFill(g, f, ldata, cur_i, lcap_loc, plan.iter_b, plan.val_expr_id, plan.scalar_is_inv, sc_inv_val, sc_inv_vsplat, plan.scalar_is_aff, plan.scalar_aff_a, plan.scalar_aff_b, plan.elem_step, loop_id);
             if ferr != squid_direct_types::Error.none { return ferr; }
         } else {
@@ -6960,13 +7093,17 @@ recursive fn emitFastPushSeqBackend(
     lget(g, leaf); lset(g, root);
     popCheckedArraysAt(f, r_empty);
     op(g, OP_else_);
-    lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, push_leaf_fn); ltee(g, fast_r);
-    let did_fast = open(g, f, OP_if_);
-    lget(g, fast_r); lset(g, root);
-    popCheckedArraysAt(f, did_fast);
-    op(g, OP_else_);
-    lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, concat_fn); lset(g, root);
-    close(g, f);
+    if plan.is_push_front {
+        lget(g, leaf); lget(g, root); lget(g, epoch); callf(g, concat_fn); lset(g, root);
+    } else {
+        lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, push_leaf_fn); ltee(g, fast_r);
+        let did_fast = open(g, f, OP_if_);
+        lget(g, fast_r); lset(g, root);
+        popCheckedArraysAt(f, did_fast);
+        op(g, OP_else_);
+        lget(g, root); lget(g, leaf); lget(g, epoch); callf(g, concat_fn); lset(g, root);
+        close(g, f);
+    }
     close(g, f);
 
     lget(g, cur_i); i32Const(g, lcap); op(g, OP_i32_add); lset(g, cur_i);
@@ -7018,6 +7155,7 @@ recursive fn tryEmitFastPushRangeLoop(
         if sperr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
         if sp.leaf_kind != SEQ_KIND_FLAT && sp.leaf_kind != SEQ_KIND_PACKED_SOA { return squid_direct_types::Error.none; }
         if sp.leaf_kind == SEQ_KIND_PACKED_SOA && !plan.is_rec_lit { return squid_direct_types::Error.none; }
+        if plan.is_push_front && (sp.leaf_kind != SEQ_KIND_FLAT || plan.is_rec_lit) { return squid_direct_types::Error.none; }
         splan = sp;
     }
 

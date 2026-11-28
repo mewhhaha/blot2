@@ -172,6 +172,16 @@ struct CheckedAdd {
     base: u32 = 0xffffffff,
     idx: u32 = 0,
     c: u32 = 0,
+    neg: bool = false,
+    depth: u32 = 0,
+}
+struct CheckedSimdWindow {
+    slot: u32 = 0,
+    generation: u32 = 0,
+    base_local: u32 = 0xffffffff,
+    idx_local: u32 = 0,
+    min_delta: i32 = 0,
+    max_end_delta: i32 = 0,
     depth: u32 = 0,
 }
 struct CheckedAffineBound {
@@ -266,8 +276,10 @@ struct Fn {
     checked_le_len: i64 = 0,
     checked_masks: CheckedMask[32] = [CheckedMask {}; 32],
     checked_masks_len: i64 = 0,
-    checked_adds: CheckedAdd[8] = [CheckedAdd {}; 8],
+    checked_adds: CheckedAdd[32] = [CheckedAdd {}; 32],
     checked_adds_len: i64 = 0,
+    checked_simd: CheckedSimdWindow[8] = [CheckedSimdWindow {}; 8],
+    checked_simd_len: i64 = 0,
     checked_affines: CheckedAffineBound[8] = [CheckedAffineBound {}; 8],
     checked_affines_len: i64 = 0,
     checked_sub1: CheckedSub1[16] = [CheckedSub1 {}; 16],
@@ -475,9 +487,15 @@ fn consumeSkipFillNode(f: Fn&, id: u32) -> bool {
 fn constU32(f: const Fn&, local_id: u32) -> ConstU32, bool {
     for at in 0..f.const_u32_len {
         let fact = f.const_u32[at];
-        if fact.local_id == local_id { return fact, true; }
+        if fact.local_id == local_id && fact.unit != 0xffffffff { return fact, true; }
     }
     return ConstU32 {}, false;
+}
+fn isAnyConstU32(f: const Fn&, local_id: u32) -> bool {
+    for at in 0..f.const_u32_len {
+        if f.const_u32[at].local_id == local_id { return true; }
+    }
+    return false;
 }
 fn recordConstU32(f: Fn&, local_id: u32, value: u32, unit: u32 = 0, node: u32 = 0) {
     if f.const_u32_len >= 32 { return; }
@@ -490,9 +508,15 @@ fn useConstU32(fact: ConstU32) {
 fn constU64(f: const Fn&, local_id: u32) -> ConstU64, bool {
     for at in 0..f.const_u64_len {
         let fact = f.const_u64[at];
-        if fact.local_id == local_id { return fact, true; }
+        if fact.local_id == local_id && fact.unit != 0xffffffff { return fact, true; }
     }
     return ConstU64 {}, false;
+}
+fn isAnyConstU64(f: const Fn&, local_id: u32) -> bool {
+    for at in 0..f.const_u64_len {
+        if f.const_u64[at].local_id == local_id { return true; }
+    }
+    return false;
 }
 fn recordConstU64(f: Fn&, local_id: u32, value: u64, unit: u32 = 0, node: u32 = 0) {
     if f.const_u64_len >= 16 { return; }
@@ -528,9 +552,9 @@ fn findCheckedMask(f: const Fn&, index: u32) -> i64 {
     }
     return -1;
 }
-fn recordCheckedAdd(f: Fn&, res: u32, base: u32, idx: u32, c: u32) {
-    if f.checked_adds_len >= 8 { return; }
-    f.checked_adds[f.checked_adds_len] = CheckedAdd { res, base, idx, c, f.depth };
+fn recordCheckedAdd(f: Fn&, res: u32, base: u32, idx: u32, c: u32, neg: bool = false) {
+    if f.checked_adds_len >= 32 { return; }
+    f.checked_adds[f.checked_adds_len] = CheckedAdd { res, base, idx, c, neg, f.depth };
     f.checked_adds_len += 1;
 }
 fn findCheckedAdd(f: const Fn&, res: u32) -> i64 {
@@ -540,6 +564,29 @@ fn findCheckedAdd(f: const Fn&, res: u32) -> i64 {
         if f.checked_adds[i].res == res { return i; }
     }
     return -1;
+}
+fn recordCheckedSimdWindow(f: Fn&, slot: u32, generation: u32, base_local: u32, idx_local: u32, min_delta: i32, max_end_delta: i32) {
+    if f.checked_simd_len >= 8 { return; }
+    f.checked_simd[f.checked_simd_len] = CheckedSimdWindow { slot, generation, base_local, idx_local, min_delta, max_end_delta, f.depth };
+    f.checked_simd_len += 1;
+}
+fn findCheckedSimdWindow(f: const Fn&, slot: u32, generation: u32, base_local: u32, idx_local: u32, delta: i32, end_delta: i32) -> i64 {
+    var i = f.checked_simd_len;
+    while i > 0 {
+        i -= 1;
+        let e = f.checked_simd[i];
+        if e.slot == slot && e.generation == generation && e.base_local == base_local && e.idx_local == idx_local &&
+            delta >= e.min_delta && end_delta <= e.max_end_delta {
+            return i;
+        }
+    }
+    return -1;
+}
+fn hasCheckedSimdIdx(f: const Fn&, idx_local: u32) -> bool {
+    for i in 0..f.checked_simd_len {
+        if f.checked_simd[i].idx_local == idx_local { return true; }
+    }
+    return false;
 }
 fn recordCheckedAffine(f: Fn&, base: u32, end_local: u32, c: u32, bound: u32) {
     if f.checked_affines_len >= 8 { return; }
@@ -768,6 +815,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_adds_len > 0 && f.checked_adds[f.checked_adds_len - 1].depth > max_depth {
         f.checked_adds_len -= 1;
     }
+    while f.checked_simd_len > 0 && f.checked_simd[f.checked_simd_len - 1].depth > max_depth {
+        f.checked_simd_len -= 1;
+    }
     while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth > max_depth {
         f.checked_affines_len -= 1;
     }
@@ -811,6 +861,9 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.checked_adds_len > 0 && f.checked_adds[f.checked_adds_len - 1].depth >= depth {
         f.checked_adds_len -= 1;
+    }
+    while f.checked_simd_len > 0 && f.checked_simd[f.checked_simd_len - 1].depth >= depth {
+        f.checked_simd_len -= 1;
     }
     while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth >= depth {
         f.checked_affines_len -= 1;
@@ -1005,6 +1058,17 @@ fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
     }
     f.checked_views_len = 0;
     f.checked_elems_len = 0;
+    if f.checked_simd_len != 0 {
+        var sout: i64 = 0;
+        for i in 0..f.checked_simd_len {
+            let entry = f.checked_simd[i];
+            if !(entry.slot == slot && entry.generation == gen) {
+                f.checked_simd[sout] = entry;
+                sout += 1;
+            }
+        }
+        f.checked_simd_len = sout;
+    }
 }
 fn findCheckedLe(f: const Fn&, a: u32, b: u32) -> i64 {
     var i = f.checked_le_len;
@@ -1021,13 +1085,23 @@ fn recordCheckedLe(f: Fn&, a: u32, b: u32) {
     f.checked_le[f.checked_le_len] = CheckedLeBound { a: a, b: b, depth: f.depth };
     f.checked_le_len += 1;
 }
+fn findCheckedLe2(f: const Fn&, a: u32, b: u32) -> bool {
+    if a == b || findCheckedLe(f, a, b) >= 0 { return true; }
+    var i = f.checked_le_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_le[i];
+        if entry.a == a && findCheckedLe(f, entry.b, b) >= 0 { return true; }
+    }
+    return false;
+}
 fn findCheckedBound(f: const Fn&, index: u32, bound: u32) -> i64 {
     if bound == 0xffffffff { return -1; }
     var i = f.checked_bounds_len;
     while i > 0 {
         i -= 1;
         let entry = f.checked_bounds[i];
-        if entry.index == index && entry.bound != 0xffffffff && (entry.bound == bound || findCheckedLe(f, entry.bound, bound) >= 0) { return i; }
+        if entry.index == index && entry.bound != 0xffffffff && findCheckedLe2(f, entry.bound, bound) { return i; }
     }
     return -1;
 }
@@ -1042,6 +1116,7 @@ fn findCheckedSizedBound(m: const Module&, f: const Fn&, index: u32, len_ty: TId
     return false;
 }
 fn recordCheckedBoundSized(f: Fn&, index: u32, bound: u32, sized_len_ty: TId) {
+    if bound != 0xffffffff { recordCheckedLe(f, index, bound); }
     var i = f.checked_bounds_len;
     while i > 0 {
         i -= 1;
@@ -1063,6 +1138,7 @@ fn invalidateCheckedContainers(f: Fn&) {
     f.checked_bounds_len = 0;
     f.checked_le_len = 0;
     f.checked_affines_len = 0;
+    f.checked_simd_len = 0;
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }

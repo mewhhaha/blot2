@@ -480,8 +480,17 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         written = writeFlatPack(g, f, target, offset, replacement, id);
     }
     if written != squid_direct_types::Error.none { return neverVal(), written; }
-    // Any element mutation invalidates cached scalar element values.
+    // Any element mutation invalidates other cached scalar element values,
+    // while retaining the freshly written scalar value for immediate RMW reads.
     f.checked_elems_len = 0;
+    if whole_element && tagOf(g, container.ty) == squid_direct_types::Tag.array &&
+        replacement.len == 1 && isScalarTag(tagOf(g, replacement.ty)) {
+        let elem_step, serr = stride(g, f, replacement.ty, id);
+        if serr == squid_direct_types::Error.none {
+            recordCheckedElem(f, w(g, container, 0), w(g, container, 1), index, elem_step, target);
+            recordCheckedElemVal(f, w(g, container, 0), w(g, container, 1), index, elem_step, w(g, replacement, 0), replacement.ty);
+        }
+    }
     return container, squid_direct_types::Error.none;
 }
 fn byteWidth(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> u32, Error { return flatBytes(g, f, ty, id); }

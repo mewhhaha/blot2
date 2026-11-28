@@ -909,6 +909,22 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
         if !in_bounds && findCheckedBound(f, index, len) >= 0 {
             in_bounds = true;
         }
+        if !in_bounds {
+            // If `index` is constant `0` and ANY `x < b <= len` is already known, then `len >= 1` (`0 < len`).
+            let pos0, known_pos0 = constU32(f, index);
+            if known_pos0 && pos0.value == 0 {
+                var bi = f.checked_bounds_len;
+                while bi > 0 {
+                    bi -= 1;
+                    let be = f.checked_bounds[bi];
+                    if be.bound != 0xffffffff && findCheckedLe2(f, be.bound, len) {
+                        useConstU32(pos0);
+                        in_bounds = true;
+                        break;
+                    }
+                }
+            }
+        }
         if !in_bounds && arr_len_ty != 0 && findCheckedSizedBound(g.units[f.unit - 1], f, index, arr_len_ty) {
             in_bounds = true;
         }
@@ -927,22 +943,36 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
                 }
             }
         }
-        if !in_bounds && !range.is_view && range.end_local != 0xffffffff {
+        if !in_bounds {
             let ca = findCheckedAdd(f, index);
             if ca >= 0 {
                 let add_e = f.checked_adds[ca];
-                if add_e.idx == range.index {
-                    if add_e.base == 0xffffffff && add_e.c == 1 && findCheckedBound(f, range.end_local, len) >= 0 {
-                        in_bounds = true;
-                    } else if findCheckedAffine(f, add_e.base, range.end_local, add_e.c, len) >= 0 {
-                        in_bounds = true;
-                    } else if add_e.base == 0xffffffff {
-                        let clen, klen = constU32(f, len);
-                        let cend, kend = constU32(f, range.end_local);
-                        if klen && kend && (cend.value as u64) + (add_e.c as u64) <= (clen.value as u64) {
-                            useConstU32(clen);
-                            useConstU32(cend);
+                if !add_e.neg {
+                    if !range.is_view && range.end_local != 0xffffffff && add_e.idx == range.index {
+                        if add_e.base == 0xffffffff && add_e.c == 1 && findCheckedBound(f, range.end_local, len) >= 0 {
                             in_bounds = true;
+                        } else if findCheckedAffine(f, add_e.base, range.end_local, add_e.c, len) >= 0 {
+                            in_bounds = true;
+                        } else if add_e.base == 0xffffffff {
+                            let clen, klen = constU32(f, len);
+                            let cend, kend = constU32(f, range.end_local);
+                            if klen && kend && (cend.value as u64) + (add_e.c as u64) <= (clen.value as u64) {
+                                useConstU32(clen);
+                                useConstU32(cend);
+                                in_bounds = true;
+                            }
+                        }
+                    }
+                    // General `idx + 1 < len` whenever `idx < b` and `b < len` (no overflow possible).
+                    if !in_bounds && add_e.base == 0xffffffff && add_e.c == 1 {
+                        var bi = f.checked_bounds_len;
+                        while bi > 0 {
+                            bi -= 1;
+                            let be = f.checked_bounds[bi];
+                            if be.index == add_e.idx && be.bound != 0xffffffff && findCheckedBound(f, be.bound, len) >= 0 {
+                                in_bounds = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -1456,22 +1486,33 @@ fn emitExtendFromRodata(g: Generator&, f: Fn&, dst: Val, is_direct: bool, rd: sq
         let cap = local32(g, f);
         lget(g, dst_entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
-        ltee(g, cap);
-        i32Const(g, squid_direct_runtime::flag_mask ^ squid_direct_runtime::heap_flag);
-        op(g, OP_i32_and);
-        i32Const(g, squid_direct_runtime::live_flag);
-        op(g, OP_i32_eq);
-        lget(g, next_len);
-        i32Const(g, max_elems);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_and);
-        lget(g, need_bytes);
-        lget(g, cap);
-        i32Const(g, squid_direct_runtime::capacity_mask);
-        op(g, OP_i32_and);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_and);
-        op(g, OP_i32_eqz);
+        if knownMutable(g, f, dst) {
+            i32Const(g, squid_direct_runtime::capacity_mask);
+            op(g, OP_i32_and);
+            lget(g, need_bytes);
+            op(g, OP_i32_lt_u);
+            lget(g, next_len);
+            i32Const(g, max_elems);
+            op(g, OP_i32_gt_u);
+            op(g, OP_i32_or);
+        } else {
+            ltee(g, cap);
+            i32Const(g, squid_direct_runtime::flag_mask ^ squid_direct_runtime::heap_flag);
+            op(g, OP_i32_and);
+            i32Const(g, squid_direct_runtime::live_flag);
+            op(g, OP_i32_eq);
+            lget(g, next_len);
+            i32Const(g, max_elems);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+            lget(g, need_bytes);
+            lget(g, cap);
+            i32Const(g, squid_direct_runtime::capacity_mask);
+            op(g, OP_i32_and);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+            op(g, OP_i32_eqz);
+        }
         let need_grow = open(g, f, OP_if_);
         lget(g, w(g, dst, 0));
         lget(g, w(g, dst, 1));
@@ -2025,16 +2066,35 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id: u32, core_ty: TId = 0, lane_count: u32 = 4) -> u32, Error {
     if tagOf(g, container.ty) == squid_direct_types::Tag.array {
         let base, len = ensureCheckedArray(g, f, container);
-        lget(g, len);
-        i32Const(g, lane_count);
-        op(g, OP_i32_lt_u);
-        lget(g, index);
-        lget(g, len);
-        i32Const(g, lane_count);
-        op(g, OP_i32_sub);
-        op(g, OP_i32_gt_u);
-        op(g, OP_i32_or);
-        trapBounds(g, f, id);
+        var in_window = false;
+        if f.checked_simd_len > 0 {
+            let slot = w(g, container, 0);
+            let gen = w(g, container, 1);
+            if findCheckedSimdWindow(f, slot, gen, 0xffffffff, index, 0, lane_count as i32) >= 0 {
+                in_window = true;
+            } else {
+                let ca = findCheckedAdd(f, index);
+                if ca >= 0 {
+                    let ae = f.checked_adds[ca];
+                    let delta: i32 = if ae.neg { 0 - (ae.c as i32) } else { ae.c as i32 };
+                    if findCheckedSimdWindow(f, slot, gen, ae.base, ae.idx, delta, delta + (lane_count as i32)) >= 0 {
+                        in_window = true;
+                    }
+                }
+            }
+        }
+        if !in_window {
+            lget(g, len);
+            i32Const(g, lane_count);
+            op(g, OP_i32_lt_u);
+            lget(g, index);
+            lget(g, len);
+            i32Const(g, lane_count);
+            op(g, OP_i32_sub);
+            op(g, OP_i32_gt_u);
+            op(g, OP_i32_or);
+            trapBounds(g, f, id);
+        }
         return emitOffsetAddress(g, f, base, index, step), squid_direct_types::Error.none;
     }
     // Views retain their existing handle and subrange checks.
@@ -2426,10 +2486,198 @@ fn ensurePushEntryHelper(g: Generator&) -> u32, Error {
     if g.s.push_entry_helper != 0 { return g.s.push_entry_helper, squid_direct_types::Error.none; }
     if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let rt = g.runtime_();
+    let grow_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32, VT_i32, VT_i32], []));
+    squid_direct_writer::setName(g.module, grow_id, "runtime.push_entry_grow");
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     squid_direct_writer::setName(g.module, fn_id, "runtime.push_entry");
     g.s.push_entry_helper = fn_id;
     let s .= g.s;
+    // Emit cold out-of-line `runtime.push_entry_grow(entry, need, length, stride, capacity)` first.
+    {
+        let code_mark = s.code.len;
+        let sites_mark = squid_direct_relocations::mark();
+        let locals_mark = s.locals.len;
+        let labels_mark = s.labels.len;
+        let handles_mark = s.handles.len;
+        let handle_cells_mark = s.handle_cells_len;
+        var gf = newFn(g, 1, 0);
+        let g_entry = local(g, gf, VT_i32);
+        let g_need = local(g, gf, VT_i32);
+        let g_length = local(g, gf, VT_i32);
+        let g_stride = local(g, gf, VT_i32);
+        let g_cap = local(g, gf, VT_i32);
+        gf.parameter_words = 5;
+        let want = local32(g, gf);
+        let old_cap = local32(g, gf);
+        let ext_cls = local32(g, gf);
+        let size = local32(g, gf);
+        let ext_delta = local32(g, gf);
+        let fresh_ptr = local32(g, gf);
+        let clamped = local32(g, gf);
+        lget(g, g_cap);
+        i32Const(g, squid_direct_runtime::capacity_mask);
+        op(g, OP_i32_and);
+        lset(g, old_cap);
+        lget(g, g_need);
+        lget(g, old_cap);
+        i32Const(g, 1);
+        op(g, OP_i32_shl);
+        lget(g, g_need);
+        lget(g, old_cap);
+        i32Const(g, 1);
+        op(g, OP_i32_shl);
+        op(g, OP_i32_gt_u);
+        op(g, OP_select);
+        lset(g, want);
+        let heap_budget = rt.layout.heap_end - rt.layout.heap_base;
+        // Gated in-place tail extension at `arena_top` for large blocks (>= 8 MiB) when target free list is empty.
+        lget(g, g_cap);
+        i32Const(g, squid_direct_runtime::heap_flag);
+        op(g, OP_i32_and);
+        i32Const(g, 0);
+        op(g, OP_i32_ne);
+        lget(g, old_cap);
+        i32Const(g, 8388608);
+        op(g, OP_i32_ge_u);
+        op(g, OP_i32_and);
+        lget(g, g_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        lget(g, old_cap);
+        op(g, OP_i32_add);
+        gget(g, rt.arena_top);
+        op(g, OP_i32_eq);
+        op(g, OP_i32_and);
+        lget(g, want);
+        i32Const(g, heap_budget);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
+        let _try_ext = open(g, gf, OP_if_);
+        lget(g, want);
+        i32Const(g, 16);
+        lget(g, want);
+        i32Const(g, 16);
+        op(g, OP_i32_gt_u);
+        op(g, OP_select);
+        lset(g, clamped);
+        i32Const(g, 32);
+        lget(g, clamped);
+        i32Const(g, 1);
+        op(g, OP_i32_sub);
+        op(g, squid_direct_writer::OP_i32_clz);
+        op(g, OP_i32_sub);
+        lset(g, ext_cls);
+        i32Const(g, 1);
+        lget(g, ext_cls);
+        op(g, OP_i32_shl);
+        lset(g, size);
+        lget(g, size);
+        lget(g, old_cap);
+        op(g, OP_i32_gt_u);
+        lget(g, ext_cls);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        i32Const(g, rt.layout.free_lists);
+        op(g, OP_i32_add);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+        op(g, OP_i32_eqz);
+        op(g, OP_i32_and);
+        let _bigger = open(g, gf, OP_if_);
+        gget(g, rt.heap_live_bytes);
+        lget(g, size);
+        op(g, OP_i32_add);
+        gget(g, rt.heap_live_bytes);
+        op(g, OP_i32_lt_u);
+        gget(g, rt.heap_live_bytes);
+        lget(g, size);
+        op(g, OP_i32_add);
+        i32Const(g, heap_budget);
+        op(g, OP_i32_gt_u);
+        op(g, OP_i32_or);
+        trap(g, gf);
+        lget(g, size);
+        lget(g, old_cap);
+        op(g, OP_i32_sub);
+        lset(g, ext_delta);
+        gget(g, rt.heap_top);
+        lget(g, ext_delta);
+        op(g, OP_i32_add);
+        gget(g, rt.heap_top);
+        op(g, OP_i32_lt_u);
+        gget(g, rt.heap_top);
+        lget(g, ext_delta);
+        op(g, OP_i32_add);
+        i32Const(g, heap_budget);
+        op(g, OP_i32_gt_u);
+        op(g, OP_i32_or);
+        let _oom_if = open(g, gf, OP_if_);
+        i32Const(g, rt.layout.arena_oom_offset);
+        i32Const(g, 1);
+        op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, 0);
+        op(g, OP_unreachable_);
+        close(g, gf);
+        lget(g, ext_delta);
+        callf(g, rt.alloc_raw);
+        op(g, OP_drop);
+        gget(g, rt.heap_top);
+        lget(g, ext_delta);
+        op(g, OP_i32_add);
+        gset(g, rt.heap_top);
+        gget(g, rt.heap_live_bytes);
+        lget(g, ext_delta);
+        op(g, OP_i32_add);
+        gset(g, rt.heap_live_bytes);
+        lget(g, g_entry);
+        lget(g, size);
+        i32Const(g, squid_direct_runtime::heap_flag | squid_direct_runtime::live_flag);
+        op(g, OP_i32_or);
+        op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+        op(g, OP_return_);
+        close(g, gf);
+        close(g, gf);
+        lget(g, want);
+        callf(g, rt.heap_alloc);
+        lset(g, size);
+        lset(g, fresh_ptr);
+        lget(g, fresh_ptr);
+        lget(g, g_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        lget(g, g_length);
+        lget(g, g_stride);
+        op(g, OP_i32_mul);
+        memoryCopyOp(g);
+        lget(g, g_cap);
+        i32Const(g, squid_direct_runtime::heap_flag);
+        op(g, OP_i32_and);
+        i32Const(g, 0);
+        op(g, OP_i32_ne);
+        lget(g, old_cap);
+        i32Const(g, 0);
+        op(g, OP_i32_ne);
+        op(g, OP_i32_and);
+        let _free_old = open(g, gf, OP_if_);
+        lget(g, g_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        lget(g, old_cap);
+        callf(g, rt.heap_free);
+        close(g, gf);
+        lget(g, g_entry);
+        lget(g, fresh_ptr);
+        op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+        lget(g, g_entry);
+        lget(g, size);
+        i32Const(g, squid_direct_runtime::heap_flag | squid_direct_runtime::live_flag);
+        op(g, OP_i32_or);
+        op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+        op(g, OP_end);
+        finishWith(g, grow_id, gf, false, 0, 0, 0);
+        squid_direct_relocations::rewind(sites_mark);
+        s.code.resize(code_mark);
+        s.locals.resize(locals_mark);
+        s.labels.resize(labels_mark);
+        s.handles.resize(handles_mark);
+        s.handle_cells_len = handle_cells_mark;
+    }
+    // Emit compact hot-path `runtime.push_entry(entry, stride) -> elem_addr`.
     let code_mark = s.code.len;
     let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len;
@@ -2443,8 +2691,6 @@ fn ensurePushEntryHelper(g: Generator&) -> u32, Error {
     let capacity = local32(g, nf);
     let length = local32(g, nf);
     let need = local32(g, nf);
-    let fresh_ptr = local32(g, nf);
-    let size = local32(g, nf);
     lget(g, entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
     lset(g, capacity);
@@ -2460,64 +2706,19 @@ fn ensurePushEntryHelper(g: Generator&) -> u32, Error {
     i32Const(g, squid_direct_runtime::capacity_mask);
     op(g, OP_i32_and);
     op(g, OP_i32_gt_u);
-    let need_grow = open(g, nf, OP_if_);
-    lget(g, need);
-    lget(g, capacity);
-    i32Const(g, squid_direct_runtime::capacity_mask);
-    op(g, OP_i32_and);
-    i32Const(g, 1);
-    op(g, OP_i32_shl);
-    lget(g, need);
-    lget(g, capacity);
-    i32Const(g, squid_direct_runtime::capacity_mask);
-    op(g, OP_i32_and);
-    i32Const(g, 1);
-    op(g, OP_i32_shl);
-    op(g, OP_i32_gt_u);
-    op(g, OP_select);
-    callf(g, rt.heap_alloc);
-    lset(g, size);
-    lset(g, fresh_ptr);
-    lget(g, fresh_ptr);
+    let _need_grow = open(g, nf, OP_if_);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
+    lget(g, need);
     lget(g, length);
     lget(g, stride_loc);
-    op(g, OP_i32_mul);
-    memoryCopyOp(g);
     lget(g, capacity);
-    i32Const(g, squid_direct_runtime::heap_flag);
-    op(g, OP_i32_and);
-    i32Const(g, 0);
-    op(g, OP_i32_ne);
-    lget(g, capacity);
-    i32Const(g, squid_direct_runtime::capacity_mask);
-    op(g, OP_i32_and);
-    i32Const(g, 0);
-    op(g, OP_i32_ne);
-    op(g, OP_i32_and);
-    let free_old = open(g, nf, OP_if_);
-    lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
-    lget(g, capacity);
-    i32Const(g, squid_direct_runtime::capacity_mask);
-    op(g, OP_i32_and);
-    callf(g, rt.heap_free);
-    close(g, nf);
-    lget(g, entry);
-    lget(g, fresh_ptr);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
-    lget(g, entry);
-    lget(g, size);
-    i32Const(g, squid_direct_runtime::heap_flag | squid_direct_runtime::live_flag);
-    op(g, OP_i32_or);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+    callf(g, grow_id);
     close(g, nf);
     lget(g, entry);
     lget(g, length);
     i32Const(g, 1);
     op(g, OP_i32_add);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+    op(g, squid_direct_writer::OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     lget(g, entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lget(g, length);
