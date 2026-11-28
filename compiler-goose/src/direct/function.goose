@@ -300,6 +300,7 @@ struct Fn {
     reuse_nodes_len: i64 = 0,
     reuse_block: u32 = 0,
     reuse_ty: Ty = 0,
+    reuse_preexisting: bool = false,
     boxed_noop_alias: bool = false,
     // The module of this body, as `g.units[unit - 1]`.
     unit: u32,
@@ -1694,7 +1695,8 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if bty > squid_check_types::never { refine(g, f, bty, value.ty); }
         if value.ty > squid_direct_types::never {
             if !had_noop && isFreshBoxedRhs(g, f, m, n.b, value.ty) {
-                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, f.loop_depth + 1);
+                let pre_flag: u32 = if rhsBoxedPreexisting(g, f, m, n.b) { UNIQUE_BOXED_PREEXISTING } else { 0 };
+                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, (f.loop_depth + 1) | pre_flag);
             }
             if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
                 squid_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
@@ -1743,12 +1745,41 @@ fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
     }
     return g.s.captured_vals[(base as i64) + (binding as i64)] != 0;
 }
+let UNIQUE_BOXED_PREEXISTING: u32 = 0x80000000;
 fn isUniqueBoxedAt(g: const Generator&, f: const Fn&, binding: u32, loop_depth: u32) -> bool {
     let val, present = squid_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
-    return present && val == loop_depth + 1;
+    return present && (val & ~UNIQUE_BOXED_PREEXISTING) == loop_depth + 1;
 }
 fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
     return isUniqueBoxedAt(g, f, binding, f.loop_depth);
+}
+fn isUniqueBoxedPreexisting(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+    let val, present = squid_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
+    return present && (val & UNIQUE_BOXED_PREEXISTING) != 0;
+}
+fn rhsBoxedPreexisting(g: const Generator&, f: const Fn&, m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        reference => {
+            let local_id = localRef(m, id);
+            return local_id != 0 && isUniqueBoxedPreexisting(g, f, local_id);
+        },
+        update => {
+            let rb = localRef(m, m.updateInfo(id).root);
+            return rb != 0 && isUniqueBoxedPreexisting(g, f, rb);
+        },
+        match_ => {
+            let inputs = m.matchInputs(id);
+            if inputs.len == 1 {
+                let mb = localRef(m, inputs[0]);
+                if mb != 0 && isUniqueBoxedPreexisting(g, f, mb) { return true; }
+            }
+            return f.reuse_preexisting;
+        },
+        suite, block_, if_value => { return f.reuse_preexisting; },
+        _ => { return false; },
+    }
 }
 fn isOpaqueOutsideUnit(g: const Generator&, m: const Module&, ty: Ty) -> bool {
     if tagOf(g, ty) != squid_direct_types::Tag.nominal { return false; }
@@ -2431,7 +2462,10 @@ fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: T
     let n = m.node(id);
     match n.tag {
         construct, record => { return true; },
-        update => { return !updateCanNoopAlias(m, id, 0); },
+        update => {
+            if m.updateSelectors(id).len != 0 || m.updatePath(id).len != 0 { return true; }
+            return !updateCanNoopAlias(m, id, 0);
+        },
         reference => {
             let local_id = localRef(m, id);
             return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
@@ -2692,11 +2726,20 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
                 let boxed, berr = isBoxed(g, f, ty, id);
                 let width, werr = layoutLen(g, f, ty, id);
                 if berr == squid_direct_types::Error.none && !boxed && werr == squid_direct_types::Error.none && width == 1 {
-                    g.recordInlined(target.unit, target.binding);
-                    let ctor_tag = tm.constructor(rn.a).tag;
-                    let loc = constLocal(g, f, ctor_tag);
-                    recordConstTag(f, loc, ctor_tag);
-                    return valOf1(g, ty, loc), squid_direct_types::Error.none;
+                    let is_niche, null_tag, _, _, nerr = g.types.nullableNiche(ty);
+                    if nerr == squid_direct_types::Error.none {
+                        let ctor_tag = tm.constructor(rn.a).tag;
+                        if is_niche && ctor_tag == null_tag {
+                            g.recordInlined(target.unit, target.binding);
+                            return valOf1(g, ty, constLocal(g, f, 0)), squid_direct_types::Error.none;
+                        }
+                        if !is_niche {
+                            g.recordInlined(target.unit, target.binding);
+                            let loc = constLocal(g, f, ctor_tag);
+                            recordConstTag(f, loc, ctor_tag);
+                            return valOf1(g, ty, loc), squid_direct_types::Error.none;
+                        }
+                    }
                 }
             } else if f.inline_depth < 3 {
                 let inlined, was_inlined, ierr = inlineSmallConst(g, f, target, ty, id);

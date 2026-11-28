@@ -817,3 +817,294 @@ io main (x: U32): U32 =>
     "result_not_owned",
   );
 });
+
+Deno.test("audit: nullableNiche module const $Nothing and const-array loop unrolling emit null pointer 0", async () => {
+  await compileAndRun(
+    `
+type BigEpoch is data = $BigEpoch {
+  a: U32, b: U32, c: U32, d: U32, e: U32, f: U32,
+  tiles: #[U32],
+}
+const no_epoch: Maybe BigEpoch = $Nothing
+const empty_epochs: #[Maybe BigEpoch] = #[$Nothing, $Nothing]
+
+func inspect_epoch (opt: Maybe BigEpoch): U32 =>
+  return case opt of
+    $Nothing => 17
+    $Some ep => ep.a + ep.f + ep.tiles.length
+
+io main (k: U32): U32 =>
+  let sum = inspect_epoch no_epoch
+  for item in empty_epochs:
+    sum := self + inspect_epoch item
+  let live = $Some ($BigEpoch { a: k, b: 1, c: 2, d: 3, e: 4, f: 5, tiles: #[9, 10, 11] })
+  sum := self + inspect_epoch live
+  return sum
+`,
+    (guest) => {
+      equal(guest.call("main", 100), 17 * 3 + 100 + 5 + 3);
+    },
+  );
+});
+
+Deno.test("audit: boxed unique_boxed deferred/own reuse stays bounded in loops and preserves pure-scalar/pure-subfield immutability", async () => {
+  // 1. Bounded stack memory across 25,000 loop updates on a large (> 16 words)
+  // boxed record holding owned storage where RHS reads sibling fields and mixes
+  // indexed updates with field replacements.
+  await compileAndRun(
+    `
+type BigAccess is data = $BigAccess {
+  entities: #[U32],
+  a: #[U32], b: #[U32], c: #[U32], d: #[U32],
+  e: #[U32], f: #[U32], g: #[U32], h: #[U32],
+  m0: U32, m1: U32, m2: U32, m3: U32,
+  m4: U32, m5: U32, m6: U32, m7: U32,
+}
+
+func push_with (entities: #[U32]) -> (xs: own #[U32]) -> (v: U32): #[U32] =>
+  @storage.push xs (v + entities.length)
+  return xs
+
+func fill_loop (access: own BigAccess) -> (n: U32): BigAccess =>
+  for i in 0 .. n:
+    let id = access.entities.length
+    @storage.push access.entities id
+    access.m0 := self + 1
+    access.a := push_with access.entities self i
+    access.m1 := self + 1
+    access.b := push_with access.entities self (i + 1)
+    access.m2 := self + 1
+    access.c := push_with access.entities self (i + 2)
+    access.m3 := self + 1
+    if access.a.length > 0:
+      access.a[0] := i
+    access.m4 := self + 1
+  return access
+
+io main (n: U32): U32 =>
+  let acc = $BigAccess {
+    entities: #[], a: #[], b: #[], c: #[], d: #[],
+    e: #[], f: #[], g: #[], h: #[],
+    m0: 0, m1: 0, m2: 0, m3: 0, m4: 0, m5: 0, m6: 0, m7: 0,
+  }
+  acc := fill_loop self n
+  return acc.entities.length + acc.a[0] + acc.m4
+`,
+    (guest) => {
+      equal(guest.call("main", 25000), 25000 + 24999 + 25000);
+    },
+  );
+
+  // 2. Soundness: pure-scalar own boxed record is NOT uniquely spent by caller,
+  // so callee MUST NOT mutate caller's block in place.
+  await compileAndRun(
+    `
+type PureBig is data = $PureBig {
+  f0: U32, f1: U32, f2: U32, f3: U32, f4: U32, f5: U32, f6: U32, f7: U32,
+  f8: U32, f9: U32, f10: U32, f11: U32, f12: U32, f13: U32, f14: U32, f15: U32,
+  f16: U32, f17: U32,
+}
+
+func mutate_pure (p: own PureBig): PureBig =>
+  p.f0 := 999
+  p.f17 := 888
+  return p
+
+io main (): U32 =>
+  let orig = $PureBig {
+    f0: 1, f1: 2, f2: 3, f3: 4, f4: 5, f5: 6, f6: 7, f7: 8,
+    f8: 9, f9: 10, f10: 11, f11: 12, f12: 13, f13: 14, f14: 15, f15: 16,
+    f16: 17, f17: 18,
+  }
+  let changed = mutate_pure orig
+  return orig.f0 * 10000 + orig.f17 * 100 + changed.f0
+`,
+    (guest) => {
+      equal(guest.call("main", null), 1 * 10000 + 18 * 100 + 999);
+    },
+  );
+
+  // 3. Soundness: own boxed record holding storage AND a pure-scalar copiedBox
+  // subfield MUST NOT mutate the parent block in place because a caller can
+  // hold an interior readFlat pointer to the pure subfield without a loan.
+  await compileAndRun(
+    `
+type PureSub is data = $PureSub {
+  s0: U32, s1: U32, s2: U32, s3: U32, s4: U32, s5: U32, s6: U32, s7: U32,
+  s8: U32, s9: U32, s10: U32, s11: U32, s12: U32, s13: U32, s14: U32, s15: U32,
+  s16: U32, s17: U32,
+}
+type MixedOwner is data = $MixedOwner {
+  xs: #[U32],
+  sub: PureSub,
+}
+
+func overwrite_sub (m: own MixedOwner): MixedOwner =>
+  m.sub.s0 := 777
+  m.sub.s17 := 666
+  return m
+
+io main (): U32 =>
+  let rec = $MixedOwner {
+    xs: #[1, 2, 3],
+    sub: $PureSub {
+      s0: 11, s1: 0, s2: 0, s3: 0, s4: 0, s5: 0, s6: 0, s7: 0,
+      s8: 0, s9: 0, s10: 0, s11: 0, s12: 0, s13: 0, s14: 0, s15: 0,
+      s16: 0, s17: 22,
+    },
+  }
+  let saved_sub = rec.sub
+  let updated = overwrite_sub rec
+  return saved_sub.s0 * 10000 + saved_sub.s17 * 100 + updated.sub.s0
+`,
+    (guest) => {
+      equal(guest.call("main", null), 11 * 10000 + 22 * 100 + 777);
+    },
+  );
+
+  // 4. Soundness: in-place boxed record write storing a fresh temporary owner
+  // inside a loop (directly or via an own callee) must notify escape tracking
+  // so releaseIteration does not free the newly-stored array handle.
+  await compileAndRun(
+    `
+type BoxedCarry = {
+  rows: #[U32],
+  a: #[U32], b: #[U32], c: #[U32], d: #[U32],
+  e: #[U32], f: #[U32], g: #[U32], h: #[U32],
+}
+
+func replace_rows (w: own BoxedCarry) -> (k: U32): BoxedCarry =>
+  let scratch = @array.fill 64 k
+  w.rows := #[k, scratch[0] + 1, scratch[63] + 2]
+  return w
+
+io direct_loop (n: U32): U32 =>
+  let w: BoxedCarry = {
+    rows: #[0, 0, 0],
+    a: #[1], b: #[2], c: #[3], d: #[4],
+    e: #[5], f: #[6], g: #[7], h: #[8],
+  }
+  for i in 0 .. n:
+    let scratch = @array.fill 64 i
+    w.rows := #[i, scratch[0] + 1, scratch[63] + 2]
+  return w.rows[0] + w.rows[1] + w.rows[2] + w.h[0]
+
+io callee_loop (n: U32): U32 =>
+  let w: BoxedCarry = {
+    rows: #[0, 0, 0],
+    a: #[1], b: #[2], c: #[3], d: #[4],
+    e: #[5], f: #[6], g: #[7], h: #[8],
+  }
+  for i in 0 .. n:
+    w := replace_rows w i
+  return w.rows[0] + w.rows[1] + w.rows[2] + w.h[0]
+`,
+    (guest) => {
+      equal(guest.call("direct_loop", 120), 119 + 120 + 121 + 8);
+      equal(guest.call("callee_loop", 120), 119 + 120 + 121 + 8);
+    },
+  );
+
+  // 5. Performance + soundness: updating a boxed record containing nested
+  // memory-holding elements (e.g. `#[RowWithSlice]`) and a >16-word copiedBox
+  // sub-record in place without changing owner slots MUST still allow loop
+  // `releaseIteration` to reclaim per-iteration scratch across 4000 iterations.
+  await compileAndRun(
+    `
+const static_extra: #[U32] = #[10, 20, 30]
+type DrawRow = { tag: U32, extra: &[U32] }
+type SubFrame is data = $SubFrame {
+  draws: #[DrawRow],
+  a: #[U32], b: #[U32], c: #[U32], d: #[U32],
+  e: #[U32], f: #[U32], g: #[U32], h: #[U32],
+  count: U32,
+}
+type OuterWorld is data = $OuterWorld {
+  frame: SubFrame,
+  x: #[U32], y: #[U32],
+}
+
+func reset_frame (fr: own SubFrame) -> (k: U32): SubFrame =>
+  @storage.truncate fr.draws 0
+  @storage.push fr.draws { tag: k, extra: &static_extra[0..2] }
+  fr.count := k
+  return fr
+
+func step_world (w: own OuterWorld) -> (k: U32): OuterWorld =>
+  w.frame := reset_frame self k
+  return w
+
+io main (n: U32): U32 =>
+  let w = $OuterWorld {
+    frame: $SubFrame {
+      draws: #[],
+      a: #[1], b: #[2], c: #[3], d: #[4],
+      e: #[5], f: #[6], g: #[7], h: #[8],
+      count: 0,
+    },
+    x: #[9], y: #[10],
+  }
+  let acc: U32 = 0
+  for i in 0 .. n:
+    let scratch = @array.fill 16384 i
+    w := step_world w i
+    acc := acc + (scratch[0] ^ scratch[16383])
+  return w.frame.count + w.frame.draws[0].tag + w.frame.draws[0].extra[1] + acc
+`,
+    (guest) => {
+      // 4000 * 64 KiB = 256 MiB > 128 MiB stack budget: passes ONLY if
+      // releaseIteration reclaims scratch every iteration.
+      equal(guest.call("main", 4000), 3999 + 3999 + 20 + 0);
+    },
+  );
+
+  // 6. Performance: mutating a freshly-allocated local boxed temporary
+  // (containing views `&[U32]`, like `ui.Node` in `editor.declare_toolbar`)
+  // in place inside a loop MUST NOT mark `escape_min_slot = 0` or block
+  // `releaseIteration` on the enclosing loop.
+  await compileAndRun(
+    `
+const empty_u32: #[U32] = #[]
+type TempNode is data = $TempNode {
+  id: U32,
+  name: &[U32],
+  desc: &[U32],
+  value_text: &[U32],
+  a: U32, b: U32, c: U32, d: U32,
+  e: U32, f: U32, g: U32, h: U32,
+}
+
+func make_node (id: U32) -> (name: &[U32]): TempNode =>
+  $TempNode {
+    id, name,
+    desc: &empty_u32[0..0],
+    value_text: &empty_u32[0..0],
+    a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8,
+  }
+
+func with_value (text: &[U32]) -> (node: TempNode): TempNode =>
+  node.value_text := text
+  return node
+
+io main (n: U32): U32 =>
+  let total: U32 = 0
+  for i in 0 .. n:
+    let scratch = @array.fill 16384 i
+    let label = #[i, i + 1, i + 2]
+    let item = make_node i (&label[0..3])
+    item.a := i + 10
+    let built = with_value (&scratch[0..4]) item
+    total := total + (built.value_text.at 0) + (built.name.at 1) + built.a
+  return total
+`,
+    (guest) => {
+      // 4000 * 64 KiB = 256 MiB > 128 MiB stack budget: passes ONLY if
+      // mutating the local fresh TempNode leaves `escape_min_slot` intact.
+      let expected = 0;
+      for (let i = 0; i < 4000; i++) {
+        expected = (expected + i + (i + 1) + (i + 10)) >>> 0;
+      }
+      equal(guest.call("main", 4000), expected);
+    },
+  );
+});

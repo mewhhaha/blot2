@@ -25,9 +25,12 @@ rewrite scope.
 
 ## Documentation
 
-- [Language](language/guide.md): syntax and programming model.
-  [The specification draft](language/spec.md) states the expected syntax
-  once the approved language changes land.
+- [Cheatsheet](../CHEATSHEET.md) & [Idioms](../IDIOMS.md): quick syntax tables
+  and idiomatic collection, ownership, SIMD, and effect patterns (also via
+  `squid guide --cheatsheet`, `squid guide --idioms`, and `squid guide <topic>`).
+- [Language](language/guide.md): executable language guide and programming model.
+  [The specification draft](language/spec.md) states the full Squid vNext
+  specification.
 - [Compiler](compiler/ARCHITECTURE.md): architecture, ownership and
   implementation contracts. [Compiler status](compiler/STATUS.md) tracks current
   design state. These were written for the Zig compiler and name its files

@@ -5,7 +5,7 @@ description: Write, check, optimize, and debug Squid vNext code cleanly on the f
 
 # Writing Squid vNext Code
 
-Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax table, [skills/squid-diagnostics/SKILL.md](../squid-diagnostics/SKILL.md) whenever `squid check` or `squid build` reports a diagnostic `[CODE]`, and [skills/agent-loops/SKILL.md](../agent-loops/SKILL.md) for the structured `--json` / quick-fix / trap / Stage-0 agent verification workflow.
+Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax table (`squid guide --cheatsheet`), [IDIOMS.md](../../IDIOMS.md) for idiomatic collection, ownership, SIMD, and effect patterns (`squid guide --idioms`, or `squid guide <topic>`), [skills/squid-diagnostics/SKILL.md](../squid-diagnostics/SKILL.md) whenever `squid check` or `squid build` reports a diagnostic `[CODE]`, and [skills/agent-loops/SKILL.md](../agent-loops/SKILL.md) for the structured `--json` / quick-fix / trap / Stage-0 agent verification workflow.
 
 ## Core Mental Model
 
@@ -28,6 +28,8 @@ Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax tabl
 - **Mutate-and-return parameter:** `func push_one (xs: own #[U32]) -> (v: U32): #[U32] =>` — caller moves `xs` in, callee mutates in place with `xs := self.push v` (or `return @storage.push xs v` / `xs[i] := ...`), and returns `xs` zero-copy.
 - **Need to keep the old value after moving or before mutating an alias:** call `.copy` explicitly (`let snap = xs.copy` or `consume xs.copy`).
 - **Share read-only in O(1):** `let shared: *#[U32] = freeze xs`.
+- **Choose the right collection:** `#[T]` for random access / `spark` SIMD, `#[n; T]` for fixed length, `%[T]` for append-and-scan SoA records or split-stream sums, `~[T]` for O(1) reverse/copy and O(log16 m) split/concat/front edits.
+- **Infix functions:** any 2-argument function can be called infix in backticks (``x `F32.min` y``) at precedence `80`.
 
 ## Effects Recipe
 
@@ -40,6 +42,9 @@ Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax tabl
 ```sh
 deno task squid check path/to/file.sq
 deno task squid build path/to/file.sq build/out.wasm
+deno task squid guide --cheatsheet
+deno task squid guide --idioms
+deno task squid guide --list
 deno task squid explain <CODE>
 ```
 

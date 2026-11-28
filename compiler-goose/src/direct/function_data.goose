@@ -26,6 +26,234 @@ recursive fn resultAssociated(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return callTarget(g, f, target, arguments, callee, result, id);
 }
 
+fn canReuseBoxedRoot(g: Generator&, f: Fn&, m: const Module&, info_root: u32, root_binding: u32) -> bool {
+    if root_binding == 0 || !isUniqueBoxed(g, f, root_binding) || bindingCaptured(g, f, root_binding) {
+        return false;
+    }
+    let ucnt = uses(g, f, root_binding);
+    if ucnt == 1 { return true; }
+    if ucnt > 1 && ucnt <= 64 {
+        let base = ensureLocalRefs(g, m);
+        var cur = g.s.local_refs_head[(base as i64) + (root_binding as i64)];
+        while cur != 0 {
+            let rnode = g.s.local_refs_node[(cur - 1) as i64];
+            cur = g.s.local_refs_next[(cur - 1) as i64];
+            if rnode != info_root {
+                let _, ok = squid_support_zigmap::get(g.s.map_pool, f.unique_boxed_safe_refs, rnode);
+                if !ok { return false; }
+            }
+        }
+        return true;
+    }
+    return false;
+}
+fn canDeferredReuseBoxed(g: Generator&, f: Fn&, m: const Module&, id: u32, value: Val, at: i64) -> bool {
+    if at != 0 || g.runtime_().has_fork || value.len != 1 { return false; }
+    let info = m.updateInfo(id);
+    let root_binding = localRef(m, info.root);
+    if !canReuseBoxedRoot(g, f, m, info.root, root_binding) { return false; }
+    let rb_val, rb_ok = bindGet(g, f, root_binding);
+    return rb_ok && rb_val.len == 1 && rb_val.ty == value.ty && w(g, rb_val, 0) == w(g, value, 0);
+}
+
+// Collect byte offsets of owner/view handle slot words inside the flat layout
+// of a non-recursive copied-box value (`copiedBox == true`). Unlike
+// `collectFlatPlainOwnerOffsets`, this accepts containers whose element type
+// holds memory (e.g. `#[render.Draw]`, `ecs.Pool brush.Stored`) and has no
+// 16-slot cap: any store INTO an existing owner already called `noteStoreToSlot`,
+// so an in-place boxed write only escapes if a handle slot word itself changes.
+recursive fn collectFlatAnyOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, out: u32[>..<]&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
+    let rec, rerr = g.types.isRecursive(ty);
+    if rerr != squid_direct_types::Error.none { return false, rerr; }
+    if rec { return false, squid_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, packed, seq, view, ref, link => {
+            out.push(base_off);
+            return true, squid_direct_types::Error.none;
+        },
+        tuple => {
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let ioff, ierr = g.types.tupleItemByteOffset(ty, index);
+                if ierr != squid_direct_types::Error.none { return false, ierr; }
+                let ok, oerr = collectFlatAnyOwnerOffsets(g, item, base_off + ioff, out);
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
+            }
+            return true, squid_direct_types::Error.none;
+        },
+        record => {
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let foff, ferr = g.types.recordFieldByteOffset(ty, index);
+                if ferr != squid_direct_types::Error.none { return false, ferr; }
+                let ok, oerr = collectFlatAnyOwnerOffsets(g, field, base_off + foff, out);
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
+            }
+            return true, squid_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectFlatAnyOwnerOffsets(g, payload, base_off, out);
+        },
+        _ => { return false, squid_direct_types::Error.none; },
+    }
+}
+
+// Collect owner/view handle slot locals inside an unboxed Val, accepting
+// containers whose elements hold memory (already tracked by `noteStoreToSlot`).
+recursive fn collectRegAnyOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u32[>..<]&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != squid_direct_types::Error.none { return false, berr; }
+    if boxed { return false, squid_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, packed, seq, view, ref, link => {
+            out.push(g.s.words[words]);
+            return true, squid_direct_types::Error.none;
+        },
+        tuple => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let layout, lerr = g.types.layout(item);
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
+                let width = layout.len as u32;
+                let ok, oerr = collectRegAnyOwnerSlots(g, item, words + at, out);
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
+                at += width;
+            }
+            return true, squid_direct_types::Error.none;
+        },
+        record => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let layout, lerr = g.types.layout(field);
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
+                let width = layout.len as u32;
+                let ok, oerr = collectRegAnyOwnerSlots(g, field, words + at, out);
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
+                at += width;
+            }
+            return true, squid_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectRegAnyOwnerSlots(g, payload, words, out);
+        },
+        _ => { return false, squid_direct_types::Error.none; },
+    }
+}
+
+// Records an in-place write of `replacement` over `old` inside an existing
+// reused boxed block. Because the reused block's pointer does not change, an
+// enclosing loop's `assignCarries` skips its word-by-word scan; if the write
+// installs a temporary memory handle that differs from the previous handle,
+// clear `rt.escape_min_slot` so `releaseIteration` does not free the
+// newly-stored allocation.
+fn noteInPlaceBoxedWrite(g: Generator&, f: Fn&, old: Val, replacement: Val) -> Error {
+    if replacement.ty == squid_direct_types::never { return squid_direct_types::Error.none; }
+    let holds, error = g.contentsHoldMemory(replacement.ty);
+    if error != squid_direct_types::Error.none { return error; }
+    if !holds { return squid_direct_types::Error.none; }
+    let rt = g.runtime_();
+    let boxed, berr = g.types.boxed(replacement.ty);
+    if berr != squid_direct_types::Error.none { return berr; }
+    let rec, rerr = g.types.isRecursive(replacement.ty);
+    if rerr != squid_direct_types::Error.none { return rerr; }
+    if boxed && !rec {
+        if w(g, old, 0) == w(g, replacement, 0) { return squid_direct_types::Error.none; }
+        lget(g, w(g, replacement, 0));
+        lget(g, w(g, old, 0));
+        op(g, OP_i32_ne);
+        let diff_ptr = open(g, f, OP_if_);
+        var offs: u32[>..<] = [];
+        let ok, cerr = collectFlatAnyOwnerOffsets(g, replacement.ty, 0, offs);
+        if cerr != squid_direct_types::Error.none { close(g, f); return cerr; }
+        if ok {
+            if offs.len > 0 {
+                let new_slot = local32(g, f);
+                for off in offs {
+                    lget(g, w(g, replacement, 0));
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+                    ltee(g, new_slot);
+                    lget(g, w(g, old, 0));
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+                    op(g, OP_i32_ne);
+                    lget(g, new_slot);
+                    i32Const(g, rt.layout.persistent_split);
+                    op(g, OP_i32_lt_u);
+                    op(g, OP_i32_and);
+                    let esc_if = open(g, f, OP_if_);
+                    i32Const(g, 0);
+                    gset(g, rt.escape_min_slot);
+                    close(g, f);
+                }
+            }
+        } else {
+            i32Const(g, 0);
+            gset(g, rt.escape_min_slot);
+        }
+        close(g, f);
+        return squid_direct_types::Error.none;
+    } else if !boxed {
+        var old_slots: u32[>..<] = [];
+        let ok1, cerr1 = collectRegAnyOwnerSlots(g, old.ty, old.start, old_slots);
+        if cerr1 != squid_direct_types::Error.none { return cerr1; }
+        var new_slots: u32[>..<] = [];
+        let ok2, cerr2 = collectRegAnyOwnerSlots(g, replacement.ty, replacement.start, new_slots);
+        if cerr2 != squid_direct_types::Error.none { return cerr2; }
+        if ok1 && ok2 && old_slots.len == new_slots.len {
+            for i in 0..new_slots.len {
+                if old_slots[i] == new_slots[i] { continue; }
+                lget(g, new_slots[i]);
+                lget(g, old_slots[i]);
+                op(g, OP_i32_ne);
+                lget(g, new_slots[i]);
+                i32Const(g, rt.layout.persistent_split);
+                op(g, OP_i32_lt_u);
+                op(g, OP_i32_and);
+                let esc_if = open(g, f, OP_if_);
+                i32Const(g, 0);
+                gset(g, rt.escape_min_slot);
+                close(g, f);
+            }
+            return squid_direct_types::Error.none;
+        }
+    }
+    if old.len == 1 && replacement.len == 1 {
+        if w(g, old, 0) == w(g, replacement, 0) { return squid_direct_types::Error.none; }
+        lget(g, w(g, replacement, 0));
+        lget(g, w(g, old, 0));
+        op(g, OP_i32_ne);
+        let diff = open(g, f, OP_if_);
+        i32Const(g, 0);
+        gset(g, rt.escape_min_slot);
+        close(g, f);
+        return squid_direct_types::Error.none;
+    }
+    i32Const(g, 0);
+    gset(g, rt.escape_min_slot);
+    return squid_direct_types::Error.none;
+}
+
 // `root` with the field path of an update replaced by its new value.
 recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
@@ -73,32 +301,17 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let prev_reuse_nodes_len = f.reuse_nodes_len;
     let prev_reuse_block = f.reuse_block;
     let prev_reuse_ty = f.reuse_ty;
+    let prev_reuse_preexisting = f.reuse_preexisting;
     if !g.runtime_().has_fork {
         let root_binding = localRef(m, info.root);
-        if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && !bindingCaptured(g, f, root_binding) {
-            let ucnt = uses(g, f, root_binding);
-            var can_reuse = ucnt == 1;
-            if !can_reuse && ucnt > 1 && ucnt <= 32 {
-                let base = ensureLocalRefs(g, m);
-                var cur = g.s.local_refs_head[(base as i64) + (root_binding as i64)];
-                can_reuse = true;
-                while cur != 0 {
-                    let rnode = g.s.local_refs_node[(cur - 1) as i64];
-                    cur = g.s.local_refs_next[(cur - 1) as i64];
-                    if rnode != info.root {
-                        let _, ok = squid_support_zigmap::get(g.s.map_pool, f.unique_boxed_safe_refs, rnode);
-                        if !ok { can_reuse = false; break; }
-                    }
-                }
-            }
-            if can_reuse {
-                let boxed, berr = isBoxed(g, f, root.ty, id);
-                if berr == squid_direct_types::Error.none && boxed && root.len == 1 {
-                    f.reuse_nodes = [id, 0, 0, 0];
-                    f.reuse_nodes_len = 1;
-                    f.reuse_block = w(g, root, 0);
-                    f.reuse_ty = root.ty;
-                }
+        if canReuseBoxedRoot(g, f, m, info.root, root_binding) {
+            let boxed, berr = isBoxed(g, f, root.ty, id);
+            if berr == squid_direct_types::Error.none && boxed && root.len == 1 {
+                f.reuse_nodes = [id, 0, 0, 0];
+                f.reuse_nodes_len = 1;
+                f.reuse_block = w(g, root, 0);
+                f.reuse_ty = root.ty;
+                f.reuse_preexisting = isUniqueBoxedPreexisting(g, f, root_binding);
             }
         }
     }
@@ -107,6 +320,7 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     f.reuse_nodes_len = prev_reuse_nodes_len;
     f.reuse_block = prev_reuse_block;
     f.reuse_ty = prev_reuse_ty;
+    f.reuse_preexisting = prev_reuse_preexisting;
     return result, uerr;
 }
 // `container[index].fields... := value` writes the selected place through the
@@ -296,7 +510,9 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
     let field_ty = g.types.recordField(record_ty, position).ty;
     let old, error = readFlat(g, f, w(g, value, 0), offset, field_ty, id);
     if error != squid_direct_types::Error.none { return neverVal(), error; }
+    let prev_nested_noop = f.boxed_noop_alias;
     let replacement, error = updateAt(g, f, id, old, at + 1);
+    f.boxed_noop_alias = prev_nested_noop;
     if error != squid_direct_types::Error.none { return replacement, error; }
     if replacement.ty == squid_direct_types::never { return replacement, squid_direct_types::Error.none; }
     if replacement.ty != field_ty { return neverVal(), g.fail(m, id, "an update that changes a boxed field's type"); }
@@ -308,14 +524,28 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
         if same {
             if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
                 f.reuse_block = 0;
-            } else {
+            } else if !canDeferredReuseBoxed(g, f, m, id, value, at) {
                 f.boxed_noop_alias = true;
             }
             return value, squid_direct_types::Error.none;
         }
     }
-    if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
-        f.reuse_block = 0;
+    let direct_reuse = f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id);
+    if direct_reuse || canDeferredReuseBoxed(g, f, m, id, value, at) {
+        let preexisting = if direct_reuse {
+            f.reuse_preexisting
+        } else {
+            let rb = localRef(m, m.updateInfo(id).root);
+            rb != 0 && isUniqueBoxedPreexisting(g, f, rb)
+        };
+        if f.reuse_block == w(g, value, 0) {
+            f.reuse_block = 0;
+            f.reuse_preexisting = false;
+        }
+        if preexisting {
+            let nerr = noteInPlaceBoxedWrite(g, f, old, replacement);
+            if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
+        }
         let written = writeFlat(g, f, w(g, value, 0), offset, replacement, id);
         if written != squid_direct_types::Error.none { return neverVal(), written; }
         return value, squid_direct_types::Error.none;
@@ -388,8 +618,22 @@ recursive fn updateBoxedShared(g: Generator&, f: Fn&, id: u32, value: Val, cases
     if error != squid_direct_types::Error.none { return replacement, error; }
     if replacement.ty == squid_direct_types::never { return replacement, squid_direct_types::Error.none; }
     if replacement.ty != ty { return neverVal(), g.fail(m, id, "an update that changes a boxed field's type"); }
-    if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
-        f.reuse_block = 0;
+    let direct_reuse = f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id);
+    if direct_reuse || canDeferredReuseBoxed(g, f, m, id, value, at) {
+        let preexisting = if direct_reuse {
+            f.reuse_preexisting
+        } else {
+            let rb = localRef(m, m.updateInfo(id).root);
+            rb != 0 && isUniqueBoxedPreexisting(g, f, rb)
+        };
+        if f.reuse_block == w(g, value, 0) {
+            f.reuse_block = 0;
+            f.reuse_preexisting = false;
+        }
+        if preexisting {
+            let nerr = noteInPlaceBoxedWrite(g, f, old, replacement);
+            if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
+        }
         let written = writeFlat(g, f, old_address, 0, replacement, id);
         if written != squid_direct_types::Error.none { return neverVal(), written; }
         return value, squid_direct_types::Error.none;
@@ -432,8 +676,10 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
         bindPut(g, f, info.self_binding, value);
         if at == 0 && info.self_binding != 0 && !g.runtime_().has_fork && !bindingCaptured(g, f, info.self_binding) {
             if f.reuse_block != 0 && value.len == 1 && f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
+                let pre_flag: u32 = if f.reuse_preexisting { UNIQUE_BOXED_PREEXISTING } else { 0 };
                 f.reuse_block = 0;
-                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, info.self_binding, f.loop_depth + 1);
+                f.reuse_preexisting = false;
+                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, info.self_binding, (f.loop_depth + 1) | pre_flag);
             }
             let rb = localRef(m, info.root);
             if rb != 0 && isUniqueOwned(g, f, rb) && ownedTotalUses(g, f, rb) == 1 && !bindingCaptured(g, f, rb) {
@@ -880,8 +1126,10 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     if error != squid_direct_types::Error.none { return neverVal(), error; }
     if boxed {
         var memory_block: u32 = 0;
+        var reused_preexisting = false;
         if f.reuse_block != 0 && f.reuse_ty == ty && consumeReuseNode(f, id) {
             memory_block = f.reuse_block;
+            reused_preexisting = f.reuse_preexisting;
         } else {
             let made, error = newBlock(g, f, ty, id);
             if error != squid_direct_types::Error.none { return neverVal(), error; }
@@ -904,6 +1152,14 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
             let tserr = emitTagStore(g, ty, 0);
             if tserr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
             offset = payload_off;
+        }
+        if reused_preexisting {
+            let p_holds, pherr = g.contentsHoldMemory(payload.ty);
+            if pherr != squid_direct_types::Error.none { return neverVal(), pherr; }
+            if is_out || p_holds {
+                i32Const(g, 0);
+                gset(g, g.runtime_().escape_min_slot);
+            }
         }
         if is_out {
             let ptr, oerr = emitOutlinePayload(g, f, payload, declared, id);

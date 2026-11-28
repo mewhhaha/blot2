@@ -22,7 +22,7 @@ import {
 import { runDocCli } from "./doc.ts";
 
 const usage =
-  `Usage: squid guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
+  `Usage: squid guide [--cheatsheet | --idioms | --list | <topic>] | explain <CODE|--list> | fmt SOURCE [--check]
        squid check ENTRY [project options]
        squid build ENTRY [OUTPUT.wasm] [--test] [project options]
        squid dependencies ENTRY OUTPUT.sqdep [project options]
@@ -34,6 +34,127 @@ Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source,
                  --stack-mb 1..1024, --heap-mb 1..1024, --transport-mb 1..1024,
                  --relaxed-simd, --tail-calls, --wasm3, --json`;
+
+interface GuideTopicSpec {
+  readonly name: string;
+  readonly summary: string;
+  readonly file: "../CHEATSHEET.md" | "../IDIOMS.md";
+  readonly headingPrefix?: string;
+}
+
+const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
+  {
+    name: "rules",
+    summary: "Top 10 syntax and ownership rules",
+    file: "../CHEATSHEET.md",
+    headingPrefix: "## 1. ",
+  },
+  {
+    name: "types",
+    summary: "Scalars, literals, collections, and stdlib modules",
+    file: "../CHEATSHEET.md",
+    headingPrefix: "## 2. ",
+  },
+  {
+    name: "control",
+    summary: "Functions, currying, control flow, and patterns",
+    file: "../CHEATSHEET.md",
+    headingPrefix: "## 3. ",
+  },
+  {
+    name: "collections",
+    summary: "Choosing #[T], #[n; T], &[T], %[T], ~[T], and *T",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 1. ",
+  },
+  {
+    name: "ownership",
+    summary: "Zero-copy borrowing, own parameters, := self, copy, freeze, fork",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 2. ",
+  },
+  {
+    name: "simd",
+    summary: "spark SIMD, exact reductions, range-push, #kernel, #process",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 4. ",
+  },
+  {
+    name: "operators",
+    summary: "Pipelines (|>), custom operators, and backtick infix",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 5. ",
+  },
+  {
+    name: "effects",
+    summary:
+      "Algebraic effects, handlers, layer composition, deterministic tests",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 6. ",
+  },
+  {
+    name: "comptime",
+    summary: "#for #fields, #variants, #if, @[...] tags, and is opaque",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 7. ",
+  },
+  {
+    name: "errors",
+    summary: "Maybe, Result, flat error handling, and anti-patterns",
+    file: "../IDIOMS.md",
+    headingPrefix: "## 8. ",
+  },
+  {
+    name: "cli",
+    summary: "CLI commands, flags, formatting, testing, and diagnostics",
+    file: "../CHEATSHEET.md",
+    headingPrefix: "## 7. ",
+  },
+  {
+    name: "cheatsheet",
+    summary: "Full one-page syntax cheatsheet (same as --cheatsheet)",
+    file: "../CHEATSHEET.md",
+  },
+  {
+    name: "idioms",
+    summary: "Full idiomatic Squid patterns guide (same as --idioms)",
+    file: "../IDIOMS.md",
+  },
+];
+
+function formatGuideTopicList(): string {
+  const lines = [
+    "Usage: squid guide [--cheatsheet | --idioms | --list | <topic>]",
+    "",
+    "Documents:",
+    "  (no args)    Full executable language guide (docs/language/guide.md)",
+    "  --cheatsheet Condensed one-page syntax cheatsheet (CHEATSHEET.md)",
+    "  --idioms     Idiomatic Squid patterns and layout selection (IDIOMS.md)",
+    "  --list       List available documents and focused topics",
+    "",
+    "Topics (run `squid guide <topic>`):",
+  ];
+  for (const topic of GUIDE_TOPICS) {
+    lines.push(`  ${topic.name.padEnd(12)} ${topic.summary}`);
+  }
+  return lines.join("\n");
+}
+
+function extractMarkdownSection(
+  markdown: string,
+  headingPrefix: string,
+): string | null {
+  const start = markdown.startsWith(headingPrefix)
+    ? 0
+    : markdown.indexOf(`\n${headingPrefix}`);
+  if (start < 0) return null;
+  const sectionStart = start === 0 ? 0 : start + 1;
+  const next = markdown.indexOf("\n## ", sectionStart + headingPrefix.length);
+  return (next < 0
+    ? markdown.slice(sectionStart)
+    : markdown.slice(sectionStart, next))
+    .trimEnd();
+}
 
 async function runTestCli(
   executable: string | URL | undefined,
@@ -323,15 +444,51 @@ export async function runCli(
       );
       return 0;
     }
-    if (args.length === 2 && filename === "--cheatsheet") {
-      console.log(
-        await Deno.readTextFile(
-          new URL("../CHEATSHEET.md", import.meta.url),
-        ),
-      );
-      return 0;
+    if (args.length === 2 && filename) {
+      if (filename === "--help" || filename === "-h" || filename === "--list") {
+        console.log(formatGuideTopicList());
+        return 0;
+      }
+      if (filename === "--cheatsheet") {
+        console.log(
+          await Deno.readTextFile(
+            new URL("../CHEATSHEET.md", import.meta.url),
+          ),
+        );
+        return 0;
+      }
+      if (filename === "--idioms") {
+        console.log(
+          await Deno.readTextFile(
+            new URL("../IDIOMS.md", import.meta.url),
+          ),
+        );
+        return 0;
+      }
+      if (!filename.startsWith("-")) {
+        const key = filename.toLowerCase();
+        const topic = GUIDE_TOPICS.find((item) => item.name === key);
+        if (!topic) {
+          console.error(
+            `Unknown guide topic: ${filename}\n\n${formatGuideTopicList()}`,
+          );
+          return 1;
+        }
+        const doc = await Deno.readTextFile(
+          new URL(topic.file, import.meta.url),
+        );
+        const text = topic.headingPrefix
+          ? extractMarkdownSection(doc, topic.headingPrefix)
+          : doc.trimEnd();
+        if (!text) {
+          console.error(`Guide topic section missing: ${topic.name}`);
+          return 1;
+        }
+        console.log(text);
+        return 0;
+      }
     }
-    console.error(usage);
+    console.error(formatGuideTopicList());
     return 2;
   }
   if (command === "explain") {

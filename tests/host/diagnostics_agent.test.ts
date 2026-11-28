@@ -143,6 +143,44 @@ Deno.test("diagnostics: canonical codes and explain catalog", async () => {
   equal(cheatsheetRun.code, 0);
   match(cheatsheetRun.stdout, /# Squid vNext Cheatsheet/);
   match(cheatsheetRun.stdout, /#\[1, 2, 3\]/);
+
+  const idiomsFlagRun = await runCapturedCli(["guide", "--idioms"]);
+  equal(idiomsFlagRun.code, 0);
+  match(idiomsFlagRun.stdout, /# Squid Idioms/);
+  match(idiomsFlagRun.stdout, /Choosing the Right Collection/);
+
+  const idiomsTopicRun = await runCapturedCli(["guide", "idioms"]);
+  equal(idiomsTopicRun.code, 0);
+  equal(idiomsTopicRun.stdout, idiomsFlagRun.stdout);
+
+  const cheatsheetTopicRun = await runCapturedCli(["guide", "cheatsheet"]);
+  equal(cheatsheetTopicRun.code, 0);
+  equal(cheatsheetTopicRun.stdout, cheatsheetRun.stdout);
+
+  const guideListRun = await runCapturedCli(["guide", "--list"]);
+  equal(guideListRun.code, 0);
+  match(guideListRun.stdout, /--cheatsheet/);
+  match(guideListRun.stdout, /--idioms/);
+  match(guideListRun.stdout, /\bcollections\b/);
+  match(guideListRun.stdout, /\bownership\b/);
+  match(guideListRun.stdout, /\boperators\b/);
+
+  const guideHelpRun = await runCapturedCli(["guide", "--help"]);
+  equal(guideHelpRun.code, 0);
+  equal(guideHelpRun.stdout, guideListRun.stdout);
+
+  const guideOwnershipRun = await runCapturedCli(["guide", "ownership"]);
+  equal(guideOwnershipRun.code, 0);
+  match(guideOwnershipRun.stdout, /Zero-Copy Ownership/);
+  equal(guideOwnershipRun.stdout.includes("## 3. "), false);
+
+  const guideOperatorsRun = await runCapturedCli(["guide", "OPERATORS"]);
+  equal(guideOperatorsRun.code, 0);
+  match(guideOperatorsRun.stdout, /Backtick Infix/);
+
+  const guideUnknownRun = await runCapturedCli(["guide", "does_not_exist"]);
+  equal(guideUnknownRun.code, 1);
+  match(guideUnknownRun.stderr, /Unknown guide topic: does_not_exist/);
 });
 
 Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point column", () => {
@@ -822,32 +860,40 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
   equal(handlerDiag.fix?.includes("let b =") ?? false, false);
 });
 
-Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile cleanly", async () => {
+Deno.test("diagnostics: positive examples in CHEATSHEET.md, IDIOMS.md, and SKILL.md compile cleanly", async () => {
   const tempDir = await Deno.makeTempDir({ prefix: "squid-doc-snippets-" });
   try {
-    const cheatsheet = await Deno.readTextFile(
-      new URL("../../CHEATSHEET.md", import.meta.url),
-    );
-    const cheatsheetBlocks = [
-      ...cheatsheet.matchAll(/```squid\n([\s\S]*?)```/g),
-    ]
-      .map((m) => m[1]);
-    ok(
-      cheatsheetBlocks.length >= 4,
-      "Expected squid examples in CHEATSHEET.md",
-    );
-
-    for (let i = 0; i < cheatsheetBlocks.length; i++) {
-      const file = join(tempDir, `cheatsheet_${i}.sq`);
-      await Deno.writeTextFile(file, cheatsheetBlocks[i]);
-      const res = await runCompilerRaw("check-project", file);
-      equal(
-        res.code,
-        0,
-        `CHEATSHEET.md block #${i} failed to compile:\n${
-          cheatsheetBlocks[i]
-        }\n${JSON.stringify(res.diagnostics, null, 2)}`,
+    for (
+      const docSpec of [
+        { path: "../../CHEATSHEET.md", label: "CHEATSHEET.md", minBlocks: 4 },
+        { path: "../../IDIOMS.md", label: "IDIOMS.md", minBlocks: 7 },
+      ]
+    ) {
+      const content = await Deno.readTextFile(
+        new URL(docSpec.path, import.meta.url),
       );
+      const blocks = [
+        ...content.matchAll(/```squid\n([\s\S]*?)```/g),
+      ].map((m) => m[1]);
+      ok(
+        blocks.length >= docSpec.minBlocks,
+        `Expected at least ${docSpec.minBlocks} squid examples in ${docSpec.label}, got ${blocks.length}`,
+      );
+      for (let i = 0; i < blocks.length; i++) {
+        const file = join(
+          tempDir,
+          `${docSpec.label.replace(/\W+/g, "_")}_${i}.sq`,
+        );
+        await Deno.writeTextFile(file, blocks[i]);
+        const res = await runCompilerRaw("check-project", file);
+        equal(
+          res.code,
+          0,
+          `${docSpec.label} block #${i} failed to compile:\n${blocks[i]}\n${
+            JSON.stringify(res.diagnostics, null, 2)
+          }`,
+        );
+      }
     }
 
     const skill = await Deno.readTextFile(

@@ -560,6 +560,7 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
 
     var unique_arg_mask: u32 = 0;
     var unique_boxed_mask: u32 = 0;
+    var unique_boxed_pre_mask: u32 = 0;
     if !g.runtime_().has_fork && peeled <= 8 && chain_len >= peeled {
         let cm .= g.units[f.unit - 1];
         var arg_bs: u32[8] = [0; 8];
@@ -583,6 +584,9 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
             }
             if isUniqueBoxed(g, f, ab) && uses(g, f, ab) == 1 {
                 unique_boxed_mask |= ((1 as u32) << (pi as u32));
+                if isUniqueBoxedPreexisting(g, f, ab) {
+                    unique_boxed_pre_mask |= ((1 as u32) << (pi as u32));
+                }
             }
         }
     }
@@ -601,6 +605,7 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     let saved_reuse_nodes_len = f.reuse_nodes_len;
     let saved_reuse_block = f.reuse_block;
     let saved_reuse_ty = f.reuse_ty;
+    let saved_reuse_preexisting = f.reuse_preexisting;
     let saved_boxed_noop_alias = f.boxed_noop_alias;
     let saved_loop_depth = f.loop_depth;
     let saved_indirect_b = f.indirect_bound_binding;
@@ -658,6 +663,7 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.reuse_nodes_len = 0;
     f.reuse_block = 0;
     f.reuse_ty = 0;
+    f.reuse_preexisting = false;
     f.boxed_noop_alias = false;
     f.loop_depth = 0;
     f.indirect_bound_binding = 0;
@@ -708,7 +714,8 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
             squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bs[pi], 1);
         }
         if (unique_boxed_mask & ((1 as u32) << (pi as u32))) != 0 {
-            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bs[pi], 1);
+            let pflag: u32 = if (unique_boxed_pre_mask & ((1 as u32) << (pi as u32))) != 0 { UNIQUE_BOXED_PREEXISTING } else { 0 };
+            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bs[pi], 1 | pflag);
         }
     }
     let body_val, b_err = stmt(g, f, final_body);
@@ -741,6 +748,7 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.reuse_nodes_len = saved_reuse_nodes_len;
     f.reuse_block = saved_reuse_block;
     f.reuse_ty = saved_reuse_ty;
+    f.reuse_preexisting = saved_reuse_preexisting;
     f.boxed_noop_alias = saved_boxed_noop_alias;
     f.loop_depth = saved_loop_depth;
     f.indirect_bound_binding = saved_indirect_b;
@@ -3227,6 +3235,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     // can reuse the caller's uniquely-owned buffer in place!
     var unique_arg_mask: u32 = 0;
     var unique_boxed_mask: u32 = 0;
+    var unique_boxed_pre_mask: u32 = 0;
     if id != 0 && param_count <= 16 {
         let cm .= g.units[f.unit - 1];
         if cm.node(id).tag == squid_check_core::Tag.call {
@@ -3247,6 +3256,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
                     }
                     if !g.runtime_().has_fork && isUniqueBoxed(g, f, ab) && uses(g, f, ab) == 1 {
                         unique_boxed_mask |= ((1 as u32) << (ai as u32));
+                        if isUniqueBoxedPreexisting(g, f, ab) {
+                            unique_boxed_pre_mask |= ((1 as u32) << (ai as u32));
+                        }
                     }
                 }
             }
@@ -3269,6 +3281,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_reuse_nodes_len = f.reuse_nodes_len;
     let saved_reuse_block = f.reuse_block;
     let saved_reuse_ty = f.reuse_ty;
+    let saved_reuse_preexisting = f.reuse_preexisting;
     let saved_boxed_noop_alias = f.boxed_noop_alias;
     let saved_loop_depth = f.loop_depth;
     let saved_indirect_b = f.indirect_bound_binding;
@@ -3326,6 +3339,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.reuse_nodes_len = 0;
     f.reuse_block = 0;
     f.reuse_ty = 0;
+    f.reuse_preexisting = false;
     f.boxed_noop_alias = false;
     f.loop_depth = 0;
     f.indirect_bound_binding = 0;
@@ -3378,11 +3392,21 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         if (unique_arg_mask & ((1 as u32) << (at as u32))) != 0 {
             squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
-        if (unique_boxed_mask & ((1 as u32) << (at as u32))) != 0 {
-            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1);
+        let from_unique_boxed = (unique_boxed_mask & ((1 as u32) << (at as u32))) != 0;
+        if from_unique_boxed {
+            let pflag: u32 = if (unique_boxed_pre_mask & ((1 as u32) << (at as u32))) != 0 { UNIQUE_BOXED_PREEXISTING } else { 0 };
+            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1 | pflag);
         }
         if at < 32 && ((own_param_mask >> (at as u32)) & 1) != 0 {
             squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
+            if !from_unique_boxed {
+                let tm_own .= g.units[target.unit - 1];
+                let own_body .= tm_own.body(target.binding);
+                if own_body && !own_body.exported &&
+                    ownBoxedParamSafe(g, f, tm_own, own_body.scheme.obligations, tm_own.binding(param_bindings[at]).ty, aval.ty) {
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1 | UNIQUE_BOXED_PREEXISTING);
+                }
+            }
         }
     }
     let body_val, b_err = stmt(g, f, body_root);
@@ -3416,6 +3440,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.reuse_nodes_len = saved_reuse_nodes_len;
     f.reuse_block = saved_reuse_block;
     f.reuse_ty = saved_reuse_ty;
+    f.reuse_preexisting = saved_reuse_preexisting;
     f.boxed_noop_alias = saved_boxed_noop_alias;
     f.loop_depth = saved_loop_depth;
     f.indirect_bound_binding = saved_indirect_b;

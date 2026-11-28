@@ -1,6 +1,6 @@
 # Squid vNext Cheatsheet
 
-Quick, version-matched reference for humans and coding agents. Run `deno task squid guide --cheatsheet` to print this file, or `deno task squid explain <CODE>` for any compiler error.
+Quick, version-matched reference for humans and coding agents. Run `deno task squid guide --cheatsheet` to print this file, `deno task squid guide --idioms` for idiomatic patterns, `deno task squid guide --list` for focused topics, or `deno task squid explain <CODE>` for any compiler error.
 
 ## 1. Top 10 Rules (Avoid Common Mistakes)
 
@@ -112,7 +112,13 @@ deno task squid build app.sq build/app.wasm   # compile to Wasm ABI 8
 deno task squid build app.sq build/app.wasm --wasm3  # opt-in Wasm 3.0 (FMA + return_call)
 deno task squid build app.sq build/app.wasm --stack-mb 256 --heap-mb 256 --transport-mb 16  # custom memory budgets
 deno task squid fmt app.sq                    # format source
-deno task squid explain SPENT_VALUE             # explain any diagnostic code
-deno task squid explain --list                  # list all diagnostic codes
-deno task squid guide --cheatsheet              # print this cheatsheet
+deno task squid test tests/                   # run Squid test suite
+deno task squid doc src/                      # inspect/generate module docs
+deno task squid explain SPENT_VALUE           # explain any diagnostic code
+deno task squid explain --list                # list all diagnostic codes
+deno task squid guide                         # full language guide
+deno task squid guide --cheatsheet            # print this cheatsheet
+deno task squid guide --idioms                # print idiomatic patterns (IDIOMS.md)
+deno task squid guide --list                  # list focused guide topics
+deno task squid guide ownership               # print a single focused topic
 ```

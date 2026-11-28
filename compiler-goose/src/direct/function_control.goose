@@ -3539,6 +3539,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let arms = m.matchArms(id);
     var fbip_block: u32 = 0;
     var fbip_ty: Ty = 0;
+    var fbip_preexisting: bool = false;
     if inputs.len == 1 && !g.runtime_().has_fork {
         let matched_binding = localRef(m, inputs[0]);
         if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(g, f, matched_binding) {
@@ -3547,6 +3548,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if berr == squid_direct_types::Error.none && boxed && input_val.len == 1 {
                 fbip_block = w(g, input_val, 0);
                 fbip_ty = input_val.ty;
+                fbip_preexisting = isUniqueBoxedPreexisting(g, f, matched_binding);
             }
         }
     }
@@ -3756,6 +3758,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let prev_reuse_nodes_len = f.reuse_nodes_len;
         let prev_reuse_block = f.reuse_block;
         let prev_reuse_ty = f.reuse_ty;
+        let prev_reuse_preexisting = f.reuse_preexisting;
         if fbip_block != 0 {
             var fbip_safe = true;
             var pat_binds: u32[32] = [0; 32];
@@ -3792,6 +3795,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 f.reuse_nodes_len = target_len;
                 f.reuse_block = fbip_block;
                 f.reuse_ty = fbip_ty;
+                f.reuse_preexisting = fbip_preexisting;
             }
         }
         let body, error = stmt(g, f, arm.body);
@@ -3799,6 +3803,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         f.reuse_nodes_len = prev_reuse_nodes_len;
         f.reuse_block = prev_reuse_block;
         f.reuse_ty = prev_reuse_ty;
+        f.reuse_preexisting = prev_reuse_preexisting;
         if error != squid_direct_types::Error.none { return body, error; }
         if body.ty != squid_direct_types::never {
             falls = true;
@@ -5782,6 +5787,16 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: squid
         if berr != squid_direct_types::Error.none || boxed { return false, squid_direct_types::Error.none; }
         let width, werr = layoutLen(g, f, elem_ty, id);
         if werr != squid_direct_types::Error.none || width != 1 { return false, squid_direct_types::Error.none; }
+        let is_niche, null_tag, _, _, nerr = g.types.nullableNiche(elem_ty);
+        if nerr != squid_direct_types::Error.none { return false, squid_direct_types::Error.none; }
+        if is_niche {
+            for ei in 0..elem_count {
+                if !elem_is_const[ei] {
+                    if elem_vals[ei] != null_tag { return false, squid_direct_types::Error.none; }
+                    elem_vals[ei] = 0;
+                }
+            }
+        }
         let carries = m.loopCarries(id);
         for at in 0..carries.len {
             if g.s.words[slots.start + at] != 0 { return false, squid_direct_types::Error.none; }
@@ -5790,6 +5805,7 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: squid
         if !countBodyNodes(m, info.body, budget) { return false, squid_direct_types::Error.none; }
     }
 
+    let elem_is_niche, _, _, _, _ = g.types.nullableNiche(elem_ty);
     g.recordInlined(target.unit, target.binding);
     let exit = open(g, f, OP_block);
     let unused = g.newSlot();
@@ -5809,7 +5825,7 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: squid
             item = valOf1(g, elem_ty, loc);
         } else {
             let loc = constLocal(g, f, elem_vals[ei]);
-            recordConstTag(f, loc, elem_vals[ei]);
+            if !elem_is_niche { recordConstTag(f, loc, elem_vals[ei]); }
             item = valOf1(g, elem_ty, loc);
         }
         if info.pattern != 0 {
@@ -11037,11 +11053,11 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             // entry and backedge, so carry.iteration is always exclusively owned
             // for in-place FBIP when its sole read is a match/update.
             if g.s.words[slots.start + at] != 0 {
-                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
+                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, (f.loop_depth + 2) | UNIQUE_BOXED_PREEXISTING);
             } else if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 1 && !bindingCaptured(g, f, carry.incoming) {
                 var bbudget: i64 = 256;
                 if carryBackedgeIsUniqueBoxed(g, f, m, id, at, carry.iteration, carry.backedge, bbudget) {
-                    squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, (f.loop_depth + 2) | UNIQUE_BOXED_PREEXISTING);
                 }
             }
             if tagOf(g, g.s.vals[iteration.start + at].ty) == squid_direct_types::Tag.array &&

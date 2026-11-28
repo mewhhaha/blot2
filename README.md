@@ -14,6 +14,7 @@
   <a href="#performance">Performance</a> ·
   <a href="#getting-started">Get started</a> ·
   <a href="CHEATSHEET.md">Cheatsheet</a> ·
+  <a href="IDIOMS.md">Idioms</a> ·
   <a href="DESIGN.md">Design</a>
 </p>
 
@@ -197,15 +198,16 @@ func step_counter (st: own U32) -> (delta: U32): (U32, U32) => (st + delta, st +
 </details>
 
 <details>
-<summary><b>Custom operators &amp; diagnostics</b> — user-defined operators, guarded destructuring, and blame-tracked errors</summary>
+<summary><b>Custom operators, backtick infix &amp; diagnostics</b> — user-defined operators, backticked 2-arg functions, guarded destructuring, and blame-tracked errors</summary>
 
 ```squid
 func (+*) (a: U32) -> (b: U32): U32 => a * b + 1
+func clamp_hi (x: U32) -> (hi: U32): U32 => if x > hi then hi else x
 
 func first_or_zero (xs: #[U32]): U32 =>
   let $Some x = xs.get 0 else:
     return 0
-  return x +* 3
+  return (x `clamp_hi` 10) +* 3
 ```
 
 ```text
@@ -275,12 +277,14 @@ deno task build:compiler
 
 # Type-check, compile to Wasm, and format
 deno task squid check path/to/app.sq
-deno task squid build path/to/app.sq -o app.wasm
+deno task squid build path/to/app.sq app.wasm
 deno task squid fmt path/to/app.sq
 
-# Inspect diagnostics and browse the built-in cheatsheet
+# Inspect diagnostics and browse built-in guides
 deno task squid explain SPENT_VALUE
 deno task squid guide --cheatsheet
+deno task squid guide --idioms
+deno task squid guide --list
 
 # Run the guest and host test suite
 deno task test:guest
@@ -291,6 +295,7 @@ deno task test:guest
 | I want to… | Read |
 |---|---|
 | Learn the syntax fast | [Cheatsheet](CHEATSHEET.md) |
+| Write idiomatic, fast Squid | [Idioms](IDIOMS.md) |
 | Understand the design philosophy | [Design](DESIGN.md) |
 | Read the language guide & formal spec | [Guide](docs/language/guide.md) · [Spec](docs/language/spec.md) |
 | Work with effects, handlers & host I/O | [Effects & I/O](docs/language/effects-and-io.md) |

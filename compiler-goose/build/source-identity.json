@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "a12172eb5435a03f61dbe74d03a2d972903ff269f8bc380f9cfd32e14f1c94be",
+  "digest": "174be3d60df0bb80cc1de334997155924ffa0c96b7a6d4405c69f0d7bf95b218",
   "goose": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -422,24 +422,24 @@
       "sha256": "a93b4b45919ed5ed62deab813286c1262e482049f38e7fb5f9f6f04352217524"
     },
     {
-      "bytes": 137733,
+      "bytes": 139743,
       "path": "src/direct/function.goose",
-      "sha256": "71df0efeb3bfac79cac80a0786df1707ac8fe013a7bf88542fbbee5252b7308f"
+      "sha256": "56f7c6a64279ad5cd1e56ce9082324752f86c47e57bc7e1b05b77a8c77e65229"
     },
     {
-      "bytes": 195760,
+      "bytes": 197265,
       "path": "src/direct/function_calls.goose",
-      "sha256": "0b94ab2c65f043eb257fb02e74369a1115c22a86b69796ac48a0f98f5bbf470c"
+      "sha256": "8474c85bb67cc07ba21c740ac33d52be215e0eeea5147e6d2f39430a73dd95b7"
     },
     {
-      "bytes": 607605,
+      "bytes": 608502,
       "path": "src/direct/function_control.goose",
-      "sha256": "2d1ce342ffbdb42975518a55b8813b1e09a6bbd0b3b4d52222552f574e9c773d"
+      "sha256": "5729d2ae5cffec1fea1ffb513ffe152451cdd76612a2de8809065527fb6f018f"
     },
     {
-      "bytes": 76574,
+      "bytes": 88669,
       "path": "src/direct/function_data.goose",
-      "sha256": "fe934a8c096cd3588ced5c3a77c6367053fb0ada61506db521fce0c0db47bf13"
+      "sha256": "fc47ca97dd3d5a5c5e98b6ab5fdae95fb420077178c74a6c53d1d276e67a9940"
     },
     {
       "bytes": 17083,
@@ -447,9 +447,9 @@
       "sha256": "275c6bc29c503b72ebd52391f754ff278f6ac1a9ddb8f92fcfe91c7614b895f4"
     },
     {
-      "bytes": 161484,
+      "bytes": 167591,
       "path": "src/direct/function_entry.goose",
-      "sha256": "a69afb960a7ed4012391813254c7dd1069ba8b579b6111cee2b8969877839c1c"
+      "sha256": "751ab19366f2d0e285f7800635145b3ca9c49e7c5a0a95444807c0be644eebb2"
     },
     {
       "bytes": 97991,

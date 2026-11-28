@@ -21,8 +21,11 @@ qualification.
   - `#[T]` (unified owned dynamic array, equivalent to `Array T`),
   - `#[n; T]` (equal-length-checked fixed array family),
   - `&[T]` (read-only borrowed view, equivalent to `View T`),
+  - `%[T]` (packed non-indexable sequential storage: SoA record/tuple columns and split-stream sums, equivalent to `Packed T`),
+  - `~[T]` (reversible 16-way SIMD-RRB sequence with O(1) reverse/copy and O(log₁₆ m) split/concat/slice, equivalent to `Seq T`),
   - `*T` (shared immutable handle via `freeze`),
   - `*(A -> B)` (frozen closure value).
+- **Operators & backtick infix:** All standard symbolic operators are ordinary prelude functions (`+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `|>`, `<|`); custom operators use parenthesized names (`func (++) a -> b => ...`), and any 2-argument function (`f`, `mod.f`, `Type.f`) can be called infix in backticks (``x `F32.min` y``) at precedence `80` (left-associative).
 - **Composable effect handlers:** `handler name: Effect => ...` declares a local
   handler (which may capture or linearly shadow outer locals) and installs it
   with `.handle ... .run`, `@handle`, or `layer` without separate
@@ -44,11 +47,17 @@ From the Squid repository:
 
 ```sh
 just guide                                  # this reference; no compiler build
-deno task squid guide                        # same CLI command
+deno task squid guide                       # full language guide
+deno task squid guide --cheatsheet          # condensed one-page cheatsheet
+deno task squid guide --idioms              # idiomatic patterns (IDIOMS.md)
+deno task squid guide --list                # list focused guide topics
+deno task squid explain SPENT_VALUE         # explain any diagnostic code
 deno task squid fmt examples/syntax.sq      # normalize spacing
 deno task build:compiler
 deno task squid check examples/arrays.sq
 deno task squid build examples/arrays.sq build/arrays.wasm
+deno task squid test tests/std              # run Squid unit tests
+deno task squid doc std/text.sq             # inspect module documentation
 ```
 
 The host loads the Wasm module and calls the `io`, `io const` and
@@ -69,11 +78,16 @@ lexically scoped. Scalar and inline aggregate values copy by value; named array
 owners permit explicit mutation through aliases. `F32.sqrt` names a function,
 not a method on an implicit receiver.
 
-Scalars: `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`),
-and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32 arithmetic wraps
-at 32 bits; F32 rounds to binary32 and can yield infinity or canonical positive
-quiet NaN (`0x7fc00000`) on arithmetic and rounding producers (`+`, `-`, `*`,
-`/`, `sqrt`, `floor`, `ceil`, `trunc`). Prefix `-` negates F32 bitwise;
+Scalars: `Unit` (`()`), `Bool` (`true`, `false`), `U8` (`42u8`, `0xff_u8`),
+`U32` (`42`, `0xFF`, `4_096`, `100u32`), `I32` (`-42i32`), `U64` (`100u64`),
+`I64` (`-9223372036854775808i64`), `F32` (`1.0`, `1e-5`, `1f32`), and `F64`
+(`1.5f64`). Character literals (`'a'`, `'\n'`, `'\x1b'`, `'é'`) type-check to
+`U8` (default when `<= 255`) or `U32` (any Unicode scalar), and byte-string
+literals (`b"hi\n"`) produce `#[U8]`. No implicit numeric conversion. Unsigned
+and signed integer arithmetic wraps at its bit width; `F32` rounds to binary32
+(canonical quiet NaN `0x7fc00000`) and `F64` rounds to binary64 (canonical
+quiet NaN `0x7ff8000000000000`) on arithmetic and rounding producers (`+`, `-`,
+`*`, `/`, `sqrt`, `floor`, `ceil`, `trunc`). Prefix `-` negates floats bitwise;
 parenthesize negative arguments: `F32.abs (-2.0)`.
 
 Functions take one argument at a time. Calls associate left: `f a b` means

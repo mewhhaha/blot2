@@ -1,13 +1,16 @@
 # Executable prelude
 
 [prelude.sq](prelude.sq) is ordinary Squid source, implicitly available to
-source compiler sessions. It currently covers generic functions, `Maybe`,
-`Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
-prelude names; the prelude keeps its own scope and nominal identities. Top-level
-bindings are public to other Squid modules. Import [text.sq](text.sq) for
-Unicode-scalar text operations, decimal parsing, whitespace and line iterators,
-formatting, validation and a linear builder. Import
-[equality.sq](equality.sq) for structural equality contracts and
+source compiler sessions. It covers generic functions, `Maybe`, `Result`,
+`Iteration`, type witnesses, `Bool`, `U8`, `U32`, `I32`, `U64`, `I64`, `F32`,
+`F64`, `Array` (`#[T]`), `Packed` (`%[T]`), `Seq` (`~[T]`), and standard
+operators. Root declarations can shadow prelude names; the prelude keeps its
+own scope and nominal identities. Top-level bindings are public to other Squid
+modules. Import [text.sq](text.sq) for Unicode-scalar text operations,
+[bytes.sq](bytes.sq) for `#[U8]` byte buffers, [map.sq](map.sq) for
+open-addressed `Map [K, V]`, [simd.sq](simd.sq) for `v128` vector types
+(`F32x4`, `I32x4`, `F64x2`, `U64x2`, `U8x16`, `I16x8`),
+[equality.sq](equality.sq) for structural equality contracts, and
 [codec.sq](codec.sq) for explicit numeric-lane codecs; the
 [derivation guide](../docs/host/derive.md) shows opt-in equality, debug and
 codec generation from checked data declarations. Only the root module's

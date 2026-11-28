@@ -2258,6 +2258,119 @@ recursive fn fnResultOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u32[8]&,
     }
 }
 
+// Whether Core type `tid` in `m` provably holds an unshared owned storage container
+// (`#[T]`, `#[n; T]`, `%[T]`, or `~[T]`), matching `uniqueness.holds` without
+// letting `*T` (`shared`, erased in Direct) masquerade as owned storage.
+recursive fn coreTypeHoldsOwnedUnshared(g: Generator&, m: const Module&, tid: TId, depth: i64) -> bool {
+    if tid <= squid_check_types::never || depth > 16 { return false; }
+    let n = m.types.node(tid);
+    match n.tag {
+        usage, forall => { return coreTypeHoldsOwnedUnshared(g, m, n.a, depth + 1); },
+        array => { return true; },
+        product => {
+            for item in m.types.list(squid_check_types::List { n.a, n.b }) {
+                if coreTypeHoldsOwnedUnshared(g, m, item, depth + 1) { return true; }
+            }
+            return false;
+        },
+        record => {
+            for idx in 0..(n.b as i64) {
+                if coreTypeHoldsOwnedUnshared(g, m, m.types.recordField(n, idx).ty, depth + 1) { return true; }
+            }
+            return false;
+        },
+        nominal => {
+            let skind = squid_check_storage_types::identity(n.a, n.b);
+            if skind.present {
+                return skind.value == squid_check_storage_types::sized_array ||
+                    skind.value == squid_check_storage_types::packed ||
+                    skind.value == squid_check_storage_types::seq;
+            }
+            if !g.hasUnit(n.a) { return false; }
+            let owner .= g.units[n.a - 1];
+            let ordinal, err = g.types.nominalOrdinal(owner, squid_check_types::NominalIdentity { n.a, n.b });
+            if err != squid_direct_types::Error.none { return false; }
+            if owner.nominal(ordinal).is_opaque { return false; }
+            let ctors = owner.nominalConstructors(ordinal);
+            if ctors.len != 1 { return false; }
+            let payload = owner.constructor(ctors[0]).payload;
+            if payload == 0 { return false; }
+            return coreTypeHoldsOwnedUnshared(g, owner, payload, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+// Whether no strict descendant (`check_self == true`) of Direct type `ty` is a
+// `copiedBox` that could be read via an interior `readFlat` pointer without holding
+// unshared owned storage (which `uniqueness` tracks as a loan preventing `own` spend).
+recursive fn directSubfieldsOwnSafe(g: Generator&, f: const Fn&, ty: Ty, check_self: bool, depth: i64) -> bool {
+    if depth > 16 { return false; }
+    let n = g.types.node(ty);
+    if check_self {
+        let cb, cberr = copiedBox(g, f, ty, 0);
+        if cberr != squid_direct_types::Error.none { return false; }
+        if cb {
+            if n.tag != squid_direct_types::Tag.nominal { return false; }
+            let nom_id = g.types.nominalIdentity(ty);
+            if !g.hasUnit(nom_id.unit) { return false; }
+            let owner .= g.units[nom_id.unit - 1];
+            let ordinal, oerr = g.types.nominalOrdinal(owner, nom_id);
+            if oerr != squid_direct_types::Error.none { return false; }
+            let ctors = owner.nominalConstructors(ordinal);
+            if ctors.len != 1 { return false; }
+            let payload = owner.constructor(ctors[0]).payload;
+            if payload == 0 || !coreTypeHoldsOwnedUnshared(g, owner, payload, 0) { return false; }
+        }
+    }
+    match n.tag {
+        tuple => {
+            for at in 0..(n.b as i64) {
+                if !directSubfieldsOwnSafe(g, f, g.types.words[n.a + at], true, depth + 1) { return false; }
+            }
+            return true;
+        },
+        record => {
+            for idx in 0..(n.b as i64) {
+                if !directSubfieldsOwnSafe(g, f, g.types.recordField(ty, idx).ty, true, depth + 1) { return false; }
+            }
+            return true;
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(ty);
+            if cerr != squid_direct_types::Error.none { return false; }
+            if cases.len == 1 {
+                return directSubfieldsOwnSafe(g, f, g.types.variant_payloads[cases.payloads], false, depth + 1);
+            }
+            for ci in 0..(cases.len as i64) {
+                if !directSubfieldsOwnSafe(g, f, g.types.variant_payloads[cases.payloads + ci], true, depth + 1) { return false; }
+            }
+            return true;
+        },
+        _ => { return true; },
+    }
+}
+fn ownBoxedParamSafe(g: Generator&, f: const Fn&, m: const Module&, obligations: squid_check_types::List, param_core_ty: TId, param_ty: Ty) -> bool {
+    if g.runtime_().has_fork { return false; }
+    let cb, cberr = copiedBox(g, f, param_ty, 0);
+    if cberr != squid_direct_types::Error.none || !cb { return false; }
+    var holds = coreTypeHoldsOwnedUnshared(g, m, param_core_ty, 0);
+    if !holds {
+        var formal = param_core_ty;
+        while formal > squid_check_types::never &&
+            (m.types.node(formal).tag == squid_check_types::Tag.usage || m.types.node(formal).tag == squid_check_types::Tag.forall) {
+            formal = m.types.node(formal).a;
+        }
+        for at in 0..(obligations.len as i64) {
+            let goal = m.obligations[obligations.start + at];
+            if (goal.kind != squid_check_types::ObligationKind.field && goal.kind != squid_check_types::ObligationKind.writable_field) ||
+                goal.ty != formal || goal.result == 0 { continue; }
+            if coreTypeHoldsOwnedUnshared(g, m, goal.result, 0) { holds = true; break; }
+        }
+    }
+    if !holds { return false; }
+    return directSubfieldsOwnSafe(g, f, param_ty, false, 0);
+}
+
 recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: i64) -> Error {
     let s .= g.s;
     let code_mark = s.code.len;
@@ -2372,6 +2485,9 @@ recursive fn emitWorkerFunction(g: Generator&, id: u32, spec_idx: i64, scc_idx: 
         bindPut(g, f, parameter.binding, pval);
         if at < 32 && ((own_mask >> (at as u32)) & 1) != 0 {
             squid_support_zigmap::put(g.s.map_pool, f.unique_owned, parameter.binding, 1);
+            if !body.exported && ownBoxedParamSafe(g, f, m, body.scheme.obligations, m.binding(parameter.binding).ty, pval.ty) {
+                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, parameter.binding, 1 | UNIQUE_BOXED_PREEXISTING);
+            }
         }
     }
     let root = body.root;
@@ -2760,6 +2876,9 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
             bindPut(g, f, parameter.binding, pval);
             if at < 32 && ((own_mask >> (at as u32)) & 1) != 0 {
                 squid_support_zigmap::put(g.s.map_pool, f.unique_owned, parameter.binding, 1);
+                if !body.exported && ownBoxedParamSafe(g, f, m, body.scheme.obligations, m.binding(parameter.binding).ty, pval.ty) {
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, parameter.binding, 1 | UNIQUE_BOXED_PREEXISTING);
+                }
             }
         }
         if key.parent != 0 && ((key.parent - 1) as i64) < g.s.closure_specs.len {
