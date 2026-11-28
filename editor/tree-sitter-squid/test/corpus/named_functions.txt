@@ -99,3 +99,30 @@ func eq (left: a) -> (right: a): Bool where {Eq a} => return Eq.eq left right
     (identifier))
   (identifier)
   (identifier))
+
+==================
+Backtick infix functions parse simple and qualified callees
+==================
+
+let a = x `min` y `U32.max` z `math.add` w
+
+---
+
+(source_file
+  (binding_keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (backtick_operator
+    (identifier))
+  (identifier)
+  (backtick_operator
+    (qualified_function_name
+      (type_identifier)
+      (identifier)))
+  (identifier)
+  (backtick_operator
+    (qualified_function_name
+      (identifier)
+      (identifier)))
+  (identifier))

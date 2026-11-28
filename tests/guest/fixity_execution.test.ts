@@ -218,3 +218,97 @@ io const d = func (): U32 =>
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("backtick infix functions support simple, qualified, closure, own, and precedence rules", async () => {
+  await compileExpectedFailure(
+    "func f (a: U32) -> (b: U32): U32 => a + b\nio const bad = func (): U32 => 1 `f 2\n",
+    "GPU_FRONTEND_SYNTAX_ERROR",
+  );
+  await compileExpectedFailure(
+    "io const bad = func (): U32 => 1 `` 2\n",
+    "GPU_FRONTEND_SYNTAX_ERROR",
+  );
+  await compileAndRun(
+    `func blend (a: U32) -> (b: U32): U32 => a * 10 + b
+func sub_u (a: U32) -> (b: U32): U32 => a - b
+func inc (x: U32): U32 => x + 1
+func (**) (base: U32) -> (exp: U32): U32 =>
+  let acc = 1
+  for _ in 0..exp:
+    acc := self * base
+  return acc
+func push_in (xs: own #[U32]) -> (x: U32): #[U32] => xs.push x
+func eq_u (a: U32) -> (b: U32): Bool => a == b
+func apply_fn (x: U32) -> (f: U32 -> U32): U32 => f x
+
+io const basic = func (): U32 => 4 \`blend\` 2
+io const left_assoc = func (): U32 => 10 \`sub_u\` 3 \`sub_u\` 2
+io const prec_over_mul = func (): U32 => 2 * 1 \`blend\` 5 + 1
+io const prec_over_pow = func (): U32 => 2 ** 1 \`U32.add\` 2
+io const looser_than_app = func (): U32 => inc 3 \`blend\` inc 1
+io const type_qual = func (): U32 => 40 \`U32.add\` 2 \`U32.bit_or\` 0
+io const type_qual_f32 = func (): F32 => 50.0 \`F32.min\` 42.0 \`F32.max\` 10.0
+io const local_closure = func (): U32 =>
+  let k = 10
+  let comb = func (a: U32) -> (b: U32): U32 => a * k + b
+  return 4 \`comb\` 2
+io const own_backtick = func (): U32 =>
+  let xs: #[U32] = #[10]
+  xs := self \`push_in\` 32
+  return xs[0] + xs[1]
+io const not_backtick = func (): Bool => not 1 \`eq_u\` 2 and true
+io const rhs_lambda = func (): U32 => 21 \`apply_fn\` func x => x * 2
+io const in_array = func (): U32 =>
+  let xs = #[1 \`blend\` 2, 3 \`blend\` 0]
+  return xs[0] + xs[1]
+`,
+    (guest) => {
+      equal(guest.call("basic", null), 42);
+      equal(guest.call("left_assoc", null), 5);
+      equal(guest.call("prec_over_mul", null), 31);
+      equal(guest.call("prec_over_pow", null), 8);
+      equal(guest.call("looser_than_app", null), 42);
+      equal(guest.call("type_qual", null), 42);
+      equal(guest.call("type_qual_f32", null), 42);
+      equal(guest.call("local_closure", null), 42);
+      equal(guest.call("own_backtick", null), 42);
+      equal(guest.call("not_backtick", null), true);
+      equal(guest.call("rhs_lambda", null), 42);
+      equal(guest.call("in_array", null), 42);
+    },
+  );
+  const dir = await Deno.makeTempDir({
+    dir: new URL("../../build", import.meta.url).pathname,
+    prefix: "squid-backtick-mod-",
+  });
+  try {
+    await Deno.writeTextFile(
+      `${dir}/ops.sq`,
+      `func combine (a: U32) -> (b: U32): U32 => a * 10 + b\n`,
+    );
+    await Deno.writeTextFile(
+      `${dir}/main.sq`,
+      `import * as ops from "./ops"
+io const answer = func (): U32 => 4 \`ops.combine\` 2
+`,
+    );
+    const output = `${dir}/program.wasm`;
+    const result = await new Deno.Command(executable, {
+      args: ["build", `${dir}/main.sq`, output, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    const stdout = new TextDecoder().decode(result.stdout);
+    const stderr = new TextDecoder().decode(result.stderr);
+    if (!result.success) throw new Error(`${stdout}\n${stderr}`);
+    const bytes = await Deno.readFile(output);
+    const guest = await instantiateGuest(bytes);
+    try {
+      equal(guest.call("answer", null), 42);
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

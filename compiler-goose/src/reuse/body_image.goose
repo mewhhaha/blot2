@@ -260,6 +260,10 @@ recursive fn samePattern(a:const Core&,pa:u32,b:const Core&,pb:u32,locals:LocalM
             }
             return true;
         },
+        record_payload=>{
+            if !squid_check_core::sameCoreType(a,na.ty,b,nb.ty,0) { return false; }
+            return samePattern(a,na.b,b,nb.b,locals,depth+1);
+        },
         _=>{ return false; },
     }
 }
@@ -629,6 +633,36 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             if na.c!=nb.c { return false; }
             if na.c==squid_check_core::flat_op_kernel_handle || na.c==squid_check_core::flat_op_process_handle { return na.a==nb.a; }
             return squid_check_core::sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
+        },
+        with_handle=>{
+            if !sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) { return false; }
+            let ca=a.children(ia);
+            let cb=b.children(ib);
+            if ca.len!=cb.len { return false; }
+            for i in 0..ca.len {
+                if !sameCoreExpr(old_units,a,ca[i],new_units,b,cb[i],locals,blocks,depth+1) { return false; }
+            }
+            return true;
+        },
+        contract_method=>{
+            if na.a!=nb.a { return false; }
+            let ca=a.children(ia);
+            let cb=b.children(ib);
+            if ca.len!=cb.len { return false; }
+            for i in 0..ca.len {
+                if !sameCoreExpr(old_units,a,ca[i],new_units,b,cb[i],locals,blocks,depth+1) { return false; }
+            }
+            return true;
+        },
+        effect_provider=>{
+            if na.c!=nb.c { return false; }
+            return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
+                   sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
+        },
+        state_provider=>{
+            return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
+                   sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1) &&
+                   sameCoreExpr(old_units,a,na.c,new_units,b,nb.c,locals,blocks,depth+1);
         },
         // Any complex or uncommon form conservatively marks the body as changed.
         _=>{ return false; },

@@ -186,6 +186,7 @@ export type LiteralKind =
   | "$"
   | "and"
   | "or"
+  | "`"
   | "·"
   | "spark"
   | "<-"
@@ -353,6 +354,7 @@ export type RuleName =
   | "lambda"
   | "infix_expression"
   | "infix_tail"
+  | "backtick_operator"
   | "prefix_expression"
   | "application"
   | "comptime_access"
@@ -1015,7 +1017,13 @@ export interface InfixExpressionCursor extends RuleCursorBase<"infix_expression"
 
 export interface InfixTailCursor extends RuleCursorBase<"infix_tail"> {
   field(name: "argument"): CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | LambdaCursor | PrefixExpressionCursor;
-  field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "&"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "+"> | TokenCursor<"literal", "^"> | TokenCursor<"literal", "and"> | TokenCursor<"literal", "or"> | TokenCursor<"literal", "|"> | TokenCursor<"literal", "~"> | TokenCursor<"named", "SYMBOL">;
+  field(name: "operator"): BacktickOperatorCursor | TokenCursor<"literal", "$"> | TokenCursor<"literal", "&"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "+"> | TokenCursor<"literal", "^"> | TokenCursor<"literal", "and"> | TokenCursor<"literal", "or"> | TokenCursor<"literal", "|"> | TokenCursor<"literal", "~"> | TokenCursor<"named", "SYMBOL">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface BacktickOperatorCursor extends RuleCursorBase<"backtick_operator"> {
+  field(name: "name"): QualifiedNameCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1556,7 +1564,7 @@ export interface CollectionInfixCursor extends RuleCursorBase<"collection_infix"
 
 export interface CollectionInfixTailCursor extends RuleCursorBase<"collection_infix_tail"> {
   field(name: "argument"): CaseExpressionCursor | CollectionIfCursor | CollectionLambdaCursor | DoBlockCursor | PrefixExpressionCursor;
-  field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "&"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "+"> | TokenCursor<"literal", "^"> | TokenCursor<"literal", "and"> | TokenCursor<"literal", "or"> | TokenCursor<"literal", "~"> | TokenCursor<"named", "SYMBOL">;
+  field(name: "operator"): BacktickOperatorCursor | TokenCursor<"literal", "$"> | TokenCursor<"literal", "&"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "+"> | TokenCursor<"literal", "^"> | TokenCursor<"literal", "and"> | TokenCursor<"literal", "or"> | TokenCursor<"literal", "~"> | TokenCursor<"named", "SYMBOL">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1684,6 +1692,7 @@ export type AnyRuleCursor =
   | LambdaCursor
   | InfixExpressionCursor
   | InfixTailCursor
+  | BacktickOperatorCursor
   | PrefixExpressionCursor
   | ApplicationCursor
   | ComptimeAccessCursor

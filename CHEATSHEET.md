@@ -52,7 +52,7 @@ io main (): U32 =>
 ```
 
 - Application is curried and left-associative: `add 1 2` means `(add 1) 2`.
-- Custom operators are ordinary functions named in parentheses (`func (++) a -> b => ...`, `import { (++) } from "./ops"`, `fold (+) 0 xs`) with lexical precedence (`|>`/`<|` 5, `or` 20, `and` 25, `= ! < >` 30, `|` 40, `^` 45, `&` 50, `<< >>` 55, `+ - ~ ?` 60, `* / %` 70, `**` 75). Standard operators live in `std/prelude.sq` using `@type.call` and `@pipe`.
+- Custom operators are ordinary functions named in parentheses (`func (++) a -> b => ...`, `import { (++) } from "./ops"`, `fold (+) 0 xs`) with lexical precedence (`|>`/`<|` 5, `or` 20, `and` 25, `= ! < >` 30, `|` 40, `^` 45, `&` 50, `<< >>` 55, `+ - ~ ?` 60, `* / %` 70, `**` 75). Any 2-argument function (`f`, `mod.f`, `Type.f`) can also be used infix in backticks (``x `F32.min` y``, ``xs `Array.concat` ys``) at precedence `80`, left-associative (tighter than `**`, looser than application). Standard operators live in `std/prelude.sq` using `@type.call` and `@pipe`.
 - Tuples use parens: `let (x, y) = pair`.
 - Indented `do:` blocks yield via `break value`.
 - Pattern matching must be exhaustive:

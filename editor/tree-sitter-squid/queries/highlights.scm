@@ -68,6 +68,8 @@
 (qualified_function_name name: (identifier) @function)
 (qualified_function_name owner: (identifier) @namespace)
 (operator_name symbol: (operator) @operator)
+(backtick_operator "`" @punctuation.delimiter)
+(backtick_operator name: (identifier) @function)
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
 (completion_constructor_pattern (identifier) @variable.parameter)

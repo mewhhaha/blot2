@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "68a300c098ef59ee40cadee2df3b2bf3670916b1f7fde9f7bc24620b806cab77",
+  "digest": "72d46f842fc2dac78fed81a75b9fb6fd83d8a6b5b87c206404c179ef372026cb",
   "goose": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -267,9 +267,9 @@
       "sha256": "5504c5d8924db4fbcd0d34e4dbfc9e3c0a5132e9b92df55ef8c9d87f4a67b149"
     },
     {
-      "bytes": 286991,
+      "bytes": 288019,
       "path": "src/check/core_builder.goose",
-      "sha256": "0b38bc9990e7629e3aa743e95d1d3a810be6df1615d87f478065bb25f7a9d0fb"
+      "sha256": "d5705b7a186815bd844a17be8e8265fe850a03b5a68031fd5abff9ff7d2da7bd"
     },
     {
       "bytes": 13330,
@@ -397,9 +397,9 @@
       "sha256": "ab75f3d38f93f817c9fdc7ba0251a85196f261facce101815fb6d96290933c92"
     },
     {
-      "bytes": 268811,
+      "bytes": 276181,
       "path": "src/check/uniqueness.goose",
-      "sha256": "3069443ec37d7e8ae4575a13ea59e0f85003ea2e42ea0c6af54a6add8120b29a"
+      "sha256": "c8e9b4ef582164f4f7545c4e70cfe1f1c85433ca8677f82cd8c8a5671f4cd046"
     },
     {
       "bytes": 78331,
@@ -462,9 +462,9 @@
       "sha256": "b848e05d8ccb1dd2f3a46301e44ed70fb63b2436d434a5c8c309aa597e6ea0d6"
     },
     {
-      "bytes": 133420,
+      "bytes": 133651,
       "path": "src/direct/function_packed.goose",
-      "sha256": "37048b9484248ed6a89075d31d18fa4a7aff296798e852e4d0320fac43881b36"
+      "sha256": "de6c128cbe8e281d0119201ec52f5a7cf418c2cbd616068519be359d5a22a6b8"
     },
     {
       "bytes": 82644,
@@ -472,14 +472,14 @@
       "sha256": "2a14be2e08d1c7b064e740116896257fd2feca7b3e98559b845a260093e81731"
     },
     {
-      "bytes": 307767,
+      "bytes": 308173,
       "path": "src/direct/function_seq.goose",
-      "sha256": "7f1defec073bd71342c4a0f168bae583e5905d63b7fac1441182e88e0ee838fe"
+      "sha256": "80f8e5e928205e3df4a1199e69d632b7fef7db4007e06edb8b85cab993286a14"
     },
     {
-      "bytes": 289024,
+      "bytes": 296517,
       "path": "src/direct/function_spark.goose",
-      "sha256": "48a4ae22c7b4540834b4d21859fbaedae8fc291712c51e0307d789300249135d"
+      "sha256": "2249e2d3ba77b3db088471c75ac6f40f2d70c84d5110f938958158f0301849e1"
     },
     {
       "bytes": 66432,
@@ -492,9 +492,9 @@
       "sha256": "105aacca6ec2a37e33477025374a53f5ad07adf4948bf91eef820ae0b8f76f50"
     },
     {
-      "bytes": 62701,
+      "bytes": 64816,
       "path": "src/direct/function_values.goose",
-      "sha256": "aea66fd9fded348c54dfdd0b13d31c8bdeb8bda01f7ec77b42480ef2b7489637"
+      "sha256": "b9caea79e7b7f7c5815025b65f1b8257c3b3443d749dc3ed236f7723baae4e0b"
     },
     {
       "bytes": 2930,
@@ -562,9 +562,9 @@
       "sha256": "dd1e5a31d607bdce82549d15c58e9986cffdcfaf0c6f14b2942a593f258c3637"
     },
     {
-      "bytes": 141089,
+      "bytes": 142196,
       "path": "src/parse/parser.goose",
-      "sha256": "6d9b2f4d1c233ae6580edb9837688ad27333b9a3fba718cebe768a88b96f81de"
+      "sha256": "913f68ef752a222ef542292da47fc5c294dbdc53d09508438614b000a8906a0a"
     },
     {
       "bytes": 54242,
@@ -592,9 +592,9 @@
       "sha256": "d030f536d7cf34d649b306f2a1027a8364fcf346f548507145f3eb225eaf776f"
     },
     {
-      "bytes": 44901,
+      "bytes": 46479,
       "path": "src/reuse/body_image.goose",
-      "sha256": "a9eae72dff35547dd19de50f85114b271d7c75f4ab0c3ce48124b273a4fbf92d"
+      "sha256": "d4dafc2d56d800c4a7f9447bca84e9f9ca1909c062fa4efae8d8c1a4507078c4"
     },
     {
       "bytes": 15904,
@@ -622,9 +622,9 @@
       "sha256": "8a4974d636c496f8f3d3ea988b03edaed7546dd47a73490037d553fa1fe56073"
     },
     {
-      "bytes": 19942,
+      "bytes": 22599,
       "path": "src/reuse/declaration_dependencies.goose",
-      "sha256": "92620619d97ddee0479eab8758258ecaf1a6071a476e0a75b67c33ce7c4f3c6d"
+      "sha256": "10477ecbee13abb69834f885964dc8acf3d87bbec9bb9a734088f6d710edef75"
     },
     {
       "bytes": 19040,

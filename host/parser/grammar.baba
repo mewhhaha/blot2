@@ -102,7 +102,8 @@ expression = (value:(package_pack | package_unpack | lambda | do_block | case_ex
 lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:suite | body:rebinding | body:effect_step | body:expression)) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
-infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "|" | "and" | "or") argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
+infix_tail = (operator:(backtick_operator | SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "|" | "and" | "or") argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
+backtick_operator = ("`" name:qualified_name "`") ;
 prefix_expression = (operator:(SYMBOL | "+" | "~" | "&" | "*" | "^")? value:application) ;
 application = (head:atom arguments:(atom | comptime_access | member_access | slice_access)*) ;
 comptime_access = ("·" "(" (name:source_identifier | operator:operator_symbol) ")") ;
@@ -187,7 +188,7 @@ collection_expression = (value:(collection_lambda | do_block | case_expression |
 collection_lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:collection_expression | body:suite | body:collection_expression)) ;
 collection_if = ("if" condition:collection_infix "then" consequence:collection_expression "else" alternative:collection_expression) ;
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
-collection_infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or") argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
+collection_infix_tail = (operator:(backtick_operator | SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or") argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
 source_identifier = (IDENT | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 

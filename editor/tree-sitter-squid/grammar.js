@@ -75,6 +75,7 @@ export default grammar({
         $.keyword,
         $.identifier,
         $.type_identifier,
+        $.backtick_operator,
         $.operator,
         $.separator,
       ),
@@ -224,6 +225,12 @@ export default grammar({
       ),
 
     operator_name: ($) => prec(2, seq("(", field("symbol", $.operator), ")")),
+    backtick_operator: ($) =>
+      seq(
+        "`",
+        field("name", choice($.qualified_function_name, $.identifier)),
+        "`",
+      ),
 
     _parameter: ($) =>
       choice(

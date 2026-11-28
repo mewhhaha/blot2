@@ -510,3 +510,207 @@ io test_known_closures (n: U32): #[U32] =>
     opts,
   );
 });
+
+Deno.test("Exact IEEE-754 left-to-right 4x unrolled F32/F64 for-in reductions across #[T], %[T], and ~[T]", async () => {
+  await compileAndRun(
+    `
+type Pair32 is data = $Pair32 { x: F32, y: F32 }
+type Pair64 is data = $Pair64 { x: F64, y: F64 }
+
+func sum_arr_f32 (xs: #[F32]): F32 =>
+  let acc: F32 = 0.0f32
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_arr_f32_ref (xs: #[F32]): F32 =>
+  let acc: F32 = 0.0f32
+  for i in 0 .. xs.length:
+    acc := self + xs[i]
+  return acc
+
+func sum_packed_f32 (xs: %[F32]): F32 =>
+  let acc: F32 = 0.0f32
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_seq_f32 (xs: ~[F32]): F32 =>
+  let acc: F32 = 0.0f32
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_arr_f64 (xs: #[F64]): F64 =>
+  let acc: F64 = 0.0f64
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_packed_f64 (xs: %[F64]): F64 =>
+  let acc: F64 = 0.0f64
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_seq_f64 (xs: ~[F64]): F64 =>
+  let acc: F64 = 0.0f64
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_arr_pair32_left (ps: #[Pair32]): F32 =>
+  let acc: F32 = 0.0f32
+  for p in ps:
+    acc := self + p.x + p.y
+  return acc
+
+func sum_arr_pair32_grouped (ps: #[Pair32]): F32 =>
+  let acc: F32 = 0.0f32
+  for p in ps:
+    acc := self + (p.x + p.y)
+  return acc
+
+func sum_packed_pair32 (ps: %[Pair32]): F32 =>
+  let acc: F32 = 0.0f32
+  for p in ps:
+    acc := self + p.x + p.y
+  return acc
+
+func sum_seq_pair64 (ps: ~[Pair64]): F64 =>
+  let acc: F64 = 0.0f64
+  for p in ps:
+    acc := self + p.x + p.y
+  return acc
+
+func sum_init_f32 (init: F32) -> (xs: #[F32]): F32 =>
+  let acc = init
+  for x in xs:
+    acc := self + x
+  return acc
+
+func sum_init_f64 (init: F64) -> (xs: %[F64]): F64 =>
+  let acc = init
+  for x in xs:
+    acc := self + x
+  return acc
+
+io run_float_reductions (): #[U32] =>
+  // Non-associative values: 1e7 + 0.3 + ... + (-1e7) depends strictly on left-to-right rounding.
+  let a32: #[F32] = #[16777216.0f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, -16777216.0f32]
+  let p32: %[F32] = %[16777216.0f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, -16777216.0f32]
+  let s32: ~[F32] = ~[16777216.0f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, 0.75f32, -16777216.0f32]
+  let ref32 = F32.to_bits (sum_arr_f32_ref a32)
+  let r_a32 = F32.to_bits (sum_arr_f32 a32)
+  let r_p32 = F32.to_bits (sum_packed_f32 p32)
+  let r_s32 = F32.to_bits (sum_seq_f32 s32)
+
+  // Pair32: (acc + 16777216) + 0.75 vs acc + (0.75 + 0.75) differ in F32!
+  let pa: #[Pair32] = #[
+    $Pair32 { x: 16777216.0f32, y: 0.75f32 },
+    $Pair32 { x: 0.75f32, y: 0.75f32 },
+    $Pair32 { x: 0.75f32, y: 0.75f32 },
+    $Pair32 { x: 0.75f32, y: 0.75f32 },
+    $Pair32 { x: -16777216.0f32, y: 0.25f32 },
+  ]
+  let pp: %[Pair32] = pa.to_packed
+  let pl_bits = F32.to_bits (sum_arr_pair32_left pa)
+  let pp_bits = F32.to_bits (sum_packed_pair32 pp)
+  let pg_bits = F32.to_bits (sum_arr_pair32_grouped pa)
+
+  // F64 across #[F64], %[F64], ~[F64] and ~[Pair64] (> 64 elems to span multiple Seq leaves)
+  let a64: #[F64] = #[9007199254740992.0f64, 0.75f64, 0.75f64, 0.75f64, 0.75f64, -9007199254740992.0f64]
+  let p64: %[F64] = %[9007199254740992.0f64, 0.75f64, 0.75f64, 0.75f64, 0.75f64, -9007199254740992.0f64]
+  let s64: ~[F64] = ~[9007199254740992.0f64, 0.75f64, 0.75f64, 0.75f64, 0.75f64, -9007199254740992.0f64]
+  let eq64_p = if F64.to_bits (sum_arr_f64 a64) == F64.to_bits (sum_packed_f64 p64) then 1 else 0
+  let eq64_s = if F64.to_bits (sum_arr_f64 a64) == F64.to_bits (sum_seq_f64 s64) then 1 else 0
+
+  let sp64: ~[Pair64] = ~[]
+  for i in 0 .. 70:
+    @storage.push sp64 ($Pair64 { x: U32.to_f64 i * 0.25f64, y: 0.5f64 })
+  let sp64_sum = sum_seq_pair64 sp64
+  // sum_{i=0..69} (0.25*i + 0.5) = 0.25*(69*70/2) + 35 = 603.75 + 35 = 638.75 (exact binary!)
+  let sp64_ok = if F64.to_bits sp64_sum == F64.to_bits 638.75f64 then 1 else 0
+
+  // Non-canonical NaN: empty preserves payload, non-empty canonicalizes to 0x7fc00000 / 0x7ff8000000000000.
+  let raw_nan32 = F32.from_bits 0x7fc01234
+  let empty32: #[F32] = #[]
+  let one32: #[F32] = #[1.0f32]
+  let keep_nan32 = F32.to_bits (sum_init_f32 raw_nan32 empty32)
+  let canon_nan32 = F32.to_bits (sum_init_f32 raw_nan32 one32)
+  let raw_nan64 = F64.from_bits 0x7ff8000000001234u64
+  let empty64: %[F64] = %[]
+  let one64: %[F64] = %[1.0f64]
+  let keep_nan64_ok = if F64.to_bits (sum_init_f64 raw_nan64 empty64) == 0x7ff8000000001234u64 then 1 else 0
+  let canon_nan64_ok = if F64.to_bits (sum_init_f64 raw_nan64 one64) == 0x7ff8000000000000u64 then 1 else 0
+
+  return #[
+    if r_a32 == ref32 then 1 else 0,
+    if r_p32 == ref32 then 1 else 0,
+    if r_s32 == ref32 then 1 else 0,
+    if pl_bits == pp_bits then 1 else 0,
+    if pl_bits != pg_bits then 1 else 0,
+    eq64_p,
+    eq64_s,
+    sp64_ok,
+    keep_nan32,
+    canon_nan32,
+    keep_nan64_ok,
+    canon_nan64_ok,
+  ]
+`,
+    (guest) => {
+      assert.deepEqual(
+        Array.from(guest.call("run_float_reductions", null) as Uint32Array),
+        [1, 1, 1, 1, 1, 1, 1, 1, 0x7fc01234, 0x7fc00000, 1, 1],
+      );
+    },
+    opts,
+  );
+});
+
+Deno.test("U64 constant-divisor Granlund-Montgomery div/rem matches runtime div/rem across edge cases", async () => {
+  await compileAndRun(
+    `
+func rt_div (x: U64) -> (d: U64): U64 => x / d
+func rt_rem (x: U64) -> (d: U64): U64 => x % d
+
+func check_d (xs: #[U64]) -> (d: U64) -> (cq: U64 -> U64) -> (cr: U64 -> U64): U32 =>
+  for x in xs:
+    if cq x != rt_div x d:
+      return 1
+    if cr x != rt_rem x d:
+      return 2
+  return 0
+
+io run_u64_div_checks (): #[U32] =>
+  let xs: #[U64] = #[
+    0u64, 1u64, 2u64, 3u64, 6u64, 7u64, 8u64, 9u64, 10u64, 11u64,
+    20u64, 21u64, 22u64, 99u64, 100u64, 101u64,
+    0xffffffffu64, 0x100000000u64, 0x100000001u64, 0x100000002u64,
+    0x7fffffffffffffffu64, 0x8000000000000000u64, 0x8000000000000001u64,
+    0xfffffffffffffffeu64, 0xffffffffffffffffu64,
+  ]
+  return #[
+    check_d xs 3u64 (func x => x / 3u64) (func x => x % 3u64),
+    check_d xs 5u64 (func x => x / 5u64) (func x => x % 5u64),
+    check_d xs 7u64 (func x => x / 7u64) (func x => x % 7u64),
+    check_d xs 10u64 (func x => x / 10u64) (func x => x % 10u64),
+    check_d xs 14u64 (func x => x / 14u64) (func x => x % 14u64),
+    check_d xs 21u64 (func x => x / 21u64) (func x => x % 21u64),
+    check_d xs 100u64 (func x => x / 100u64) (func x => x % 100u64),
+    check_d xs 1000000007u64 (func x => x / 1000000007u64) (func x => x % 1000000007u64),
+    check_d xs 0x100000001u64 (func x => x / 0x100000001u64) (func x => x % 0x100000001u64),
+    check_d xs 0x8000000000000001u64 (func x => x / 0x8000000000000001u64) (func x => x % 0x8000000000000001u64),
+    check_d xs 0xffffffffffffffffu64 (func x => x / 0xffffffffffffffffu64) (func x => x % 0xffffffffffffffffu64),
+  ]
+`,
+    (guest) => {
+      assert.deepEqual(
+        Array.from(guest.call("run_u64_div_checks", null) as Uint32Array),
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      );
+    },
+    opts,
+  );
+});

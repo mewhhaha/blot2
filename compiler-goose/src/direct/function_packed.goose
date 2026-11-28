@@ -2686,7 +2686,7 @@ recursive fn emitPackedLoopCore(
         if red.matched {
             var cols_ok = true;
             var col_starts: u32[4] = [0; 4];
-            let elem_bytes: u32 = if red.is_i64 { 8 } else { 4 };
+            let elem_bytes: u32 = if red.is_i64 || red.is_f64 { 8 } else { 4 };
             if plan.mode == PACKED_FLAT {
                 if red.is_record { cols_ok = false; }
                 else { col_starts[0] = emitOffsetAddress(g, f, base, index, elem_bytes); }
@@ -2707,7 +2707,12 @@ recursive fn emitPackedLoopCore(
                 let run_if = open(g, f, OP_if_);
                 let count = local32(g, f);
                 lget(g, end_loc); lget(g, index); op(g, OP_i32_sub); lset(g, count);
-                emitSimdColumnSum(g, f, col_starts, if plan.mode == PACKED_FLAT { 1 } else { red.field_count }, count, acc_loc, red.is_i64, red.is_xor);
+                let col_n = if plan.mode == PACKED_FLAT { 1 } else { red.field_count };
+                if red.is_float {
+                    emitFloatUnrolledColumnSum(g, f, col_starts, col_n, count, acc_loc, red.is_f64);
+                } else {
+                    emitSimdColumnSum(g, f, col_starts, col_n, count, acc_loc, red.is_i64, red.is_xor);
+                }
                 popCheckedArraysAt(f, run_if);
                 close(g, f);
                 return assign(g, f, iteration, outgoing, id);

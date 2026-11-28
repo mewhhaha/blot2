@@ -505,6 +505,7 @@ Precedence and associativity are determined lexically by each operator's spellin
 - `+`, `-`, `~`, `?`-prefixed (60, left) — e.g. `+`, `-`, `++`, `~>`, `??`
 - `*`, `/`, `%`-prefixed (70, left) — e.g. `*`, `/`, `%`, `/=`
 - `**`… (75, right) — exponentiation and power-like operators
+- `` `f` ``, `` `mod.f` ``, `` `Type.f` `` (80, left) — backticked infix functions; `a `f` b` desugars directly to `f a b` (tighter than `**`, looser than function application, supporting local functions, closures, module-qualified names, type-associated functions, and `own` parameters)
 
 Custom and standard symbolic operators are ordinary functions or bindings named in parentheses:
 

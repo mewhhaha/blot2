@@ -468,6 +468,40 @@ fn u64DivParams(d: u64) -> u64, u64, bool {
 // When `runtime` is true, `m_lo_arg`/`m_hi_arg` are VT_i64 local indices holding 32-bit halves;
 // otherwise they are 32-bit half constants.
 fn emitMulHi64(g: Generator&, f: const Fn&, xv: u32, m_lo_arg: u64, m_hi_arg: u64, runtime: bool) {
+    if !runtime && m_hi_arg == 0 {
+        // Form 2 (`m_hi == 0`): matches wtime-aot `try_fold_schoolbook_mul_hi_u` Form 2 -> `mul r64`.
+        let x_lo = local(g, f, VT_i64);
+        let x_hi = local(g, f, VT_i64);
+        let p2 = local(g, f, VT_i64);
+        lget(g, xv);
+        i64Const(g, 0xffffffff);
+        op(g, OP_i64_and);
+        lset(g, x_lo);
+        lget(g, xv);
+        i64Const(g, 32);
+        op(g, OP_i64_shr_u);
+        lset(g, x_hi);
+        lget(g, x_hi);
+        i64Const(g, m_lo_arg as! i64);
+        op(g, OP_i64_mul);
+        lset(g, p2);
+        lget(g, x_lo);
+        i64Const(g, m_lo_arg as! i64);
+        op(g, OP_i64_mul);
+        i64Const(g, 32);
+        op(g, OP_i64_shr_u);
+        lget(g, p2);
+        i64Const(g, 0xffffffff);
+        op(g, OP_i64_and);
+        op(g, OP_i64_add);
+        i64Const(g, 32);
+        op(g, OP_i64_shr_u);
+        lget(g, p2);
+        i64Const(g, 32);
+        op(g, OP_i64_shr_u);
+        op(g, OP_i64_add);
+        return;
+    }
     let x_lo = local(g, f, VT_i64);
     let x_hi = local(g, f, VT_i64);
     let p1 = local(g, f, VT_i64);
@@ -565,10 +599,47 @@ fn emitU64StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, le
             }
             return true;
         }
-        // Non-power-of-two 64-bit divisors stay on native i64.div_u / i64.rem_u:
-        // Wasm32 lacks a 64x64->128 multiply, and emulating mulhi64 in software
-        // (~30 Wasm ops) is ~45% slower than hardware divq on x86-64.
-        return false;
+        // Non-power-of-two 64-bit constant divisors: exact Granlund-Montgomery
+        // reciprocal multiply (`emitMulHi64`). wtime-aot folds this schoolbook
+        // mulhi64 pattern into a single native `mul r64` (`MulHiU`).
+        let mult, sh, add = u64DivParams(d);
+        let m_lo = mult & 0xffffffff;
+        let m_hi = mult >> 32;
+        let xv = local(g, f, VT_i64);
+        pushScalarOperand(g, f, left_id, left);
+        lset(g, xv);
+        if !add {
+            emitMulHi64(g, f, xv, m_lo, m_hi, false);
+            if sh != 0 {
+                i64Const(g, sh as! i64);
+                op(g, OP_i64_shr_u);
+            }
+        } else {
+            let t = local(g, f, VT_i64);
+            emitMulHi64(g, f, xv, m_lo, m_hi, false);
+            lset(g, t);
+            lget(g, xv);
+            lget(g, t);
+            op(g, OP_i64_sub);
+            i64Const(g, 1);
+            op(g, OP_i64_shr_u);
+            lget(g, t);
+            op(g, OP_i64_add);
+            if sh != 0 {
+                i64Const(g, sh as! i64);
+                op(g, OP_i64_shr_u);
+            }
+        }
+        if remainder {
+            i64Const(g, d as! i64);
+            op(g, OP_i64_mul);
+            let prod = local(g, f, VT_i64);
+            lset(g, prod);
+            lget(g, xv);
+            lget(g, prod);
+            op(g, OP_i64_sub);
+        }
+        return true;
     }
     return false;
 }

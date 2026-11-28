@@ -5467,7 +5467,9 @@ fn tryEmitAosF32RecordLoop(
     return squid_direct_types::Error.none;
 }
 
-// ---- Shared `for x in xs:` / `for { f0, f1 } in ps:` associative integer reduction (SIMD + 4x unroll) ----
+// ---- Shared `for x in xs:` / `for { f0, f1 } in ps:` reductions ----
+// Integer (`U32`/`I32`/`U64`/`I64`, `+`/`^`): 16-wide (i32) / 8-wide (i64) v128 SIMD + 4x AoS.
+// Float (`F32`/`F64`, `+`): exact IEEE-754 left-to-right 4x unroll + once-at-end canonical NaN.
 // Reused across `#[T]` (Array), `%[T]` (Packed Flat & SoA), and `~[T]` (Seq Flat/Span & SoA).
 
 struct ForInRedPlan {
@@ -5475,11 +5477,95 @@ struct ForInRedPlan {
     carry_idx: i64 = -1,
     is_xor: bool = false,
     is_i64: bool = false,
+    is_float: bool = false,
+    is_f64: bool = false,
     is_record: bool = false,
     inner_ty: Ty = 0,
     inner_is_record: bool = false,
     field_count: i64 = 0,
     field_pos: i64[4] = [0; 4],
+}
+
+fn matchForInRedLeaf(
+    g: Generator&,
+    m: const Module&,
+    id: u32,
+    is_record: bool,
+    elem_bind: u32,
+    inner_ty: Ty,
+    is_nominal: bool,
+    pat_bs: const u32[16]&,
+    pat_pos: const i64[16]&,
+    pat_len: i64,
+) -> i64 {
+    if id == 0 { return -1; }
+    let n = m.node(id);
+    if n.tag == squid_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if b == 0 { return -1; }
+        if !is_record {
+            return if b == elem_bind { 0 } else { -1 };
+        }
+        for pi in 0..pat_len {
+            if pat_bs[pi] == b { return pat_pos[pi]; }
+        }
+        return -1;
+    }
+    if n.tag == squid_check_core::Tag.project && is_record && elem_bind != 0 && localRef(m, n.a) == elem_bind {
+        return soaProjectFieldPos(g, m, n.b, inner_ty, is_nominal);
+    }
+    return -1;
+}
+
+// Strict IEEE-754 left-to-right chain matcher for float `+` reductions:
+// matches `acc + f0`, `f0 + acc`, or `((acc + f0) + f1) + ...` so addition order
+// is preserved bit-for-bit (rejects `acc + (f0 + f1)`).
+recursive fn matchFloatLeftRedChain(
+    g: Generator&,
+    m: const Module&,
+    id: u32,
+    carry_iter_b: u32,
+    is_record: bool,
+    elem_bind: u32,
+    inner_ty: Ty,
+    is_nominal: bool,
+    pat_bs: const u32[16]&,
+    pat_pos: const i64[16]&,
+    pat_len: i64,
+    out_pos: i64[4]&,
+    out_len: i64&,
+    depth: i64,
+) -> bool {
+    if id == 0 || depth > 8 { return false; }
+    let n = m.node(id);
+    let is_op = n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none);
+    if !is_op || n.op != squid_check_core::Op.add || n.b == 0 { return false; }
+    let lb = localRef(m, n.a);
+    let rb = localRef(m, n.b);
+    if lb == carry_iter_b {
+        let lp = matchForInRedLeaf(g, m, n.b, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len);
+        if lp < 0 || out_len >= 4 { return false; }
+        out_pos[out_len] = lp;
+        out_len += 1;
+        return true;
+    }
+    if rb == carry_iter_b {
+        // IEEE-754 `+` with canonical NaN is strictly commutative: `x + acc == acc + x`.
+        let lp = matchForInRedLeaf(g, m, n.a, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len);
+        if lp < 0 || out_len >= 4 { return false; }
+        out_pos[out_len] = lp;
+        out_len += 1;
+        return true;
+    }
+    let rp = matchForInRedLeaf(g, m, n.b, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len);
+    if rp < 0 { return false; }
+    if !matchFloatLeftRedChain(g, m, n.a, carry_iter_b, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, depth + 1) {
+        return false;
+    }
+    if out_len >= 4 { return false; }
+    out_pos[out_len] = rp;
+    out_len += 1;
+    return true;
 }
 
 recursive fn matchForInRedExpr(
@@ -5567,7 +5653,8 @@ fn analyzeForInRedPlan(
         if iv.len != 1 { return plan; }
         let t = tagOf(g, iv.ty);
         if t != squid_direct_types::Tag.u32_ && t != squid_direct_types::Tag.i32_ &&
-            t != squid_direct_types::Tag.u64_ && t != squid_direct_types::Tag.i64_ {
+            t != squid_direct_types::Tag.u64_ && t != squid_direct_types::Tag.i64_ &&
+            t != squid_direct_types::Tag.f32_ && t != squid_direct_types::Tag.f64_ {
             return plan;
         }
         red_ci = ci;
@@ -5577,6 +5664,8 @@ fn analyzeForInRedPlan(
     let carry_iter_b = carries[red_ci].iteration;
     let carry_back_b = carries[red_ci].backedge;
     let is_i64 = acc_tag == squid_direct_types::Tag.u64_ || acc_tag == squid_direct_types::Tag.i64_;
+    let is_float = acc_tag == squid_direct_types::Tag.f32_ || acc_tag == squid_direct_types::Tag.f64_;
+    let is_f64 = acc_tag == squid_direct_types::Tag.f64_;
 
     let body_node = unwrapSingleBody(m, info.body);
     if body_node == 0 { return plan; }
@@ -5585,6 +5674,7 @@ fn analyzeForInRedPlan(
     let rhs_n = m.node(bn.b);
     let is_op = rhs_n.tag == squid_check_core::Tag.scalar || (rhs_n.tag == squid_check_core::Tag.associated && rhs_n.op != squid_check_core::Op.none);
     if !is_op || (rhs_n.op != squid_check_core::Op.add && rhs_n.op != squid_check_core::Op.bit_xor) { return plan; }
+    if is_float && rhs_n.op != squid_check_core::Op.add { return plan; }
     let want_op = rhs_n.op;
 
     // Classify element & loop pattern: flat scalar vs record/tuple/single-ctor field projection or destructuring.
@@ -5674,10 +5764,17 @@ fn analyzeForInRedPlan(
     var carry_hits: i64 = 0;
     var out_pos: i64[4] = [0; 4];
     var out_len: i64 = 0;
-    if !matchForInRedExpr(g, m, bn.b, want_op, carry_iter_b, carry_hits, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, 0) {
-        return plan;
+    if is_float {
+        if !matchFloatLeftRedChain(g, m, bn.b, carry_iter_b, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, 0) {
+            return plan;
+        }
+        if out_len == 0 { return plan; }
+    } else {
+        if !matchForInRedExpr(g, m, bn.b, want_op, carry_iter_b, carry_hits, is_record, elem_bind, inner_ty, is_nominal, pat_bs, pat_pos, pat_len, out_pos, out_len, 0) {
+            return plan;
+        }
+        if carry_hits != 1 || out_len == 0 { return plan; }
     }
-    if carry_hits != 1 || out_len == 0 { return plan; }
 
     if is_record {
         let in_node = g.types.node(inner_ty);
@@ -5692,12 +5789,91 @@ fn analyzeForInRedPlan(
     plan.carry_idx = red_ci;
     plan.is_xor = want_op == squid_check_core::Op.bit_xor;
     plan.is_i64 = is_i64;
+    plan.is_float = is_float;
+    plan.is_f64 = is_f64;
     plan.is_record = is_record;
     plan.inner_ty = inner_ty;
     plan.inner_is_record = inner_is_record;
     plan.field_count = out_len;
     for fi in 0..out_len { plan.field_pos[fi] = out_pos[fi]; }
     return plan;
+}
+
+// Emits exact IEEE-754 left-to-right 4x unrolled scalar/SoA float addition across
+// `col_count` (1..4) contiguous columns for `count_loc` elements into `acc_loc`,
+// with at most ONE canonical NaN pass at the end (only when `count_loc != 0` and
+// `g.s.float_bits_observable` is true).
+fn emitFloatUnrolledColumnSum(
+    g: Generator&,
+    f: Fn&,
+    col_starts: const u32[4]&,
+    col_count: i64,
+    count_loc: u32,
+    acc_loc: u32,
+    is_f64: bool,
+) {
+    let elem_bytes: u32 = if is_f64 { 8 } else { 4 };
+    let load_op = if is_f64 { squid_direct_writer::OP_f64_load } else { squid_direct_writer::OP_f32_load };
+    let load_align: u32 = if is_f64 { 3 } else { 2 };
+    let add_op = if is_f64 { squid_direct_writer::OP_f64_add } else { squid_direct_writer::OP_f32_add };
+
+    lget(g, count_loc);
+    let nz = open(g, f, OP_if_);
+    var ptrs: u32[4] = [0; 4];
+    for c in 0..col_count {
+        ptrs[c] = local32(g, f);
+        lget(g, col_starts[c]);
+        lset(g, ptrs[c]);
+    }
+    let rem = local32(g, f);
+    lget(g, count_loc);
+    lset(g, rem);
+
+    // 4x unrolled exact left-to-right loop
+    let u4_exit = open(g, f, OP_block);
+    let u4_top = open(g, f, OP_loop);
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u);
+    br(g, f, OP_br_if, u4_exit);
+    lget(g, acc_loc);
+    for u in 0..4 {
+        let byte_off = (u as u32) * elem_bytes;
+        for c in 0..col_count {
+            lget(g, ptrs[c]); op(g, load_op); uleb(g, load_align); uleb(g, byte_off);
+            op(g, add_op);
+        }
+    }
+    lset(g, acc_loc);
+    for c in 0..col_count {
+        lget(g, ptrs[c]); i32Const(g, elem_bytes * 4); op(g, OP_i32_add); lset(g, ptrs[c]);
+    }
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, u4_top);
+    close(g, f);
+    close(g, f);
+
+    // Exact scalar tail (0..3 elements)
+    let t_exit = open(g, f, OP_block);
+    let t_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, t_exit);
+    lget(g, acc_loc);
+    for c in 0..col_count {
+        lget(g, ptrs[c]); op(g, load_op); uleb(g, load_align); uleb(g, 0);
+        op(g, add_op);
+        lget(g, ptrs[c]); i32Const(g, elem_bytes); op(g, OP_i32_add); lset(g, ptrs[c]);
+    }
+    lset(g, acc_loc);
+    lget(g, rem); i32Const(g, 1); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, t_top);
+    close(g, f);
+    close(g, f);
+
+    // Canonicalize NaN ONCE at the end when float bits are observable.
+    if g.s.float_bits_observable {
+        lget(g, acc_loc);
+        if is_f64 { canonicalizeF64Stack(g, f); } else { canonicalizeF32Stack(g, f); }
+        lset(g, acc_loc);
+    }
+    close(g, f);
 }
 
 // Emits full 16-wide (i32) / 8-wide (i64) v128 SIMD + 4/2-wide tail + scalar tail reduction
@@ -5850,16 +6026,28 @@ fn tryEmitForInArrayReduction(
 
     if !plan.is_record {
         var cols: u32[4] = [start_ptr, 0, 0, 0];
-        emitSimdColumnSum(g, f, cols, 1, count, acc_loc, plan.is_i64, plan.is_xor);
+        if plan.is_float {
+            emitFloatUnrolledColumnSum(g, f, cols, 1, count, acc_loc, plan.is_f64);
+        } else {
+            emitSimdColumnSum(g, f, cols, 1, count, acc_loc, plan.is_i64, plan.is_xor);
+        }
     } else {
         // 4x unrolled direct-offset AoS record field reduction (zero record copy, 1 bounds check / 4 records!).
-        let sop = if plan.is_i64 {
+        let sop = if plan.is_float {
+            if plan.is_f64 { squid_direct_writer::OP_f64_add } else { squid_direct_writer::OP_f32_add }
+        } else if plan.is_i64 {
             if plan.is_xor { squid_direct_writer::OP_i64_xor } else { squid_direct_writer::OP_i64_add }
         } else {
             if plan.is_xor { OP_i32_xor } else { OP_i32_add }
         };
-        let load_op = if plan.is_i64 { squid_direct_writer::OP_i64_load } else { OP_i32_load };
-        let load_align: u32 = if plan.is_i64 { 3 } else { 2 };
+        let load_op = if plan.is_float {
+            if plan.is_f64 { squid_direct_writer::OP_f64_load } else { squid_direct_writer::OP_f32_load }
+        } else if plan.is_i64 {
+            squid_direct_writer::OP_i64_load
+        } else {
+            OP_i32_load
+        };
+        let load_align: u32 = if plan.is_i64 || plan.is_f64 { 3 } else { 2 };
         let ptr = local32(g, f);
         lget(g, start_ptr); lset(g, ptr);
         let rem = local32(g, f);
@@ -5870,15 +6058,26 @@ fn tryEmitForInArrayReduction(
         lget(g, rem); i32Const(g, 4); op(g, OP_i32_lt_u);
         br(g, f, OP_br_if, a_exit);
         lget(g, acc_loc);
-        var u: i64 = 4;
-        while u > 0 {
-            u -= 1;
-            let base_off = (u as u32) * step;
-            var fi = plan.field_count;
-            while fi > 0 {
-                fi -= 1;
-                lget(g, ptr); op(g, load_op); uleb(g, load_align); uleb(g, base_off + field_offs[fi]);
-                op(g, sop);
+        if plan.is_float {
+            // Strict IEEE-754 left-to-right element and field order.
+            for u in 0..4 {
+                let base_off = (u as u32) * step;
+                for fi in 0..plan.field_count {
+                    lget(g, ptr); op(g, load_op); uleb(g, load_align); uleb(g, base_off + field_offs[fi]);
+                    op(g, sop);
+                }
+            }
+        } else {
+            var u: i64 = 4;
+            while u > 0 {
+                u -= 1;
+                let base_off = (u as u32) * step;
+                var fi = plan.field_count;
+                while fi > 0 {
+                    fi -= 1;
+                    lget(g, ptr); op(g, load_op); uleb(g, load_align); uleb(g, base_off + field_offs[fi]);
+                    op(g, sop);
+                }
             }
         }
         lset(g, acc_loc);
@@ -5902,6 +6101,12 @@ fn tryEmitForInArrayReduction(
         br(g, f, OP_br, t_top);
         close(g, f);
         close(g, f);
+
+        if plan.is_float && g.s.float_bits_observable {
+            lget(g, acc_loc);
+            if plan.is_f64 { canonicalizeF64Stack(g, f); } else { canonicalizeF32Stack(g, f); }
+            lset(g, acc_loc);
+        }
     }
 
     lget(g, end_loc); lset(g, index);

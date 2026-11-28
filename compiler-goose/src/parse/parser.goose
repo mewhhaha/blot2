@@ -16,7 +16,7 @@ type Span=squid_parse_ast::Span;
 type List=squid_parse_ast::List;
 type Token=squid_parse_token::Token;
 type Symbol=squid_parse_symbols::Symbol;
-struct Operator { symbol: Symbol, precedence: u32, association: u32, span: Span, known: bool, application: bool=false }
+struct Operator { symbol: Symbol, precedence: u32, association: u32, span: Span, known: bool, application: bool=false, named: bool=false, callee: Id=0 }
 struct Where { predicates: List=List {}, node: Id=0 }
 struct LambdaParameter { node: Id, pattern: Id, name: Symbol, start: u32 }
 struct Qualifier { kind: u32, name: Symbol=0, value: Id, start: u32 }
@@ -898,11 +898,29 @@ fn lexical_fixity(spelling: const u8[:]) -> u32, u32, bool {
  }
 }
 fn read_operator(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Operator {
+ if at(p,source,tokens,t_backtick) {
+  let open=advance(p,source,tokens);
+  let name_start=current(p,source,tokens).start;
+  let token_start=p.index;
+  let sym=qualified(p,source,tokens);
+  let callee=add(p,source,tokens,a_name,sym,0,0,name_start);
+  if p.failure==squid_error::Error.none {
+   for index in token_start..p.index {
+    let item=tokens[index];
+    if item.tag==t_dot {
+     let member,found=p.pool.lookup(text(p,source,tokens[index+1]));
+     p.tree.operator_origins.push(squid_parse_ast::OperatorOrigin {node:callee,span:Span {item.start,item.end},member:member,member_point:tokens[index+1].start});
+    }
+   }
+  }
+  let close=expect(p,source,tokens,t_backtick);
+  return Operator {sym,80,0,Span {open.start,close.end},true,false,true,callee};
+ }
  let t=advance(p,source,tokens); let span=Span {t.start,t.end}; let spelling=text(p,source,t);
  let symbol=intern(p,source,tokens,spelling);
- if spelling=="$" { return Operator {symbol,0,1,span,true,true}; }
+ if spelling=="$" { return Operator {symbol,0,1,span,true,true,false,0}; }
  let precedence,association,known=lexical_fixity(spelling);
- return Operator {symbol,precedence,association,span,known,false};
+ return Operator {symbol,precedence,association,span,known,false,false,0};
 }
 fn stop_infix_for_not(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
  let tag=current(p,source,tokens).tag;
@@ -958,9 +976,10 @@ fn reduce(p: Parser&,source: const u8[:],tokens: const Token[:],values: ScratchI
  if p.failure!=squid_error::Error.none { return; }
  let rhs=values.items[values.len-1]; let lhs=values.items[values.len-2]; values.resize(values.len-2); var id: Id=0;
  if op.application { let argument=add(p,source,tokens,a_group,rhs,0,0,p.tree.span(rhs).start); if p.failure!=squid_error::Error.none { return; } p.tree.spans.items[argument].end=p.tree.span(rhs).end; id=add(p,source,tokens,a_apply,lhs,argument,0,p.tree.span(lhs).start); }
+ else if op.named { let partial=add(p,source,tokens,a_apply,op.callee,lhs,0,p.tree.span(lhs).start); if p.failure!=squid_error::Error.none { return; } p.tree.spans.items[partial].end=op.span.end; id=add(p,source,tokens,a_apply,partial,rhs,0,p.tree.span(lhs).start); }
  else { id=add(p,source,tokens,a_binary,op.symbol,lhs,rhs,p.tree.span(lhs).start); }
  if p.failure!=squid_error::Error.none { return; } p.tree.spans.items[id].end=p.tree.span(rhs).end;
- if !op.application { p.tree.operator_origins.push(squid_parse_ast::OperatorOrigin {node:id,span:op.span}); } values.push(id);
+ if !op.application&&!op.named { p.tree.operator_origins.push(squid_parse_ast::OperatorOrigin {node:id,span:op.span}); } values.push(id);
 }
 recursive fn prefix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if p.failure!=squid_error::Error.none { return 0; } let t=current(p,source,tokens);
@@ -1678,7 +1697,7 @@ recursive fn case_expression(p: Parser&,source: const u8[:],tokens: const Token[
  }
  expect(p,source,tokens,t_dedent); let inputs=list(p,source,tokens,values.items); let cases=list(p,source,tokens,arms.items); let __cleanup_result_78_0: Id = add(p,source,tokens,a_case_expr,extra(p,source,tokens,[inputs.start,inputs.len]),cases.start,cases.len,start); arms.deinit(); values.deinit(); return __cleanup_result_78_0;
  arms.deinit(); values.deinit(); }
-fn operator_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_dollar||tag==t_star||tag==t_caret||tag==t_pipe||tag==t_kw_and||tag==t_kw_or; }
+fn operator_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_dollar||tag==t_star||tag==t_caret||tag==t_pipe||tag==t_kw_and||tag==t_kw_or||tag==t_backtick; }
 fn atom_tag(tag: Tag) -> bool { return tag==t_integer||tag==t_char_literal||tag==t_float||tag==t_string||tag==t_byte_string||tag==t_intrinsic||tag==t_identifier||tag==t_type_identifier||tag==t_selector||tag==t_hash||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_colon||tag==t_kw_true||tag==t_kw_false||tag==t_kw_spark; }
 fn type_atom_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_type_identifier||tag==t_intrinsic||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_caret||tag==t_symbol; }
 fn packed_bracket_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i64) -> bool {

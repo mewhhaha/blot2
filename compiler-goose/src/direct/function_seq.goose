@@ -5293,7 +5293,11 @@ recursive fn emitSeqLoopCore(
                 }
                 if cols_ok {
                     let acc_loc = w(g, g.s.vals[iteration.start + seq_red.carry_idx], 0);
-                    emitSimdColumnSum(g, f, col_starts, seq_red.field_count, leaf_len, acc_loc, seq_red.is_i64, seq_red.is_xor);
+                    if seq_red.is_float {
+                        emitFloatUnrolledColumnSum(g, f, col_starts, seq_red.field_count, leaf_len, acc_loc, seq_red.is_f64);
+                    } else {
+                        emitSimdColumnSum(g, f, col_starts, seq_red.field_count, leaf_len, acc_loc, seq_red.is_i64, seq_red.is_xor);
+                    }
                     soa_simd_emitted = true;
                 }
             }
@@ -5680,7 +5684,11 @@ recursive fn emitSeqLoopCore(
             if seq_red.matched && !seq_red.is_record {
                 let acc_loc = w(g, g.s.vals[iteration.start + seq_red.carry_idx], 0);
                 var cols: u32[4] = [f_cur, 0, 0, 0];
-                emitSimdColumnSum(g, f, cols, 1, leaf_len, acc_loc, seq_red.is_i64, seq_red.is_xor);
+                if seq_red.is_float {
+                    emitFloatUnrolledColumnSum(g, f, cols, 1, leaf_len, acc_loc, seq_red.is_f64);
+                } else {
+                    emitSimdColumnSum(g, f, cols, 1, leaf_len, acc_loc, seq_red.is_i64, seq_red.is_xor);
+                }
             } else {
                 let f_end = emitOffsetAddress(g, f, f_cur, leaf_len, sp.elem_bytes);
                 let elem_exit = open(g, f, OP_block);

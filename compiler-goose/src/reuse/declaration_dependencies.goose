@@ -173,6 +173,53 @@ fn capture(module: const Module&, declarations: Recipe[>..<]&, references: Bindi
     references.append(collected_refs[..]); members.append(collected_members[..]);
     return squid_error::Error.none;
 }
+fn spliceDependencies(previous: const Module&, result: const Module&, edited: const u32[:], declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> bool, Error {
+    if previous.declaration_dependencies.len != previous.bodies.len || result.bodies.len != previous.bodies.len {
+        return false, squid_error::Error.none;
+    }
+    var is_edited: bool[>..] = [];
+    is_edited.resize(result.bodies.len, false);
+    for b in edited {
+        if b < result.bindings.len {
+            let bi = result.bindings[b].body_id;
+            if bi != 0 && bi < is_edited.len { is_edited[bi] = true; }
+        }
+    }
+    var work: Work[>..] = []; var locations: u32[>..] = []; var collected_refs: BindingRef[>..] = []; var collected_members: Member[>..] = []; var seen: u32[>..] = [];
+    seen.resize(result.bindings.len, 0 as u32);
+    let seen_marks = seen[..];
+    var scan = Capture { module: result, work: work, references: collected_refs, locations: locations, members: collected_members, schemes_seen: seen_marks , ..};
+    for _ in result.bodies.len { declarations.push(Recipe {..}); }
+    for bi in 1..result.bodies.len {
+        if is_edited[bi] {
+            let recipe, error = scan.scan(result.bodies[bi]);
+            if error != squid_error::Error.none { declarations.clear(); references.clear(); members.clear(); return false, error; }
+            declarations[bi] = recipe;
+        } else {
+            let prev = previous.declaration_dependencies[bi];
+            let first_ref = collected_refs.len;
+            let first_mem = collected_members.len;
+            if prev.references.len != 0 {
+                collected_refs.append(previous.dependency_references[prev.references.start..prev.references.start + prev.references.len]);
+            }
+            if prev.members.len != 0 {
+                collected_members.append(previous.dependency_members[prev.members.start..prev.members.start + prev.members.len]);
+            }
+            if collected_refs.len > 0xffffffff || collected_members.len > 0xffffffff {
+                declarations.clear(); references.clear(); members.clear();
+                return false, squid_error::Error.core_limit;
+            }
+            declarations[bi] = Recipe {
+                references: squid_check_core::List { first_ref as u32, prev.references.len , ..},
+                members: squid_check_core::List { first_mem as u32, prev.members.len , ..},
+                runtime_metadata: prev.runtime_metadata , ..
+            };
+        }
+    }
+    references.append(collected_refs[..]);
+    members.append(collected_members[..]);
+    return true, squid_error::Error.none;
+}
 struct Selection { body: squid_check_core::Body, output: Member[>..<]& }
 fn selectionMembers(module: const Module&, body: squid_check_core::Body, output: Member[>..<]&) -> Error { return withCapture(module, Selection { body, output , ..}, true, 0, select); }
 fn select(scan: Capture&, context: Selection) -> Error { let recipe, error = scan.scan(context.body); if error != squid_error::Error.none { return error; } context.output.append(scan.members[..]); return squid_error::Error.none; }

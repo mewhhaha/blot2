@@ -1926,8 +1926,24 @@ fn splice(self_:Builder&,owner:squid_reuse_dependency_payload::Owner&,previous:c
   }
  }
  if !squid_reuse_declaration_dependencies::independentEdits(result,edited[..]) {return default<Module>(),squid_error::Error.invalid_artifact;}
+ var s_decls:squid_reuse_declaration_dependencies::Recipe[>..<]=[];
+ var s_refs:squid_check_core::BindingRef[>..<]=[];
+ var s_mems:squid_check_core::DependencyMember[>..<]=[];
+ let deps_ok,deps_err=squid_reuse_declaration_dependencies::spliceDependencies(previous,result,edited[..],s_decls,s_refs,s_mems);
+ if deps_err!=squid_error::Error.none {return default<Module>(),deps_err;}
+ if deps_ok {
+  let dd,e1=squid_reuse_dependency_payload::copy<squid_check_core::DeclarationDependencies>(owner,s_decls[..]);
+  if e1!=squid_error::Error.none {return default<Module>(),e1;}
+  let dr,e2=squid_reuse_dependency_payload::copy<squid_check_core::BindingRef>(owner,s_refs[..]);
+  if e2!=squid_error::Error.none {return default<Module>(),e2;}
+  let dm,e3=squid_reuse_dependency_payload::copy<squid_check_core::DependencyMember>(owner,s_mems[..]);
+  if e3!=squid_error::Error.none {return default<Module>(),e3;}
+  result.declaration_dependencies=dd;
+  result.dependency_references=dr;
+  result.dependency_members=dm;
+ }
  var rejected:squid_check_core::Diagnostic[>..<]=[];
- squid_check_uniqueness::check(result,rejected);
+ squid_check_uniqueness::checkSelected(result,edited[..],rejected);
  if rejected.len!=0 {return default<Module>(),squid_error::Error.invalid_artifact;}
  return result,squid_error::Error.none;
 }

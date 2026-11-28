@@ -149,6 +149,16 @@ export async function formatSource(source: string): Promise<string> {
             tightBefore.add(Number(bars[1].offset));
           }
         }
+        if (
+          node.kind === "infix_tail" || node.kind === "collection_infix_tail" ||
+          node.kind === "backtick_operator"
+        ) {
+          const ticks = nested.filter((child) => child.text === "`");
+          if (ticks.length === 2) {
+            tightAfter.add(Number(ticks[0].offset));
+            tightBefore.add(Number(ticks[1].offset));
+          }
+        }
       }
       const lexed = frontend.lex(current);
       const rawTokens: {
@@ -245,6 +255,7 @@ export async function formatSource(source: string): Promise<string> {
                 "const",
                 "let",
                 "as",
+                "`",
               ]
                 .includes(previous.text);
           } else if (value === ".") space = !adjacent;

@@ -613,3 +613,98 @@ const read = func (seed: U32) => return do:
     }
   }
 });
+
+Deno.test("cone-scoped uniqueness and record-pattern replay preserve exact Wasm and reject escaping helper edits", async () => {
+  const item = await fixture("squid-zig-project-cone-replay-");
+  const { directory } = item, entry = directory + "/main.sq";
+  const targetMod = directory + "/target.sq";
+  let compiler: ZigProjectCompiler | undefined;
+  const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
+  const makeTarget = (helperBody: string, extraExpr: string) => `type Pair is data = $Pair { a: U32, b: U32 }
+func f1 (x: U32): U32 => x + 1
+func f2 (x: U32): U32 => x + 2
+func f3 (x: U32): U32 => x + 3
+func f4 (p: Pair): U32 =>
+  let $Pair { a, b } = p
+  return a + b
+func keep (xs: #[U32]): #[U32] =>
+  ${helperBody}
+func caller (n: U32): U32 =>
+  let xs: #[U32] = #[n, n + 1]
+  let alias = keep xs
+  xs := self.push 9
+  return xs[0] + alias[0]
+func editable (x: U32): U32 =>
+  let p = $Pair { a: x, b: 10 }
+  return f4 p + (${extraExpr})
+func run_all (): U32 =>
+  return f1 1 + f2 1 + f3 1 + caller 10 + editable 5
+`;
+  try {
+    // 16+ modules with frontendWorkers: 2 engages persistent retained splice + checkSelected.
+    const imps: string[] = [];
+    const calls: string[] = [];
+    for (let i = 0; i < 15; i++) {
+      await Deno.writeTextFile(
+        `${directory}/m${i}.sq`,
+        `func g${i} (x: U32): U32 => x + ${i}\n`,
+      );
+      imps.push(`import * as m${i} from "./m${i}"`);
+      calls.push(`m${i}.g${i} 1`);
+    }
+    await Deno.writeTextFile(
+      targetMod,
+      makeTarget("return xs.copy", "x + 2 + (x * 3) + (x & 1)"),
+    );
+    await Deno.writeTextFile(
+      entry,
+      `${imps.join("\n")}\nimport * as target from "./target"\nio main (): U32 => ${calls.join(" + ")} + target.run_all ()\n`,
+    );
+    compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude,
+      frontendWorkers: 2,
+    });
+    const base = await compiler.build();
+    equal(base.success, true);
+    // 1. Structural edit on `editable` (triggers splice + cone-scoped uniqueness + body replay)
+    await Deno.writeTextFile(
+      targetMod,
+      makeTarget("return xs.copy", "x * 3 + 1"),
+    );
+    const edit1 = await compiler.build();
+    equal(edit1.success, true);
+    equal(edit1.stats.frontend.body_lowerings, 1);
+    // 2. Second consecutive structural edit on `editable` (exercises spliceDependencies propagation + replay!)
+    await Deno.writeTextFile(
+      targetMod,
+      makeTarget("return xs.copy", "(x * 5 + 7) + (x & 3)"),
+    );
+    const edit2 = await compiler.build();
+    equal(edit2.success, true);
+    equal(edit2.stats.frontend.body_lowerings, 1);
+    // Verify byte-exact match against a fresh build using the same prelude
+    const freshOut = directory + "/fresh.wasm";
+    const res = await new Deno.Command(executable, {
+      args: ["build", entry, freshOut, "--prelude", prelude],
+    }).output();
+    equal(res.success, true);
+    equal(edit2.bytes, await Deno.readFile(freshOut));
+    // 3. Soundness check: editing ONLY `keep` to return `xs` directly (creating an alias
+    //    violation in the unedited `caller`!) must STILL reject via reverse caller cone R!
+    await Deno.writeTextFile(
+      targetMod,
+      makeTarget("return xs", "(x * 5 + 7) + (x & 3)"),
+    );
+    const badEdit = await compiler.build();
+    equal(badEdit.success, false);
+    await compiler.close();
+  } finally {
+    try {
+      await compiler?.dispose();
+    } finally {
+      await item.cleanup();
+    }
+  }
+});

@@ -298,13 +298,171 @@ root struct Analyzer {
 // spent name in `module`.
 fn check(module: const Module&, out: squid_check_core::Diagnostic[>..<]&) {
     var unused_origins: OriginInfo[>..<] = [];
-    analyze(module, out, unused_origins, false);
+    analyzeSelected(module, out, unused_origins, false, default<const bool[:]>(), default<const bool[:]>(), false);
+}
+// Cone-scoped uniqueness check for spliced single-module edits where all
+// unedited bodies already passed in the previous revision. Computes the exact
+// reverse caller cone `R` of `edited` and forward callee cone `F` of `R`
+// (including associated methods), falling back to full `check` when dependency
+// tables are absent or contract/type-tag defaults may interact.
+fn checkSelected(module: const Module&, edited: const u32[:], out: squid_check_core::Diagnostic[>..<]&) {
+    let body_count = module.bodies.len;
+    if edited.len == 0 || body_count <= 1 || module.declaration_dependencies.len != body_count {
+        check(module, out);
+        return;
+    }
+    for tt in module.type_tags {
+        if !tt.has_default || tt.value == 0 || tt.value >= module.nodes.len { continue; }
+        if tt.nominal.unit != 0 && tt.nominal.unit != module.unit { continue; }
+        if module.node(tt.value).tag != squid_check_core::Tag.invalid {
+            check(module, out);
+            return;
+        }
+    }
+    var is_edited_binding: bool[>..] = [];
+    is_edited_binding.resize(module.bindings.len, false);
+    for b in edited {
+        if b < is_edited_binding.len { is_edited_binding[b] = true; }
+    }
+    for template in module.member_templates {
+        if template.binding < is_edited_binding.len && is_edited_binding[template.binding] {
+            check(module, out);
+            return;
+        }
+    }
+    for member in module.implementation_members {
+        if member.target.unit != 0 && member.target.unit != module.unit { continue; }
+        if member.target.binding < is_edited_binding.len && is_edited_binding[member.target.binding] {
+            check(module, out);
+            return;
+        }
+    }
+    // Pre-filter `module.associated` to same-module methods with a body so the
+    // per-body dependency scan does O(0) work when no local associated methods exist.
+    var local_assoc_member: u32[>..] = [];
+    var local_assoc_op: squid_check_types::Operator[>..] = [];
+    var local_assoc_body: u32[>..] = [];
+    for method in module.associated {
+        var target = method.target;
+        if target.unit == 0 && target.binding < module.bindings.len && module.bindings[target.binding].kind == squid_reuse_principal_interface::Kind.external {
+            target = module.bindings[target.binding].target;
+        }
+        if target.unit != 0 && target.unit != module.unit { continue; }
+        if target.binding == 0 || target.binding >= module.bindings.len { continue; }
+        let dst_bi = module.bindings[target.binding].body_id;
+        if dst_bi == 0 || dst_bi >= body_count { continue; }
+        local_assoc_member.push(method.member);
+        local_assoc_op.push(method.operator);
+        local_assoc_body.push(dst_bi);
+    }
+    // Build compact linked-list forward & reverse call/associated graphs over module bodies.
+    var fwd_head: i64[>..] = [];
+    var rev_head: i64[>..] = [];
+    fwd_head.resize(body_count, -1);
+    rev_head.resize(body_count, -1);
+    var fwd_to: u32[>..] = [];
+    var fwd_next: i64[>..] = [];
+    var rev_to: u32[>..] = [];
+    var rev_next: i64[>..] = [];
+    for bi in 1..body_count {
+        let dep = module.declaration_dependencies[bi];
+        if dep.references.len != 0 {
+            let refs = module.dependency_references[dep.references.start..dep.references.start + dep.references.len];
+            for raw_ref in refs {
+                var target = raw_ref;
+                if target.unit == 0 && target.binding < module.bindings.len && module.bindings[target.binding].kind == squid_reuse_principal_interface::Kind.external {
+                    target = module.bindings[target.binding].target;
+                }
+                if target.unit != 0 && target.unit != module.unit { continue; }
+                if target.binding == 0 || target.binding >= module.bindings.len { continue; }
+                let dst_bi = module.bindings[target.binding].body_id;
+                if dst_bi == 0 || dst_bi >= body_count { continue; }
+                let fi = fwd_to.len;
+                fwd_to.push(dst_bi);
+                fwd_next.push(fwd_head[bi]);
+                fwd_head[bi] = fi;
+                let ri = rev_to.len;
+                rev_to.push(bi as u32);
+                rev_next.push(rev_head[dst_bi]);
+                rev_head[dst_bi] = ri;
+            }
+        }
+        if dep.members.len != 0 && local_assoc_body.len != 0 {
+            let mems = module.dependency_members[dep.members.start..dep.members.start + dep.members.len];
+            for mem in mems {
+                for ai in 0..local_assoc_body.len {
+                    if (mem.name != 0 && mem.name == local_assoc_member[ai]) || (mem.operator != squid_check_types::Operator.none && mem.operator == local_assoc_op[ai]) {
+                        let dst_bi = local_assoc_body[ai];
+                        let fi = fwd_to.len;
+                        fwd_to.push(dst_bi);
+                        fwd_next.push(fwd_head[bi]);
+                        fwd_head[bi] = fi;
+                        let ri = rev_to.len;
+                        rev_to.push(bi as u32);
+                        rev_next.push(rev_head[dst_bi]);
+                        rev_head[dst_bi] = ri;
+                    }
+                }
+            }
+        }
+    }
+    // Reverse BFS from edited bodies -> exact set `check_body` (`R`) that can observe edited changes.
+    var check_body: bool[>..] = [];
+    check_body.resize(body_count, false);
+    var queue: u32[>..] = [];
+    for b in edited {
+        if b < module.bindings.len {
+            let bi = module.bindings[b].body_id;
+            if bi != 0 && bi < body_count && !check_body[bi] {
+                check_body[bi] = true;
+                queue.push(bi);
+            }
+        }
+    }
+    var qh: i64 = 0;
+    while qh < queue.len {
+        let cur = queue[qh];
+        qh += 1;
+        var e = rev_head[cur];
+        while e >= 0 {
+            let caller = rev_to[e];
+            if !check_body[caller] {
+                check_body[caller] = true;
+                queue.push(caller);
+            }
+            e = rev_next[e];
+        }
+    }
+    // Forward BFS from `R` -> exact set `needed_callee` (`F`) needed for `non_escaping_params`.
+    var needed_callee: bool[>..] = [];
+    needed_callee.resize(body_count, false);
+    var fqueue: u32[>..] = [];
+    for bi in queue {
+        needed_callee[bi] = true;
+        fqueue.push(bi);
+    }
+    var fh: i64 = 0;
+    while fh < fqueue.len {
+        let cur = fqueue[fh];
+        fh += 1;
+        var e = fwd_head[cur];
+        while e >= 0 {
+            let callee = fwd_to[e];
+            if !needed_callee[callee] {
+                needed_callee[callee] = true;
+                fqueue.push(callee);
+            }
+            e = fwd_next[e];
+        }
+    }
+    var unused_origins: OriginInfo[>..<] = [];
+    analyzeSelected(module, out, unused_origins, false, check_body[..], needed_callee[..], true);
 }
 // Re-runs the analyzer on an already-rejected module to extract secondary blame
 // origins (move site, borrow holder, alias site) for agent/CLI diagnostics.
 fn explain(module: const Module&, out: OriginInfo[>..<]&) {
     var unused_diags: squid_check_core::Diagnostic[>..<] = [];
-    analyze(module, unused_diags, out, true);
+    analyzeSelected(module, unused_diags, out, true, default<const bool[:]>(), default<const bool[:]>(), false);
 }
 fn originKindName(kind: u8) -> const u8[:] {
     if kind == 1 { return "moved"; }
@@ -335,8 +493,8 @@ fn moduleIsPureScalar(module: const Module&) -> bool {
     }
     return true;
 }
-fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, origins: OriginInfo[>..<]&, collect_origins: bool) {
-    if moduleIsPureScalar(module) { return; }
+fn analyzeSelected(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, origins: OriginInfo[>..<]&, collect_origins: bool, check_body: const bool[:], needed_callee: const bool[:], selective: bool) {
+    if !selective && moduleIsPureScalar(module) { return; }
     var analyzer = Analyzer { .. };
     analyzer.collect_origins = collect_origins;
     {
@@ -406,6 +564,7 @@ fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, orig
     var has_candidate_param = false;
     for body, bi in module.bodies {
         if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
+        if selective && !needed_callee[bi] { continue; }
         let params = module.bodyParameters(body);
         if params.len == 0 || params.len > 32 { continue; }
         analyzer.non_escaping_arity[body.binding] = params.len as! u8;
@@ -419,6 +578,7 @@ fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, orig
             var changed = false;
             for body, bi in module.bodies {
                 if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
+                if selective && !needed_callee[bi] { continue; }
                 let params = module.bodyParameters(body);
                 if params.len == 0 || params.len > 32 { continue; }
                 let prev_mask = analyzer.non_escaping_params[body.binding];
@@ -449,6 +609,7 @@ fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, orig
     }
     for body, index in module.bodies {
         if index == 0 || body.root == 0 { continue; }
+        if selective && !check_body[index] { continue; }
         analyzer.in_fork = 0;
         // An `own` parameter arrives unique all the way down: every call
         // names this function and gives up an argument that was.
@@ -499,6 +660,7 @@ fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, orig
     // Validate field default expressions declared on types in this module:
     // `field.default` in `#for` builders treats them as fresh owned values, so
     // an owning field default cannot alias an immutable module `const` pool.
+    if !selective {
     for tt in module.type_tags {
         if !tt.has_default || tt.value == 0 || tt.value >= module.nodes.len { continue; }
         if tt.nominal.unit != 0 && tt.nominal.unit != module.unit { continue; }
@@ -528,6 +690,7 @@ fn analyze(module: const Module&, out: squid_check_core::Diagnostic[>..<]&, orig
         if !value.exits { ownedResult(analyzer, module, tt.value, value); }
         escape(analyzer, value);
         analyzer.function_roots.resize(analyzer.function_roots.len - 1);
+    }
     }
     sort(analyzer.rejections[..]) { a, b => a.node < b.node }
     var previous: u32 = 0;

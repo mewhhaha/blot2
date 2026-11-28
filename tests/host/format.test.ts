@@ -685,3 +685,18 @@ io main ():U32=>
   equal(formatted.includes("let op = (~) 10 3"), true);
   equal(formatted.includes("let q = take ~[1, 2] (freeze ~[3, 4])"), true);
 });
+
+Deno.test("formatter preserves backtick infix functions and normalizes spacing", async () => {
+  const source = `func blend (a:U32)->(b:U32):U32=>a*10+b
+io main ():U32=>
+  let x=4\`blend\`2
+  let y=x  \`  U32.min  \`  (10+20)
+  let z=#[1\`blend\`2, 3\`U32.max\`4]
+  return y+z[0]+z[1]
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("let x = 4 `blend` 2"), true);
+  equal(formatted.includes("let y = x `U32.min` (10 + 20)"), true);
+  equal(formatted.includes("let z = #[1 `blend` 2, 3 `U32.max` 4]"), true);
+});
