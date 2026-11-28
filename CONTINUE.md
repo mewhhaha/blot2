@@ -1,25 +1,27 @@
 # Working on Squid and Gdev
 
-## Current frontier (27 November 2026)
+## Current frontier (28 November 2026)
 
 Recent completed milestones on `origin/main`:
 
-- **Rebrand to Squid (`e7807f00`):** Renamed language, repo (`mewhhaha/squid-lang`), compiler (`squidc-goose` / `generated/compiler/squidc.gz`), CLI (`squid`/`spm`), configs (`squid.json`, `squid-workspace.yaml`, `squid.lock.json`), source extension (`.sq`), Wasm ABI exports/sections (`squid:*`), and sibling checkouts (`../pen` `acf6b0f`, `../ink` `29b672f`, `../gdev` `373c4ba`).
-- **Collection families `%[T]` & `~[T]` codegen optimizations (`b27d4d3a`, `6a455eae`):** Added 2-level outer-leaf / inner-element specialized `~[T]` loops (`emitSeqLoopCore`), once-only mutable focus flush, dense 16+1 right-spine leaf append (`ensureSeqTreePushLeaf`), zero-copy `readFlat` inline SoA/Sum packing in `ensureSeqFocusToLeaf`, header-cached `PACKED_SOA` column offsets (`function_packed.goose`), tuned leaf caps, inline FocusGap deque fast paths, and removed 7 spurious `noteAllocation` calls from in-place `Seq` mutators.
-- **`PersistentSafe` numeric primitives fix (`abb9acaf`):** Added `U8`, `I32`, `U64`, `I64`, and `F64` to `wire_schema.goose`'s `checkPersistentSafe` and `encodeTypeId` so `#process` / `#kernel` persistent states can hold `#[U64]` (including upgraded `ink/ecs` `Entities` bitsets) and 64-bit / 8-bit scalars, with guest regression coverage.
-- **All 8 cross-language benchmark suites refreshed on `wtime-aot 0.1.11 --guard-pages` (`66698119` + this commit):**
-  - **Suite 8 (`benchmarks/collections/`):** New 12-workload cross-language collection suite comparing Squid (`#[T]`, `%[T]`, `~[T]`) against C++20 (`-O3 -march=native`: `std::vector`, `std::deque`, manual SoA/split), Rust (`Vec`, `VecDeque`, manual SoA/split), and `imbl::Vector 6.1` with 12/12 bit-exact checksum parity (`~[T]` beats `imbl::Vector` on **11/12** by `1.49×`–`1,199×`, hits `123×` vs C++ `std::vector` on `packed_sum_cow`, `33.6×` on `generative_1m`, `27.1×` on `reverse_ops`, `10–19×` on `cursor_insert`).
-  - **Suite 1 (`goose-suite`, 16 benchmarks / 88 impls):** Post-rebrand `abb9acaf` achieves **`1.10×` C++ expert runtime** (`1.88×` faster than idiomatic C++, `1.66×` faster than idiomatic Rust, `#1` overall on `sum` and `particles`), **`0.86×` C++ expert peak RSS** (`#2` overall, `#1` lowest RSS on `strlist`/`words`/`sexp`), and **`29.9 ms` cold build** (`8.5×` faster than `clang++ -O2`).
-  - **Suites 2–4 (`comparison`):** **6/6** kernels faster than native `rustc -O3` (`lcg` `4.87×`, `mandelbrot` `6.64×`, `particle_spark_simd` `1.82×`), 8T `mandelbrot` `1.06 ms` (`4.77×` scaling, `4.35×` vs native Rust), `#process` no-op `48.4 ns/step` (`20.67M` steps/sec), Ink ECS updated for upgraded sparse/dense/bitset `Pool` + `#[U64]` `Entities` (SoA `spark` `7.33×`, snapshot `14.8×`, batch spawn `2.17×` vs Bevy 0.20.1).
-  - **Suite 6 (`bddicken`):** Squid beats C (`clang -O3`) and C++ on **3/3** compute workloads (`loops` `58.8 ms` = `2.14×` vs C / `2.15×` vs Rust, `levenshtein` `47.5 ms` beating Goose/C++/C, `fibonacci` `48.1 ms` beating C/C++).
-  - **Suite 7 (`PLB`, 13 problems / 26 unittests + full SHA-256):** **`2.18×` faster than Go** on geomean CPU across 12 non-trivial problems with **`1.83×` less RAM**, beating Go on **9/12**.
-- **Preceding milestones** (direct codegen Waves 1–3, granular numeric types, Wave A/B compiler & `wtime-aot` optimizations, `squid doc`, `#kernel`/`#process`, contextual `io` syntax) are preserved in pinned Git history (`git show b9c04470:CONTINUE.md`, `git show ddd6f991:CONTINUE.md`).
+- **All-collection SIMD, fast range-push, split-sum & indirect AoS SIMD (`e508d586`):**
+  - Shared 16-wide `i32` / 8-wide `i64` `v128` SIMD associative integer reductions (`+`/`^`) across `#[T]`, `%[T]` (Flat & SoA), and `~[T]` (Flat & SoA).
+  - Fast counted range-push lowering (`tryEmitFastPushRangeLoop`) with single pre-reserve + 64B/iter `v128` affine/const fill across `#[T]`, `%[T]` Flat/SoA, and direct full-leaf `~[T]` Flat/SoA right-spine append.
+  - Header-cached `PACKED_SPLIT_SUM` with dense `OP_br_table` push/match dispatch (with `branchMerge` soundness guard) and shared 16-byte `v128` uniform-tag run skipping (`emitSplitSumHotRun16`) across `%[T]` and `~[T]`.
+  - `Seq ~[T]`: 64-element `LEAF_PACKED_SUM` with `4×v128` + `i64.popcnt` O(1) rank, 64 KiB wide slabs, zero-copy `FocusGap -> LEAF_FLAT` promotion, `pop_front` leaf batch refill, radix-16 `LEAF_SPAN` guard fix, and post-`emitAll` `seq_release_fn` export patching for cross-invocation slab reclamation.
+  - Generalized `k==3` (12B) cross-nominal (`Pos` + `Vel`) and Shape 2 indirect `ids[k]` AoS `F32` SIMD (`tryEmitAosF32RecordLoop`), plus nominal-aware `tyHasU32` and inner-carry unwrapping for outer deferred-NaN & 5B-2 indirect index scanning.
+- **Refreshed benchmark evidence on `e508d586` + `wtime-aot 0.1.11 --guard-pages` (this commit):**
+  - **Suite 8 (`benchmarks/collections/`, 12 workloads, 12/12 bit-exact):** Squid wins **#1 fastest overall on 11/12**; **`~[T]` sweeps `imbl::Vector` 12/12** (`1.37×`–`2,895×`); **`%[T]` beats hand-written C++20/Rust manual split-stream** (`376.5 µs` vs `487.9`/`708.9 µs`, `1.30–1.88×`) and **manual SoA** (`728.6 µs` vs `2.86`/`2.75 ms`, `3.77–3.93×`); `flat_scan` `#[U32]` `38.1 µs` (`1.50×` vs C++ `std::vector`) / `~[U32]` `66.9 µs` (`1.43×` vs Rust `Vec`); `random_index` `#[U32]` `268.5 µs` (#1 overall); `cursor_insert` `25.9 µs` (`34×` vs C++ `vector`); `front_deque` `37.6 µs` (`1.58×` vs `imbl`); `frozen_span` `73.2 µs` (`14.2×` vs C++ `vector`); `reverse_ops` `61.7 µs` (`64.8×` vs C++ `vector`, `2,895×` vs `imbl`).
+  - **Suites 2–4 (`comparison`):** **6/6** kernels faster than native `rustc -O3` and **5/6** faster than Rust Wasm `-O3`; `aos_vec4` `1.435 ms` (`1.336 ms` `--wasm3`, `2.18×`/`2.34×` vs native Rust); **Ink ECS vs Bevy 0.20.1 wins 4/5** with all 3 dense paths `4.2×–5.4×` faster (`Pool` direct `0.230 ms` = **`5.42×`**, SoA `spark` `0.262 ms` = `4.75×`, cached query `0.295 ms` = **`4.22×`**, sparse `0.089 ms` down `4.05×`, batch spawn `0.124 ms` = `2.64×`, structural churn `74.5 µs` = `1.18×`, snapshot `34.6 µs` = `11.0×`).
+  - **Suite 1 (`goose-suite`, 16 benchmarks / 88 impls):** **`1.07×` C++ expert runtime** (`1.79×` faster than idiomatic C++, `1.60×` faster than idiomatic Rust, within `3.4%` of Rust expert, `#1` overall on `sum` `44.1 ms` and `particles` `83.2 ms`), **`0.87×` C++ expert peak RSS** (`#2` overall, `#1` lowest RSS on `strlist`/`words`/`sexp`), and **`27.5 ms` cold build** (`8.2×` faster than `clang++ -O2`).
+  - **Suites 6–7 (`bddicken`, `PLB`, recorded at `abb9acaf`):** `bddicken` beats C/C++ 3/3 compute (`loops` `58.8 ms` = `2.14×` vs C, `levenshtein` `47.5 ms`, `fibonacci` `48.1 ms`); `PLB` `2.18×` faster than Go on geomean CPU across 12 problems with `1.83×` less RAM (9/12 wins).
+- **Preceding milestones** (rebrand `e7807f00`, initial `%[T]`/`~[T]` `b27d4d3a`/`6a455eae`, `PersistentSafe` numerics `abb9acaf`, Waves 1–3, granular numeric types) are preserved in pinned Git history (`git show 3b71de42:CONTINUE.md`, `git show b9c04470:CONTINUE.md`).
 
 ## Checkpoints on `origin/main`
 
 | Repo | Observed HEAD | Status / Frontier |
 |---|---|---|
-| `squid` | `66698119` (+ this commit) | `~[T]`/`%[T]` codegen optimizations (`b27d4d3a`, `6a455eae`), `PersistentSafe` numerics (`abb9acaf`), Suite 8 + Suites 1–7 refreshed on `wtime-aot 0.1.11 --guard-pages` |
+| `squid` | `e508d586` (+ this commit) | All-collection SIMD (`#[T]`/`%[T]`/`~[T]`), fast range-push, header-cached split-sum `br_table` & 16B tag-run skip, `k==3` + Shape 2 indirect AoS SIMD; Suites 1–4 & 8 refreshed on `wtime-aot 0.1.11 --guard-pages` |
 | `../pen` | `acf6b0f` (1 dirty) | Rebranded to Squid; last qualified at `92e2ef7` (Stage-0 Squid generators `pen:plugin@0.3.0`, `squid:traps` v1 `f2047ec`, unified `pen test-squid` `eb8f575`) |
 | `../ink` | `29b672f` (1 dirty) | Rebranded to Squid + dense/bitset/sparse `ecs.Pool` & `#[U64]` `Entities`; last qualified at `46111bd` + local edits (`493/493` Squid + `257/257` Rust tests) |
 | `../gdev` | `373c4ba` (10 dirty) | Rebranded to Squid; last live Vulkan hardware frame qualified at `4e891d2` (and verified byte-identical 640×480 PNG on Wave 3 `b9c04470`) |
@@ -37,22 +39,21 @@ Recent completed milestones on `origin/main`:
 
 Historical qualification records below qualify their exact cited revisions, not later edits.
 
-- **Current built `squid` artifacts (`abb9acaf`):**
-  - `compiler-goose/build/squidc-goose`: SHA-256 `914cfd5a55f9fa58fa60e553d26b814238139b8200ef968ec29342a1dace7651` (`11,514,312` B)
-  - `generated/compiler/squidc.gz`: SHA-256 `ed4aca072feaa4f004053444b40387971e52541224e1df22b86d18177fd71153` (`4,768,270` B)
+- **Current built `squid` artifacts (`e508d586`):**
+  - `compiler-goose/build/squidc-goose`: SHA-256 `4cd57042376a936e31f0cffc9a55adba8a7e8f7130792f4055dac6021c0179eb` (`11,655,304` B)
+  - `generated/compiler/squidc.gz`: SHA-256 `db8c45ce13ac0a5898a6f0eb81d187141ddef3c4570a489ba66733c741eb0c07` (`4,810,555` B)
   - `std/prelude.sq`: SHA-256 `d5670b1e48c9b9ccd8f4aa56c1edd76aa0db23fbfe86592ed9a0f25c433108f9` (`26,986` B)
 - **Qualification gates:**
-  - `squid` (`abb9acaf`): full `deno task test:compiler && deno task test:std` passed (`harness` 2.51s, `release-build` 162.17s, `reference-direct` 2/2, `reference-uniqueness` 206/206, `reference-fixtures` 109/109 with `live_bytes == 0`, `pack`, `guests` 30.84s incl. `packed_execution`, `seq_execution`, and `PersistentSafe` numeric-primitives tests, `test:std` 9 modules / 20 tests / 171 assertions).
+  - `squid` (`e508d586`): full `deno task test:compiler && deno task test:std` passed (`harness` 2.50s, `release-build` 127.01s, `reference-direct` 2/2, `reference-uniqueness` 206/206, `reference-fixtures` 109/109 with `live_bytes == 0` and 3 reviewed SIMD-reduction updates documented in `test_fixtures.py`, `pack`, `preflight-regressions`, `guests` 26.21s incl. expanded `packed_execution`, `seq_execution`, and `spark_simd_phase2` tests, `test:std` 9 modules / 20 tests / 171 assertions).
   - `../pen` (`92e2ef7`, binary SHA-256 `deec51f8d7c689701dcc6c21d70888f59e59b86b9016cfa3353edf2de0bfe0f6`, `plugins/squid.wasm` SHA-256 `3f291f7a3e6c203b959ceaf19d1b808e77e35dbb3c79522a52380a88b103c901`): `plugins/squid` (24/24), `pen-plugins` (9 unit + 10 WASI integration), `pen plugin_build` (4/4), `pen test-squid` Stage-0 smoke; `f2047ec` qualified `pen-runtime` (218/218), `squid-host` (33 unit + 11 integration), and `pen squid_test` (17/17).
   - `../ink` (`46111bd` + local edits): `pen test-squid --project ../ink` **493/493** Squid tests (108 modules, `1.7 s`) + **257/257** native Rust f64-reference tests (`9.43 s`).
   - `../gdev` (`4e891d2`) live NVIDIA Vulkan hardware frame: built via `scripts/integration/build_gdev.ts --frontend-workers 8 --profile` (`320` modules / `4,555` functions, `6,530,935` B `.wasm`, SHA-256 `a51952caafaba76540c566b834e1af736a2d66734a494a4dfd59760ae4ce4d63`, `885.1 ms`) and rendered on `NVIDIA GeForce RTX 4080 SUPER (Vulkan)` via `scripts/integration/run_pen.py --launch --hardware` (`640×480` inspected PNG SHA-256 `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`, `frames.trace` `0 7062536994385978 f1af2247052533db`, `guest 9.577 ms`, `render 0.614 ms`, `total 12.497 ms`, 6/6 runner checks `true`).
 
 ## Remaining / Optional Next Tracks
 
-1. **Post-rebrand Gdev / Pen / Ink re-qualification:** Rebuild `../gdev` against post-rebrand `squidc-goose` (`abb9acaf`) + `../pen` (`acf6b0f`) + `../ink` (`29b672f`) via `scripts/integration/build_gdev.ts` and re-qualify the live Vulkan frame via `scripts/integration/run_pen.py --launch --hardware`.
-2. **Dense 3-field `#[Pos]` AoS auto-SIMD & Ink ECS query speedup:** Extend `function_spark.goose`'s generalized AoS record auto-SIMD (currently 8B `Vec2` and 16B `Vec4`) to 12B 3-`F32` records (`#[Pos]`/`#[Vel]`) so upgraded `ink/ecs` dense `Pool` loops regain coalesced `v128` speedups over Bevy ECS.
-3. **Incremental uniqueness & backend replay (Track 5):** Scope uniqueness validation to the spliced binding's dependency cone and broaden backend body-image replay to push structural edits below `20 ms`.
-4. **Remaining `%[T]` / `~[T]` & backend opportunities:** Vectorized `v128` 2-level scans for `~[U32]`/`~[F32]` leaves, constant-divisor 64-bit `U64` reciprocals, and `#[U8]`/`#[F32]` generic flat lane decoders in Ink & Gdev (`codec.decode_lanes` / `codec.decode_record`).
+1. **Post-rebrand Gdev / Pen / Ink re-qualification:** Rebuild `../gdev` against `squidc-goose` (`e508d586`) + `../pen` (`acf6b0f`) + `../ink` (`29b672f`) via `scripts/integration/build_gdev.ts` and re-qualify the live Vulkan frame via `scripts/integration/run_pen.py --launch --hardware`.
+2. **Incremental uniqueness & backend replay (Track 5):** Scope uniqueness validation to the spliced binding's dependency cone and broaden backend body-image replay to push structural edits below `20 ms`.
+3. **Remaining backend & library opportunities:** Constant-divisor 64-bit `U64` reciprocals, `F32`/`F64` SIMD reductions in `for`-in loops, and `#[U8]`/`#[F32]` generic flat lane decoders in Ink & Gdev (`codec.decode_lanes` / `codec.decode_record`).
 
 ## Pinned History & References
 

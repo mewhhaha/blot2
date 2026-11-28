@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generated_at": "2026-11-27T20:57:09.557640+00:00",
+    "generated_at": "2026-11-28T00:04:14.534043+00:00",
     "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
     "os": "Linux 7.3.5-2-cachyos (x86_64)",
-    "squid_commit": "6a455eae",
+    "squid_commit": "e508d586",
     "wtime_aot": "0.1.11 (91d6cfe)",
     "clang": "clang version 23.1.5",
     "rust": "rustc 1.96.0-nightly (3645249d7 2026-03-16)",
@@ -19,59 +19,59 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 0.09326,
+          "ms": 0.03812,
           "mem_bytes": 589824,
-          "rss_bytes": 4440064,
+          "rss_bytes": 4341760,
           "checksum": 3970611936,
-          "wasm_bytes": 5011,
-          "squidc_ms": 18.16,
-          "aot_ms": 4.07
+          "wasm_bytes": 5769,
+          "squidc_ms": 18.49,
+          "aot_ms": 3.53
         },
         "packed": {
-          "ms": 0.13053,
+          "ms": 0.0429,
           "mem_bytes": 589824,
-          "rss_bytes": 4284416,
+          "rss_bytes": 4280320,
           "checksum": 3970611936,
-          "wasm_bytes": 5072,
-          "squidc_ms": 17.75,
-          "aot_ms": 3.29
+          "wasm_bytes": 5762,
+          "squidc_ms": 19.35,
+          "aot_ms": 3.44
         },
         "seq": {
-          "ms": 0.30154,
+          "ms": 0.06692,
           "mem_bytes": 524288,
-          "rss_bytes": 4489216,
+          "rss_bytes": 4395008,
           "checksum": 3970611936,
-          "wasm_bytes": 11348,
-          "squidc_ms": 16.88,
-          "aot_ms": 4.66
+          "wasm_bytes": 12279,
+          "squidc_ms": 18.39,
+          "aot_ms": 4.86
         }
       },
       "cpp": {
         "vector": {
-          "ms": 0.05797,
-          "rss_bytes": 4595712,
+          "ms": 0.05731,
+          "rss_bytes": 4448256,
           "checksum": 3970611936
         },
         "deque": {
-          "ms": 0.59496,
-          "rss_bytes": 4702208,
+          "ms": 0.57459,
+          "rss_bytes": 4747264,
           "checksum": 3970611936
         }
       },
       "rust": {
         "vec": {
-          "ms": 0.09717,
-          "rss_bytes": 3158016,
+          "ms": 0.09562,
+          "rss_bytes": 2961408,
           "checksum": 3970611936
         },
         "deque": {
-          "ms": 0.48545,
-          "rss_bytes": 3092480,
+          "ms": 0.46127,
+          "rss_bytes": 3158016,
           "checksum": 3970611936
         },
         "imbl": {
-          "ms": 3.14815,
-          "rss_bytes": 3293184,
+          "ms": 2.90578,
+          "rss_bytes": 3178496,
           "checksum": 3970611936
         }
       }
@@ -83,49 +83,49 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 0.3367,
+          "ms": 0.26849,
           "mem_bytes": 589824,
-          "rss_bytes": 4489216,
+          "rss_bytes": 4374528,
           "checksum": 1505971104,
-          "wasm_bytes": 5097,
-          "squidc_ms": 17.31,
-          "aot_ms": 3.1
+          "wasm_bytes": 5578,
+          "squidc_ms": 18.14,
+          "aot_ms": 3.58
         },
         "seq": {
-          "ms": 1.887,
+          "ms": 2.08581,
           "mem_bytes": 524288,
-          "rss_bytes": 4493312,
+          "rss_bytes": 4300800,
           "checksum": 1505971104,
-          "wasm_bytes": 11056,
-          "squidc_ms": 16.45,
-          "aot_ms": 3.86
+          "wasm_bytes": 11808,
+          "squidc_ms": 19.09,
+          "aot_ms": 4.91
         }
       },
       "cpp": {
         "vector": {
-          "ms": 0.27568,
-          "rss_bytes": 4390912,
+          "ms": 0.33182,
+          "rss_bytes": 4435968,
           "checksum": 1505971104
         },
         "deque": {
-          "ms": 0.52346,
-          "rss_bytes": 4726784,
+          "ms": 0.42698,
+          "rss_bytes": 4591616,
           "checksum": 1505971104
         }
       },
       "rust": {
         "vec": {
-          "ms": 0.33305,
-          "rss_bytes": 3088384,
+          "ms": 0.35413,
+          "rss_bytes": 2990080,
           "checksum": 1505971104
         },
         "deque": {
-          "ms": 0.32707,
+          "ms": 0.31183,
           "rss_bytes": 3092480,
           "checksum": 1505971104
         },
         "imbl": {
-          "ms": 2.93464,
+          "ms": 3.11822,
           "rss_bytes": 3289088,
           "checksum": 1505971104
         }
@@ -138,59 +138,59 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 1.42694,
+          "ms": 1.48166,
           "mem_bytes": 8454144,
-          "rss_bytes": 10665984,
+          "rss_bytes": 10641408,
           "checksum": 2000120000,
           "wasm_bytes": 5471,
-          "squidc_ms": 17.58,
-          "aot_ms": 2.99
+          "squidc_ms": 18.36,
+          "aot_ms": 3.62
         },
         "packed": {
-          "ms": 1.00231,
+          "ms": 0.37652,
           "mem_bytes": 327680,
-          "rss_bytes": 3985408,
+          "rss_bytes": 4222976,
           "checksum": 2000120000,
-          "wasm_bytes": 6125,
-          "squidc_ms": 18.34,
-          "aot_ms": 3.17
+          "wasm_bytes": 6346,
+          "squidc_ms": 17.21,
+          "aot_ms": 3.73
         },
         "seq": {
-          "ms": 1.74512,
-          "mem_bytes": 458752,
+          "ms": 0.96127,
+          "mem_bytes": 393216,
           "rss_bytes": 4362240,
           "checksum": 2000120000,
-          "wasm_bytes": 12929,
-          "squidc_ms": 16.57,
-          "aot_ms": 4.16
+          "wasm_bytes": 13057,
+          "squidc_ms": 19.76,
+          "aot_ms": 4.72
         }
       },
       "cpp": {
         "vector": {
-          "ms": 2.84458,
-          "rss_bytes": 11395072,
+          "ms": 2.86764,
+          "rss_bytes": 11403264,
           "checksum": 2000120000
         },
         "manual_split": {
-          "ms": 0.49814,
-          "rss_bytes": 4575232,
+          "ms": 0.48791,
+          "rss_bytes": 4763648,
           "checksum": 2000120000
         }
       },
       "rust": {
         "vec": {
-          "ms": 1.23212,
-          "rss_bytes": 9904128,
+          "ms": 1.16362,
+          "rss_bytes": 9842688,
           "checksum": 2000120000
         },
         "manual_split": {
-          "ms": 0.58461,
-          "rss_bytes": 2838528,
+          "ms": 0.70891,
+          "rss_bytes": 2654208,
           "checksum": 2000120000
         },
         "imbl": {
-          "ms": 4.08352,
-          "rss_bytes": 9908224,
+          "ms": 3.91084,
+          "rss_bytes": 10104832,
           "checksum": 2000120000
         }
       }
@@ -202,59 +202,59 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 5.65476,
+          "ms": 4.75723,
           "mem_bytes": 8454144,
-          "rss_bytes": 10788864,
+          "rss_bytes": 10784768,
           "checksum": 1700124416,
-          "wasm_bytes": 5240,
-          "squidc_ms": 16.17,
-          "aot_ms": 3.47
+          "wasm_bytes": 5758,
+          "squidc_ms": 18.04,
+          "aot_ms": 3.9
         },
         "packed": {
-          "ms": 4.45587,
+          "ms": 0.72864,
           "mem_bytes": 8978432,
-          "rss_bytes": 12759040,
+          "rss_bytes": 12718080,
           "checksum": 1700124416,
-          "wasm_bytes": 7972,
-          "squidc_ms": 17.66,
-          "aot_ms": 4.89
+          "wasm_bytes": 12294,
+          "squidc_ms": 18.4,
+          "aot_ms": 6.91
         },
         "seq": {
-          "ms": 7.70169,
-          "mem_bytes": 8650752,
-          "rss_bytes": 11440128,
+          "ms": 1.71862,
+          "mem_bytes": 7471104,
+          "rss_bytes": 11304960,
           "checksum": 1700124416,
-          "wasm_bytes": 12395,
-          "squidc_ms": 18.72,
-          "aot_ms": 4.76
+          "wasm_bytes": 15230,
+          "squidc_ms": 20.18,
+          "aot_ms": 5.68
         }
       },
       "cpp": {
         "vector": {
-          "ms": 7.20344,
-          "rss_bytes": 11186176,
+          "ms": 6.89227,
+          "rss_bytes": 11182080,
           "checksum": 1700124416
         },
         "manual_soa": {
-          "ms": 3.43537,
-          "rss_bytes": 10657792,
+          "ms": 2.86209,
+          "rss_bytes": 10641408,
           "checksum": 1700124416
         }
       },
       "rust": {
         "vec": {
-          "ms": 4.58354,
-          "rss_bytes": 9973760,
+          "ms": 4.47926,
+          "rss_bytes": 9748480,
           "checksum": 1700124416
         },
         "manual_soa": {
-          "ms": 2.69965,
-          "rss_bytes": 9060352,
+          "ms": 2.7472,
+          "rss_bytes": 9207808,
           "checksum": 1700124416
         },
         "imbl": {
-          "ms": 12.00053,
-          "rss_bytes": 9867264,
+          "ms": 11.91002,
+          "rss_bytes": 9768960,
           "checksum": 1700124416
         }
       }
@@ -266,40 +266,40 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 4.62577,
+          "ms": 4.69495,
           "mem_bytes": 589824,
-          "rss_bytes": 4493312,
+          "rss_bytes": 4489216,
           "checksum": 14999900,
-          "wasm_bytes": 5639,
-          "squidc_ms": 17.28,
-          "aot_ms": 3.22
+          "wasm_bytes": 6139,
+          "squidc_ms": 17.36,
+          "aot_ms": 3.78
         },
         "seq": {
-          "ms": 0.15036,
+          "ms": 0.06168,
           "mem_bytes": 393216,
-          "rss_bytes": 4358144,
+          "rss_bytes": 4362240,
           "checksum": 14999900,
-          "wasm_bytes": 9660,
-          "squidc_ms": 16.82,
-          "aot_ms": 4.04
+          "wasm_bytes": 9693,
+          "squidc_ms": 17.8,
+          "aot_ms": 4.41
         }
       },
       "cpp": {
         "vector": {
-          "ms": 4.08,
-          "rss_bytes": 4587520,
+          "ms": 4.00085,
+          "rss_bytes": 4505600,
           "checksum": 14999900
         }
       },
       "rust": {
         "vec": {
-          "ms": 1.15582,
+          "ms": 1.1475,
           "rss_bytes": 3158016,
           "checksum": 14999900
         },
         "imbl": {
-          "ms": 180.30424,
-          "rss_bytes": 3682304,
+          "ms": 178.64245,
+          "rss_bytes": 3817472,
           "checksum": 14999900
         }
       }
@@ -311,40 +311,40 @@
       "n": 1000000,
       "squid": {
         "array": {
-          "ms": 0.69468,
+          "ms": 0.06628,
           "mem_bytes": 4259840,
-          "rss_bytes": 8028160,
+          "rss_bytes": 7839744,
           "checksum": 1631421043,
-          "wasm_bytes": 5437,
-          "squidc_ms": 20.21,
-          "aot_ms": 3.3
+          "wasm_bytes": 5918,
+          "squidc_ms": 18.12,
+          "aot_ms": 3.46
         },
         "seq": {
-          "ms": 0.00793,
+          "ms": 0.00851,
           "mem_bytes": 131072,
           "rss_bytes": 4096000,
           "checksum": 1631421043,
-          "wasm_bytes": 12237,
-          "squidc_ms": 17.02,
-          "aot_ms": 4.55
+          "wasm_bytes": 12557,
+          "squidc_ms": 16.49,
+          "aot_ms": 4.3
         }
       },
       "cpp": {
         "vector": {
-          "ms": 0.26559,
-          "rss_bytes": 8192000,
+          "ms": 0.28053,
+          "rss_bytes": 8114176,
           "checksum": 1631421043
         }
       },
       "rust": {
         "vec": {
-          "ms": 0.43893,
-          "rss_bytes": 6635520,
+          "ms": 0.42712,
+          "rss_bytes": 6705152,
           "checksum": 1631421043
         },
         "imbl": {
-          "ms": 7.20043,
-          "rss_bytes": 7741440,
+          "ms": 7.05268,
+          "rss_bytes": 8007680,
           "checksum": 1631421043
         }
       }
@@ -356,40 +356,40 @@
       "n": 50000,
       "squid": {
         "array": {
-          "ms": 5.78215,
+          "ms": 6.2967,
           "mem_bytes": 589824,
-          "rss_bytes": 4493312,
+          "rss_bytes": 4485120,
           "checksum": 52604000,
-          "wasm_bytes": 5276,
-          "squidc_ms": 17.4,
-          "aot_ms": 3.32
+          "wasm_bytes": 5751,
+          "squidc_ms": 17.44,
+          "aot_ms": 3.45
         },
         "seq": {
-          "ms": 0.95534,
+          "ms": 0.90738,
           "mem_bytes": 3080192,
-          "rss_bytes": 6729728,
+          "rss_bytes": 6983680,
           "checksum": 52604000,
-          "wasm_bytes": 11816,
-          "squidc_ms": 17.32,
-          "aot_ms": 4.33
+          "wasm_bytes": 12562,
+          "squidc_ms": 16.21,
+          "aot_ms": 4.95
         }
       },
       "cpp": {
         "vector": {
-          "ms": 5.85171,
-          "rss_bytes": 4542464,
+          "ms": 5.38292,
+          "rss_bytes": 4415488,
           "checksum": 52604000
         }
       },
       "rust": {
         "vec": {
-          "ms": 5.96064,
-          "rss_bytes": 3162112,
+          "ms": 5.38883,
+          "rss_bytes": 2928640,
           "checksum": 52604000
         },
         "imbl": {
-          "ms": 1.41734,
-          "rss_bytes": 3026944,
+          "ms": 1.24142,
+          "rss_bytes": 2785280,
           "checksum": 52604000
         }
       }
@@ -401,50 +401,50 @@
       "n": 20000,
       "squid": {
         "array": {
-          "ms": 7.58129,
+          "ms": 8.73735,
           "mem_bytes": 196608,
-          "rss_bytes": 4091904,
+          "rss_bytes": 4100096,
           "checksum": 233999,
-          "wasm_bytes": 5320,
-          "squidc_ms": 19.72,
-          "aot_ms": 3.56
+          "wasm_bytes": 5795,
+          "squidc_ms": 18.77,
+          "aot_ms": 3.35
         },
         "seq": {
-          "ms": 0.0712,
+          "ms": 0.02589,
           "mem_bytes": 196608,
-          "rss_bytes": 4096000,
+          "rss_bytes": 4100096,
           "checksum": 233999,
-          "wasm_bytes": 11150,
-          "squidc_ms": 19.67,
-          "aot_ms": 4.46
+          "wasm_bytes": 11896,
+          "squidc_ms": 17.47,
+          "aot_ms": 5.44
         }
       },
       "cpp": {
         "vector": {
-          "ms": 0.73137,
-          "rss_bytes": 4628480,
+          "ms": 0.88046,
+          "rss_bytes": 4333568,
           "checksum": 233999
         },
         "deque": {
-          "ms": 1.33977,
-          "rss_bytes": 4415488,
+          "ms": 1.61499,
+          "rss_bytes": 4669440,
           "checksum": 233999
         }
       },
       "rust": {
         "vec": {
-          "ms": 0.81175,
-          "rss_bytes": 2568192,
-          "checksum": 233999
-        },
-        "deque": {
-          "ms": 0.76785,
+          "ms": 0.8013,
           "rss_bytes": 2764800,
           "checksum": 233999
         },
+        "deque": {
+          "ms": 0.79368,
+          "rss_bytes": 2695168,
+          "checksum": 233999
+        },
         "imbl": {
-          "ms": 45.25924,
-          "rss_bytes": 3289088,
+          "ms": 45.60924,
+          "rss_bytes": 3354624,
           "checksum": 233999
         }
       }
@@ -456,50 +456,50 @@
       "n": 5000,
       "squid": {
         "array": {
-          "ms": 8.51484,
+          "ms": 8.28993,
           "mem_bytes": 131072,
-          "rss_bytes": 4096000,
+          "rss_bytes": 4100096,
           "checksum": 9376250,
           "wasm_bytes": 5411,
-          "squidc_ms": 20.55,
-          "aot_ms": 4.06
+          "squidc_ms": 19.16,
+          "aot_ms": 3.85
         },
         "seq": {
-          "ms": 0.06709,
+          "ms": 0.03763,
           "mem_bytes": 131072,
-          "rss_bytes": 4096000,
+          "rss_bytes": 2322432,
           "checksum": 9376250,
-          "wasm_bytes": 11650,
-          "squidc_ms": 17.22,
-          "aot_ms": 4.29
+          "wasm_bytes": 12028,
+          "squidc_ms": 18.83,
+          "aot_ms": 5.29
         }
       },
       "cpp": {
         "vector": {
-          "ms": 0.65197,
-          "rss_bytes": 4509696,
+          "ms": 0.6761,
+          "rss_bytes": 4411392,
           "checksum": 9376250
         },
         "deque": {
-          "ms": 0.01151,
-          "rss_bytes": 4403200,
+          "ms": 0.01046,
+          "rss_bytes": 4358144,
           "checksum": 9376250
         }
       },
       "rust": {
         "vec": {
-          "ms": 0.67047,
-          "rss_bytes": 2834432,
+          "ms": 0.67829,
+          "rss_bytes": 2768896,
           "checksum": 9376250
         },
         "deque": {
           "ms": 0.00758,
-          "rss_bytes": 2633728,
+          "rss_bytes": 2592768,
           "checksum": 9376250
         },
         "imbl": {
-          "ms": 0.05331,
-          "rss_bytes": 2764800,
+          "ms": 0.05931,
+          "rss_bytes": 2678784,
           "checksum": 9376250
         }
       }
@@ -511,40 +511,40 @@
       "n": 50000,
       "squid": {
         "array": {
-          "ms": 32.68164,
+          "ms": 32.26545,
           "mem_bytes": 131399680,
-          "rss_bytes": 106463232,
+          "rss_bytes": 106201088,
           "checksum": 106417,
-          "wasm_bytes": 5677,
-          "squidc_ms": 16.45,
-          "aot_ms": 3.17
+          "wasm_bytes": 6152,
+          "squidc_ms": 17.96,
+          "aot_ms": 3.69
         },
         "seq": {
-          "ms": 1.04533,
+          "ms": 0.97576,
           "mem_bytes": 2949120,
           "rss_bytes": 6852608,
           "checksum": 106417,
-          "wasm_bytes": 11633,
-          "squidc_ms": 19.3,
-          "aot_ms": 4.27
+          "wasm_bytes": 12379,
+          "squidc_ms": 19.85,
+          "aot_ms": 4.93
         }
       },
       "cpp": {
         "vector": {
-          "ms": 1.44668,
-          "rss_bytes": 4628480,
+          "ms": 1.50198,
+          "rss_bytes": 4521984,
           "checksum": 106417
         }
       },
       "rust": {
         "vec": {
-          "ms": 1.46626,
-          "rss_bytes": 3092480,
+          "ms": 1.43865,
+          "rss_bytes": 2899968,
           "checksum": 106417
         },
         "imbl": {
-          "ms": 4.55546,
-          "rss_bytes": 3022848,
+          "ms": 4.49612,
+          "rss_bytes": 2793472,
           "checksum": 106417
         }
       }
@@ -556,40 +556,40 @@
       "n": 100000,
       "squid": {
         "array": {
-          "ms": 9.31296,
+          "ms": 8.91847,
           "mem_bytes": 720896,
           "rss_bytes": 4489216,
           "checksum": 2346780112,
-          "wasm_bytes": 5657,
-          "squidc_ms": 18.54,
-          "aot_ms": 3.33
+          "wasm_bytes": 6138,
+          "squidc_ms": 17.63,
+          "aot_ms": 3.46
         },
         "seq": {
-          "ms": 0.25346,
+          "ms": 0.07315,
           "mem_bytes": 786432,
-          "rss_bytes": 4489216,
+          "rss_bytes": 4395008,
           "checksum": 2346780112,
-          "wasm_bytes": 11329,
-          "squidc_ms": 17.59,
-          "aot_ms": 4.61
+          "wasm_bytes": 12131,
+          "squidc_ms": 16.69,
+          "aot_ms": 4.81
         }
       },
       "cpp": {
         "vector": {
-          "ms": 1.12217,
-          "rss_bytes": 4530176,
+          "ms": 1.04462,
+          "rss_bytes": 4677632,
           "checksum": 2346780112
         }
       },
       "rust": {
         "vec": {
-          "ms": 1.2881,
-          "rss_bytes": 3162112,
+          "ms": 1.15325,
+          "rss_bytes": 2859008,
           "checksum": 2346780112
         },
         "imbl": {
-          "ms": 14.32721,
-          "rss_bytes": 3268608,
+          "ms": 15.20262,
+          "rss_bytes": 3305472,
           "checksum": 2346780112
         }
       }
@@ -601,40 +601,40 @@
       "n": 50000,
       "squid": {
         "array": {
-          "ms": 60.52618,
+          "ms": 60.88811,
           "mem_bytes": 8454144,
-          "rss_bytes": 10907648,
+          "rss_bytes": 10792960,
           "checksum": 1504060,
           "wasm_bytes": 6058,
-          "squidc_ms": 20.22,
-          "aot_ms": 3.38
+          "squidc_ms": 20.11,
+          "aot_ms": 3.65
         },
         "seq": {
-          "ms": 0.56332,
+          "ms": 0.59108,
           "mem_bytes": 983040,
-          "rss_bytes": 4751360,
+          "rss_bytes": 4882432,
           "checksum": 1504060,
-          "wasm_bytes": 14332,
-          "squidc_ms": 17.03,
-          "aot_ms": 4.48
+          "wasm_bytes": 14577,
+          "squidc_ms": 19.41,
+          "aot_ms": 5.42
         }
       },
       "cpp": {
         "vector": {
-          "ms": 69.23556,
-          "rss_bytes": 10964992,
+          "ms": 66.1936,
+          "rss_bytes": 11206656,
           "checksum": 1504060
         }
       },
       "rust": {
         "vec": {
-          "ms": 67.25302,
-          "rss_bytes": 9957376,
+          "ms": 65.19255,
+          "rss_bytes": 9904128,
           "checksum": 1504060
         },
         "imbl": {
-          "ms": 1.14437,
-          "rss_bytes": 6176768,
+          "ms": 1.04061,
+          "rss_bytes": 6434816,
           "checksum": 1504060
         }
       }

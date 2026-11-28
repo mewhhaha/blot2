@@ -52,7 +52,7 @@ deno run --allow-read --allow-write --allow-run --allow-env=SQUID_CLIENT_TEST_AM
 
 - [2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json](../evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json):
   Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
-  AMD Ryzen 7 7800X3D with `squidc-goose` (`abb9acaf`), `wtime-aot 0.1.11`
+  AMD Ryzen 7 7800X3D with `squidc-goose` (`e508d586`), `wtime-aot 0.1.11`
   (`--backend x64 --target-cpu native --guard-pages`, `x64-v4`, `91d6cfe`),
   `rustc 1.96.0-nightly`, and `bevy_ecs 0.20.1`.
 - [2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json](../evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json):

@@ -16,7 +16,7 @@ Unified index of all recorded Squid benchmark suites, charts, and exact measurem
 
 ## Suite 1: 16-Benchmark Cross-Language Suite (Squid vs Goose, Rust & C++)
 
-Full mirror of Goose's 16-benchmark main suite at **medium** size across **88 implementations** (**100% bit-exact stdout parity**): **Squid** (`squidc-goose` `abb9acaf` with native `U8`/`I32`/`U64`/`I64`/`F64`, `F64x2`/`U64x2`/`U8x16`/`I16x8` unboxed `v128` SIMD, whole-program unobservable-NaN canonicalization elision, Mode-4 `v128` wide-float recursive worker ABI + shared `v128.store` packing, direct `.rodata` constant tables & literal appends, recursive SCC Mode-R/Mode-M descriptor workers with `no_scope_alloc` elision, right-spine associative TCO, 1-level leaf peeling, and external direct worker dispatch, wide-aggregate leaf inlining, hoisted loop `CheckedGrow`/`CheckedArray` checks, masked/2-pointer/affine bounds hoisting with zero-duplication `mask == len - 1` proofs, proven `knownMutable` & non-resizing `own`-helper preservation, stack-backed top-level `Array.with_capacity`, `OP_br_table`, boxed-array direct projection & subfield updates, function-exit reclamation, boxed-return FBIP reuse, cross-function closure specialization, byte/alignment packing, skewed sum outlining, and scalar-packed `DirectArray` stack/register inlining + `wtime-aot 0.1.11` x64 `--guard-pages`), **Goose** (`d5ae5bb` + `clang 23.1.5 -O2`), **C++20** (`clang++ 23.1.5 -O2`, idiomatic & expert), and **Rust** (`rustc 1.96.0-nightly -O -C codegen-units=1`, idiomatic & arena/expert).
+Full mirror of Goose's 16-benchmark main suite at **medium** size across **88 implementations** (**100% bit-exact stdout parity**): **Squid** (`squidc-goose` `e508d586` with native `U8`/`I32`/`U64`/`I64`/`F64`, `F64x2`/`U64x2`/`U8x16`/`I16x8` unboxed `v128` SIMD, 16-wide `i32` / 8-wide `i64` `for`-in SIMD reductions & fast counted range-push fill, whole-program unobservable-NaN canonicalization elision, Mode-4 `v128` wide-float recursive worker ABI + shared `v128.store` packing, direct `.rodata` constant tables & literal appends, recursive SCC Mode-R/Mode-M descriptor workers with `no_scope_alloc` elision, right-spine associative TCO, 1-level leaf peeling, and external direct worker dispatch, wide-aggregate leaf inlining, hoisted loop `CheckedGrow`/`CheckedArray` checks, masked/2-pointer/affine bounds hoisting with zero-duplication `mask == len - 1` proofs, proven `knownMutable` & non-resizing `own`-helper preservation, stack-backed top-level `Array.with_capacity`, `OP_br_table`, boxed-array direct projection & subfield updates, function-exit reclamation, boxed-return FBIP reuse, cross-function closure specialization, byte/alignment packing, skewed sum outlining, and scalar-packed `DirectArray` stack/register inlining + `wtime-aot 0.1.11` x64 `--guard-pages`), **Goose** (`d5ae5bb` + `clang 23.1.5 -O2`), **C++20** (`clang++ 23.1.5 -O2`, idiomatic & expert), and **Rust** (`rustc 1.96.0-nightly -O -C codegen-units=1`, idiomatic & arena/expert).
 
 - **Best of 3 runs** (2 discarded warmups) measuring single-process CPU time (`ru_utime + ru_stime`) and exact per-child peak RSS (`ru_maxrss`) via [`measure_proc.c`](benchmarks/goose-suite/measure_proc.c) (`posix_spawnp` + `wait4`).
 - **Details & diagnosis:** [benchmarks/goose-suite/README.md](benchmarks/goose-suite/README.md) · **Raw JSON:** [`results.json`](benchmarks/evidence/measurements/2026-11-27-goose-suite/results.json) (previous Nov 26 baseline preserved in [`2026-11-26-goose-suite/`](benchmarks/evidence/measurements/2026-11-26-goose-suite/results.json))
@@ -25,9 +25,9 @@ Full mirror of Goose's 16-benchmark main suite at **medium** size across **88 im
 
 ### Geometric Means Across All 16 Benchmarks
 
-- **Runtime (vs C++ expert = `1.00×`, lower is better):** Goose **`0.89×`**, C++ expert **`1.00×`**, Rust expert **`1.06×`**, **Squid (`wtime-aot 0.1.11` x64 `--guard-pages`) `1.10×`** (down from `2.07×` on Nov 26 and `2.90×` earlier — **`0.53×` of idiomatic C++** at `2.06×` = **`1.88×` faster**, **`0.60×` of idiomatic Rust** at `1.82×` = **`1.66×` faster**, within **`3.6%`** of Rust expert; excluding `particles`, **`1.16×` C++ expert / `1.33×` Goose**). Squid beats idiomatic C++ on **14/16** benchmarks (`sum`, `push`, `strlist`, `records`, `tree`, `interp`, `graph`, `words`, `particles`, `sexp`, `lru`, `scene`, `calc`, `bintrees`), beats idiomatic Rust on **14/16** (`sum`, `strlist`, `records`, `tree`, `interp`, `graph`, `words`, `particles`, `sexp`, `lru`, `scene`, `calc`, `bintrees`, `respond`), beats **Rust expert** on **7/16** (`sum`, `strlist`, `records`, `interp`, `graph`, `particles`, `bintrees`), beats **C++ expert** on **5/16** (`sum` `44.5 vs 53.0 ms`, `push` `44.5 vs 44.9 ms`, `records` `112.0 vs 124.7 ms`, `particles` `86.9 vs 190.7 ms`, `bintrees` `67.2 vs 85.5 ms`), beats **Goose** on **2/16** (`sum` `44.5 vs 52.8 ms`, `particles` `86.9 vs 201.2 ms`), and finishes **#1 fastest overall** on **2/16** (`sum`, `particles`).
-- **Peak Memory (exact per-process RSS vs C++ expert = `1.00×`, lower is better):** Goose **`0.72×`**, **Squid `0.86×`** (down from `1.03×` on Nov 26, **#2 lowest peak memory in the suite** — ahead of Rust expert **`0.87×`**, C++ expert **`1.00×`**, Rust idiomatic **`1.12×`**, and C++ idiomatic **`1.31×`**). Squid beats idiomatic C++ on **13/16**, C++ expert on **11/16**, idiomatic Rust on **8/16**, Goose on **6/16**, achieves **#1 lowest RSS of every language** on `strlist` (`43.4 MiB`), `words` (`79.6 MiB`), and `sexp` (`109.1 MiB`), and cuts `sum` (`129.3 → 64.8 MiB`) and `tree` (`61.1 → 27.9 MiB`) peak RSS in half via `Array.with_capacity`.
-- **Cold Compile Time (geomean full build to native binary / `.so`):** **Squid `29.9 ms`** (`20.6 ms` `squidc-goose` + `9.2 ms` `wtime-aot`, `26.6–33.2 ms` range, **`5.6–17.4 KiB`** `.wasm`) — **`8.5×` faster than C++** (`253.1 ms`), **`4.5×` faster than Goose** (`134.4 ms`), and **`3.1×` faster than Rust** (`93.3 ms`).
+- **Runtime (vs C++ expert = `1.00×`, lower is better):** Goose **`0.89×`**, C++ expert **`1.00×`**, Rust expert **`1.03×`**, **Squid (`wtime-aot 0.1.11` x64 `--guard-pages`) `1.07×`** (down from `1.10×`, `2.07×` on Nov 26, and `2.90×` earlier — **`0.56×` of idiomatic C++** at `1.91×` = **`1.79×` faster**, **`0.63×` of idiomatic Rust** at `1.70×` = **`1.60×` faster**, within **`3.4%`** of Rust expert; excluding `particles`, **`1.13×` C++ expert / `1.28×` Goose**). Squid beats idiomatic C++ on **14/16** benchmarks (`sum`, `push`, `strlist`, `records`, `tree`, `interp`, `graph`, `words`, `particles`, `sexp`, `lru`, `scene`, `calc`, `bintrees`), beats idiomatic Rust on **14/16** (`sum`, `strlist`, `records`, `tree`, `interp`, `graph`, `words`, `particles`, `sexp`, `lru`, `scene`, `calc`, `bintrees`, `respond`), beats **Rust expert** on **7/16** (`sum`, `strlist`, `records`, `graph`, `words`, `particles`, `bintrees`), beats **C++ expert** on **5/16** (`sum` `44.1 vs 48.5 ms`, `push` `43.5 vs 43.8 ms`, `records` `110.6 vs 119.0 ms`, `particles` `83.2 vs 186.8 ms`, `bintrees` `65.0 vs 82.7 ms`), beats **Goose** on **2/16** (`sum` `44.1 vs 50.8 ms`, `particles` `83.2 vs 198.0 ms`), and finishes **#1 fastest overall** on **2/16** (`sum`, `particles`).
+- **Peak Memory (exact per-process RSS vs C++ expert = `1.00×`, lower is better):** Goose **`0.73×`**, **Squid `0.87×`** (down from `1.03×` on Nov 26, **#2 lowest peak memory in the suite** — ahead of Rust expert **`0.88×`**, C++ expert **`1.00×`**, Rust idiomatic **`1.13×`**, and C++ idiomatic **`1.32×`**). Squid beats idiomatic C++ on **14/16**, C++ expert on **11/16**, idiomatic Rust on **8/16**, Goose on **6/16**, achieves **#1 lowest RSS of every language** on `strlist` (`43.4 MiB`), `words` (`79.6 MiB`), and `sexp` (`109.2 MiB`), and cuts `sum` (`129.3 → 64.9 MiB`) and `tree` (`61.1 → 27.9 MiB`) peak RSS in half via `Array.with_capacity`.
+- **Cold Compile Time (geomean full build to native binary / `.so`):** **Squid `27.5 ms`** (`18.6 ms` `squidc-goose` + `8.9 ms` `wtime-aot`, `24.6–32.1 ms` range, **`5.6–17.4 KiB`** `.wasm`) — **`8.2×` faster than C++** (`225.9 ms`), **`4.5×` faster than Goose** (`123.7 ms`), and **`3.2×` faster than Rust** (`87.9 ms`).
 
 ### Runtime Charts & Per-Benchmark Results (ms)
 
@@ -47,28 +47,28 @@ Full mirror of Goose's 16-benchmark main suite at **medium** size across **88 im
 
 ### Complete Per-Benchmark Numbers (`medium` size)
 
-- **`sum`** (`N = 16,000,000`) — Time: **Squid `44.5 ms` (#1 fastest overall)** (**beats Rust `51.8 ms` by `1.16×`**, **Goose `52.8 ms` by `1.19×`**, **C++ exp `53.0 ms` by `1.19×`**, **C++ id `57.5 ms` by `1.29×`**) · RSS: **Squid `64.8 MiB`** (beats C++ exp `65.0`, Goose `65.4` & C++ id `68.7`), Rust `63.5` · Compile: Squid `26.6 ms` (`19.1 + 7.5`, `5.6 KiB` `.wasm`).
-- **`push`** (`N = 16,000,000`) — Time: **Squid `44.5 ms`** (**beats C++ exp `44.9 ms`**, **1.23× vs C++ id `54.7 ms`**), Goose `40.1 ms`, Rust `41.7 ms` · RSS: Squid `126.9 MiB` (beats Goose `127.0`, C++ exp `127.9` & C++ id `133.7`), Rust `126.4` · Compile: Squid `27.7 ms` (`19.7 + 8.1`, `6.9 KiB`).
-- **`strlist`** (`N = 2,000,000`) — Time: **Squid `81.4 ms`** (**beats Rust exp `98.3 ms` by `1.21×`**, **1.45× vs C++ id `118.2 ms`**, **1.86× vs Rust id `151.7 ms`**), Goose `76.1 ms`, C++ exp `79.5 ms` · RSS: **Squid `43.4 MiB` (#1 lowest overall)**, Goose `57.0`, Rust exp `59.3`, C++ exp `60.0`, C++ id `108.0`, Rust id `135.7` · Compile: Squid `26.6 ms` (`18.8 + 7.8`, `6.6 KiB`).
-- **`records`** (`N = 4,000,000`) — Time: **Squid `112.0 ms`** (**beats C++ exp `124.7 ms` by `1.11×`**, **1.53× vs C++ id `171.2 ms`**, **1.49× vs Rust `167.1 ms`**), Goose `108.8 ms` · RSS: Squid `74.0 MiB` (**2.66× vs C++ id**, **2.11× vs Rust**), Goose `39.2`, C++ exp `101.0`, Rust `156.0`, C++ id `196.8` · Compile: Squid `27.9 ms` (`20.1 + 7.8`, `7.2 KiB`).
-- **`tree`** (`depth = 20`) — Time: **Squid `36.1 ms`** (**2.93× vs C++ id `105.6 ms`**, **2.21× vs Rust id `79.6 ms`**), Goose `26.2 ms`, C++ exp `26.8 ms`, Rust exp `27.7 ms` · RSS: **Squid `27.9 MiB`** (ties C++ exp `27.9 MiB`, **2.43× vs C++ id**), Goose `26.2`, Rust exp `26.5`, Rust id `66.1`, C++ id `67.9` · Compile: Squid `27.3 ms` (`19.9 + 7.5`, `6.8 KiB`).
-- **`interp`** (`depth = 20`) — Time: **Squid `10.5 ms`** (**beats Rust exp `10.9 ms`**, **1.41× vs C++ id `14.7 ms`**, **1.53× vs Rust id `16.0 ms`**), C++ exp `7.2 ms`, Goose `8.3 ms` · RSS: Squid `8.0 MiB` (beats C++ exp `11.4` & Rust id `11.4`), Goose `4.0`, Rust exp `7.8`, C++ id `13.1` · Compile: Squid `27.6 ms` (`19.4 + 8.2`, `6.8 KiB`).
-- **`graph`** (`V = 500,000`) — Time: **Squid `123.3 ms`** (**beats Rust exp `146.4 ms` by `1.19×`**, **2.95× vs C++ id `364.0 ms`**, **3.12× vs Rust id `385.2 ms`**), Goose `80.8 ms`, C++ exp `112.9 ms` · RSS: Squid `57.2 MiB` (beats Goose `58.8`), C++ exp `57.0`, Rust exp `55.5`, C++ id `51.5`, Rust id `50.9` · Compile: Squid `29.2 ms` (`20.0 + 9.2`, `8.2 KiB`).
-- **`words`** (`N = 4,000,000`) — Time: **Squid `296.8 ms`** (**1.24× vs C++ id `368.3 ms`**, **1.21× vs Rust `HashMap` `359.9 ms`**), Goose `178.3 ms`, C++ exp `236.1 ms`, Rust exp `261.9 ms` · RSS: **Squid `79.6 MiB` (#1 lowest overall, 1.87× vs C++ id)**, Goose `138.2`, Rust id `142.1`, C++ id `148.7`, Rust exp `171.6`, C++ exp `194.8` · Compile: Squid `31.9 ms` (`21.8 + 10.1`, `8.9 KiB`).
-- **`particles`** (`N = 1,000,000`) — Time: **Squid SoA 4-wide SIMD `86.9 ms` (#1 fastest overall)** — **`2.19×` faster than C++ exp** `190.7 ms`, **`2.22×` faster than Rust** `193.1 ms`, **`2.31×` faster than Goose** `201.2 ms`, and **`2.57×` faster than C++ id** `223.7 ms` · RSS: Squid `26.8 MiB`, Goose `25.3`, Rust `25.4`, C++ `26.7–26.8` · Compile: Squid `32.5 ms` (`24.1 + 8.4`, `9.4 KiB`).
-- **`sexp`** (`N = 100,000`) — Time: **Squid `609.7 ms`** (**2.17× vs C++ id `1,321.5 ms`**, **1.53× vs Rust id `930.6 ms`**), Goose `478.0 ms`, Rust exp `486.9 ms`, C++ exp `516.4 ms` · RSS: **Squid `109.1 MiB` (#1 lowest overall, 5.78× vs C++ id)**, Goose `128.0`, Rust exp `226.0`, C++ exp `290.1`, Rust id `481.6`, C++ id `630.4` · Compile: Squid `32.8 ms` (`21.0 + 11.8`, `11.8 KiB`).
-- **`lru`** (`N = 8,000,000`) — Time: **Squid `414.1 ms`** (**3.87× vs C++ id `1,603.3 ms`**, **1.43× vs Rust id `593.8 ms`**), Goose `218.2 ms`, C++ exp `244.2 ms`, Rust exp `274.7 ms` · RSS: Squid `38.9 MiB` (**1.93× vs C++ id**, beats Rust id `44.7`), Rust exp `34.0`, Goose `34.3`, C++ exp `35.9`, C++ id `75.2` · Compile: Squid `31.3 ms` (`21.2 + 10.0`, `10.9 KiB`).
-- **`scene`** (`depth = 14`) — Time: **Squid `66.9 ms`** (**1.72× vs C++ id `115.4 ms`**, **1.42× vs Rust id `94.8 ms`**), Rust exp `46.9 ms`, Goose `47.1 ms`, C++ exp `52.5 ms` · RSS: Squid `57.4 MiB`, Rust exp `31.6`, Goose `32.1`, C++ exp `35.0`, Rust id `41.6`, C++ id `42.9` · Compile: Squid `30.4 ms` (`20.9 + 9.5`, `9.5 KiB`).
-- **`calc`** (`N = 400,000`) — Time: **Squid `181.5 ms`** (**2.25× vs C++ id `408.8 ms`**, **1.23× vs Rust id `223.8 ms`**), Rust exp `118.2 ms`, Goose `126.6 ms`, C++ exp `128.1 ms` · RSS: Squid `3.9 MiB` (beats C++ `4.1–4.3`), Goose `2.0`, Rust `2.4` · Compile: Squid `33.2 ms` (`20.1 + 13.1`, `17.4 KiB`).
-- **`bintrees`** (`depth = 17`) — Time: **Squid `67.2 ms`** (**beats C++ exp `85.5 ms` by `1.27×`**, **beats Rust exp `70.5 ms` by `1.05×`**, **7.32× vs C++ id `492.1 ms`**, **8.83× vs Rust id `593.4 ms`**), Goose `52.6 ms` · RSS: Squid `11.2 MiB` (**1.79× vs C++ id**, beats C++ exp `11.9 MiB`), Goose `8.3`, Rust exp `8.6`, Rust id `18.4`, C++ id `20.1` · Compile: Squid `29.3 ms` (`20.7 + 8.6`, `8.0 KiB`).
-- **`respond`** (`N = 400,000`) — Time: **Squid `194.3 ms`** (**1.37× vs Rust DTO `266.9 ms`**), Goose stream `113.0 ms`, C++ stream `133.5 ms`, Rust stream `165.4 ms`, C++ DTO `182.4 ms` · RSS: Squid `3.9 MiB` (beats C++ `4.1–4.2`), Goose `2.1`, Rust `2.4–2.5` · Compile: Squid `32.8 ms` (`20.3 + 12.4`, `10.8 KiB`).
-- **`blur`** (`W = 2,048`) — Time: **Squid 16-wide `U8x16`/`I16x8` SIMD `28.5 ms`** (down `4.19×` from Nov 26 `119.3 ms`), Goose `19.4 ms`, Rust `20.4–22.7 ms`, C++ `22.3–24.7 ms` · RSS: **Squid `11.9 MiB`**, Rust `10.4–10.5`, Goose `11.2`, C++ `11.8` · Compile: Squid `32.3 ms` (`23.5 + 8.8`, `8.1 KiB`).
+- **`sum`** (`N = 16,000,000`) — Time: **Squid `44.1 ms` (#1 fastest overall)** (**beats C++ exp `48.5 ms` by `1.10×`**, **Rust `50.1 ms` by `1.14×`**, **Goose `50.8 ms` by `1.15×`**, **C++ id `54.7 ms` by `1.24×`**) · RSS: **Squid `64.9 MiB`** (ties C++ exp `64.9`, beats Goose `65.2` & C++ id `69.0`), Rust `63.5` · Compile: Squid `25.5 ms` (`18.5 + 7.1`, `5.6 KiB` `.wasm`).
+- **`push`** (`N = 16,000,000`) — Time: **Squid `43.5 ms`** (**beats C++ exp `43.8 ms`**, **1.16× vs C++ id `50.4 ms`**), Goose `37.2 ms`, Rust `39.9 ms` · RSS: Squid `126.9 MiB` (beats Goose `127.0`, C++ exp `128.0` & C++ id `134.6`), Rust `126.5` · Compile: Squid `26.9 ms` (`18.6 + 8.2`, `6.9 KiB`).
+- **`strlist`** (`N = 2,000,000`) — Time: **Squid `76.0 ms`** (**beats Rust exp `84.2 ms` by `1.11×`**, **1.45× vs C++ id `110.3 ms`**, **1.87× vs Rust id `141.8 ms`**), C++ exp `74.1 ms`, Goose `75.0 ms` · RSS: **Squid `43.4 MiB` (#1 lowest overall)**, Goose `57.4`, Rust exp `59.2`, C++ exp `59.9`, C++ id `108.3`, Rust id `136.0` · Compile: Squid `25.7 ms` (`17.5 + 8.1`, `6.6 KiB`).
+- **`records`** (`N = 4,000,000`) — Time: **Squid `110.6 ms`** (**beats C++ exp `119.0 ms` by `1.08×`**, **1.48× vs C++ id `163.6 ms`**, **1.42× vs Rust `157.5 ms`**), Goose `105.6 ms` · RSS: Squid `73.8 MiB` (**2.66× vs C++ id**, **2.12× vs Rust**), Goose `39.2`, C++ exp `100.5`, Rust `156.1`, C++ id `196.5` · Compile: Squid `25.2 ms` (`17.2 + 8.0`, `7.2 KiB`).
+- **`tree`** (`depth = 20`) — Time: **Squid `32.0 ms`** (**2.63× vs C++ id `84.2 ms`**, **2.36× vs Rust id `75.5 ms`**), Goose `24.1 ms`, C++ exp `24.3 ms`, Rust exp `25.3 ms` · RSS: **Squid `27.9 MiB`** (ties C++ exp `27.9 MiB`, **2.43× vs C++ id**), Goose `26.2`, Rust exp `26.4`, Rust id `65.9`, C++ id `67.7` · Compile: Squid `26.4 ms` (`18.3 + 8.0`, `6.8 KiB`).
+- **`interp`** (`depth = 20`) — Time: **Squid `10.5 ms`** (**1.17× vs C++ id `12.3 ms`**, **1.44× vs Rust id `15.1 ms`**), Goose `8.0 ms`, C++ exp `8.2 ms`, Rust exp `9.6 ms` · RSS: Squid `8.0 MiB` (beats C++ exp `9.9` & Rust id `11.2`), Goose `4.1`, Rust exp `7.7`, C++ id `13.1` · Compile: Squid `26.6 ms` (`18.8 + 7.8`, `6.8 KiB`).
+- **`graph`** (`V = 500,000`) — Time: **Squid `85.4 ms`** (**beats Rust exp `85.9 ms`**, **2.04× vs C++ id `174.5 ms`**, **1.76× vs Rust id `149.9 ms`**), Goose `73.7 ms`, C++ exp `83.6 ms` · RSS: Squid `57.3 MiB` (ties C++ exp `57.3`, beats Goose `58.6`), Rust exp `55.8`, C++ id `51.7`, Rust id `51.0` · Compile: Squid `24.6 ms` (`16.9 + 7.7`, `8.2 KiB`).
+- **`words`** (`N = 4,000,000`) — Time: **Squid `195.3 ms`** (**beats Rust exp `195.8 ms`**, **1.47× vs C++ id `287.5 ms`**, **1.31× vs Rust `HashMap` `256.5 ms`**), Goose `129.4 ms`, C++ exp `185.8 ms` · RSS: **Squid `79.6 MiB` (#1 lowest overall, 1.86× vs C++ id)**, Goose `138.2`, Rust id `142.4`, C++ id `148.4`, Rust exp `171.5`, C++ exp `194.5` · Compile: Squid `28.3 ms` (`18.4 + 9.9`, `8.9 KiB`).
+- **`particles`** (`N = 1,000,000`) — Time: **Squid SoA 4-wide SIMD `83.2 ms` (#1 fastest overall)** — **`2.25×` faster than C++ exp** `186.8 ms`, **`2.27×` faster than Rust** `188.6 ms`, **`2.38×` faster than Goose** `198.0 ms`, and **`2.66×` faster than C++ id** `220.9 ms` · RSS: Squid `26.5 MiB` (beats C++ `26.8`), Goose `25.4`, Rust `25.4` · Compile: Squid `28.8 ms` (`19.7 + 9.1`, `9.4 KiB`).
+- **`sexp`** (`N = 100,000`) — Time: **Squid `556.1 ms`** (**2.11× vs C++ id `1,173.6 ms`**, **1.57× vs Rust id `872.8 ms`**), Goose `428.1 ms`, Rust exp `459.0 ms`, C++ exp `460.5 ms` · RSS: **Squid `109.2 MiB` (#1 lowest overall, 5.77× vs C++ id)**, Goose `128.0`, Rust exp `225.8`, C++ exp `290.1`, Rust id `481.6`, C++ id `630.5` · Compile: Squid `30.0 ms` (`19.6 + 10.4`, `11.8 KiB`).
+- **`lru`** (`N = 8,000,000`) — Time: **Squid `192.0 ms`** (**4.25× vs C++ id `815.6 ms`**, **1.57× vs Rust id `300.8 ms`**), Goose `127.0 ms`, C++ exp `139.9 ms`, Rust exp `145.4 ms` · RSS: Squid `38.9 MiB` (**1.95× vs C++ id**, beats Rust id `44.6`), Goose `34.1`, Rust exp `34.4`, C++ exp `36.9`, C++ id `75.7` · Compile: Squid `28.0 ms` (`18.2 + 9.8`, `10.9 KiB`).
+- **`scene`** (`depth = 14`) — Time: **Squid `59.9 ms`** (**1.50× vs C++ id `89.6 ms`**, **1.39× vs Rust id `83.4 ms`**), Goose `44.8 ms`, Rust exp `46.3 ms`, C++ exp `49.2 ms` · RSS: Squid `57.5 MiB`, Rust exp `31.6`, Goose `32.2`, C++ exp `34.9`, Rust id `42.0`, C++ id `42.9` · Compile: Squid `27.1 ms` (`18.4 + 8.7`, `9.5 KiB`).
+- **`calc`** (`N = 400,000`) — Time: **Squid `179.6 ms`** (**2.22× vs C++ id `399.5 ms`**, **1.18× vs Rust id `212.8 ms`**), Rust exp `117.0 ms`, C++ exp `123.0 ms`, Goose `127.0 ms` · RSS: Squid `3.9 MiB` (beats C++ `4.1–4.3`), Goose `2.2`, Rust `2.4–2.5` · Compile: Squid `32.1 ms` (`19.9 + 12.2`, `17.4 KiB`).
+- **`bintrees`** (`depth = 17`) — Time: **Squid `65.0 ms`** (**beats C++ exp `82.7 ms` by `1.27×`**, **beats Rust exp `74.0 ms` by `1.14×`**, **7.49× vs C++ id `487.0 ms`**, **8.94× vs Rust id `581.2 ms`**), Goose `51.1 ms` · RSS: Squid `11.2 MiB` (**1.79× vs C++ id**, beats C++ exp `11.8 MiB`), Goose `8.4`, Rust exp `8.6`, Rust id `18.3`, C++ id `20.0` · Compile: Squid `26.6 ms` (`18.2 + 8.4`, `8.0 KiB`).
+- **`respond`** (`N = 400,000`) — Time: **Squid `183.9 ms`** (**1.39× vs Rust DTO `254.8 ms`**), Goose stream `113.2 ms`, C++ stream `132.2 ms`, Rust stream `160.5 ms`, C++ DTO `176.7 ms` · RSS: Squid `4.0 MiB` (beats C++ stream `4.1`), Goose `2.2`, Rust `2.4–2.5` · Compile: Squid `31.5 ms` (`19.6 + 11.9`, `10.8 KiB`).
+- **`blur`** (`W = 2,048`) — Time: **Squid 16-wide `U8x16`/`I16x8` SIMD `29.7 ms`** (down `4.02×` from Nov 26 `119.3 ms`), Goose `18.6 ms`, Rust `20.7–21.6 ms`, C++ `21.0–23.9 ms` · RSS: **Squid `11.9 MiB`** (beats C++ id `12.1`), Rust `10.4–10.5`, Goose `11.3`, C++ exp `11.8` · Compile: Squid `27.9 ms` (`19.2 + 8.6`, `8.1 KiB`).
 
 ---
 
 ## Suite 2: Compute, Memory & Auto-SIMD Kernels (Squid vs Rust `-O3`, Default & `--wasm3`)
 
-Six compute, memory, sorting, and `spark` auto-SIMD kernels comparing **Squid** (`squidc-goose` `abb9acaf` → `wtime-aot 0.1.11` `x64-v4 --guard-pages`) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.11 --guard-pages`) and native `x86_64` (`-O3`, thin LTO). Medians of 15 runs; **6/6 bit-exact checksum parity**, **6/6 faster than native Rust `-O3`**.
+Six compute, memory, sorting, and `spark` auto-SIMD kernels comparing **Squid** (`squidc-goose` `e508d586` → `wtime-aot 0.1.11` `x64-v4 --guard-pages`) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.11 --guard-pages`) and native `x86_64` (`-O3`, thin LTO). Medians of 15 runs; **6/6 bit-exact checksum parity**, **6/6 faster than native Rust `-O3`**, and **5/6 faster than Rust Wasm `-O3`**.
 
 - **Source & runner:** [benchmarks/comparison/README.md](benchmarks/comparison/README.md) · **Raw JSON:** [`2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json`](benchmarks/evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json)
 
@@ -78,12 +78,12 @@ Six compute, memory, sorting, and `spark` auto-SIMD kernels comparing **Squid** 
 
 ### Per-Kernel Results (Median ms)
 
-- **`lcg_recurrence`** (1,000,000 U32 steps, checksum `54448`): **Squid `0.070 ms`** (`--wasm3`: `0.090 ms`) vs Rust Wasm `0.340 ms` (**4.83× faster**) vs Native Rust `0.342 ms` (**4.87× faster**).
-- **`prime_sieve`** (100k Bool sieve, checksum `1881015445`): **Squid `0.058 ms`** (`--wasm3`: `0.068 ms`) vs Rust Wasm `0.062 ms` (**1.07× faster**) vs Native Rust `0.074 ms` (**1.27× faster**).
-- **`matmul_64`** (64×64 F32 matmul, checksum `6538500`): **Squid `0.0157 ms`** (`--wasm3`: **`0.0120 ms`**) vs Rust Wasm `0.0200 ms` (**1.28× faster**) vs Native Rust `0.0206 ms` (**1.32× faster**).
-- **`mandelbrot_f32`** (256×256 F32 escape-time, checksum `1686408`): **Squid `0.556 ms`** (`--wasm3`: `0.580 ms`) vs Native Rust `3.689 ms` (**6.64× faster**); Rust Wasm `0.344 ms` (`1.62×`).
-- **`particle_spark_simd`** (65k × 32 `spark` SIMD, checksum `13338354`): **Squid `0.376 ms`** (`--wasm3`: **`0.316 ms`**) vs Rust Wasm `0.607 ms` (**1.61× faster**) vs Native Rust `0.685 ms` (**1.82× faster**).
-- **`merge_sort`** (100k U32 ping-pong merge sort, checksum `2814210976`): **Squid `3.840 ms`** (`--wasm3`: **`3.496 ms`**) vs Native Rust `5.444 ms` (**1.42× faster**); Rust Wasm `3.394 ms` (`1.13×`).
+- **`lcg_recurrence`** (1,000,000 U32 steps, checksum `54448`): **Squid `0.071 ms`** (`--wasm3`: **`0.070 ms`**) vs Rust Wasm `0.349 ms` (**4.92× faster**) vs Native Rust `0.344 ms` (**4.86× faster**).
+- **`prime_sieve`** (100k Bool sieve, checksum `1881015445`): **Squid `0.056 ms`** (`--wasm3`: `0.067 ms`) vs Rust Wasm `0.060 ms` (**1.06× faster**) vs Native Rust `0.070 ms` (**1.24× faster**).
+- **`matmul_64`** (64×64 F32 matmul, checksum `6538500`): **Squid `0.0150 ms`** (`--wasm3`: **`0.0133 ms`**) vs Rust Wasm `0.0192 ms` (**1.28× faster**) vs Native Rust `0.0200 ms` (**1.33× faster**).
+- **`mandelbrot_f32`** (256×256 F32 escape-time, checksum `1686408`): **Squid `0.549 ms`** (`--wasm3`: `0.572 ms`) vs Native Rust `3.901 ms` (**7.11× faster**); Rust Wasm `0.343 ms` (`1.60×`).
+- **`particle_spark_simd`** (65k × 32 `spark` SIMD, checksum `13338354`): **Squid `0.351 ms`** (`--wasm3`: **`0.349 ms`**) vs Rust Wasm `0.578 ms` (**1.65× faster**) vs Native Rust `0.687 ms` (**1.96× faster**).
+- **`merge_sort`** (100k U32 ping-pong merge sort, checksum `2814210976`): **Squid `3.393 ms`** (`--wasm3`: `3.699 ms`) vs Rust Wasm `3.532 ms` (**1.04× faster**) vs Native Rust `5.570 ms` (**1.64× faster**).
 
 ---
 
@@ -93,46 +93,46 @@ Measured on the same `wtime-aot 0.1.11` (`x64-v4 --guard-pages`) and native `rus
 
 ### AoS Record Auto-SIMD (65,536 particles × 32 ticks, bit-exact checksums)
 
-- **`aos_vec4_euler_65k_x32`** (`#[Vec4]`, checksum `16529059`): **Squid `1.599 ms`** (`--wasm3`: **`1.516 ms`**) vs Native Rust `3.008 ms` — **Squid `1.88×` faster** (`1.98×` with `--wasm3`).
-- **`aos_vec2_euler_65k_x32`** (`#[Vec2]`, checksum `19009988`): Squid `0.732 ms` (`--wasm3`: `0.724 ms`) vs Native Rust `0.482 ms` — Squid `1.52×` (`1.50×` `--wasm3`).
+- **`aos_vec4_euler_65k_x32`** (`#[Vec4]`, checksum `16529059`): **Squid `1.435 ms`** (`--wasm3`: **`1.336 ms`**) vs Native Rust `3.132 ms` — **Squid `2.18×` faster** (`2.34×` with `--wasm3`).
+- **`aos_vec2_euler_65k_x32`** (`#[Vec2]`, checksum `19009988`): Squid `0.659 ms` (`--wasm3`: `0.585 ms`) vs Native Rust `0.479 ms` — Squid `1.38×` (`1.22×` `--wasm3`).
 
 ### Multi-Core Isolated Guests (`mandelbrot`, 8 × 256×256 tiles, checksum `13500030`)
 
-- **1 thread:** **Squid `5.076 ms`** (`1.00×`) vs Native Rust `28.982 ms` (**Squid `5.71×` faster**).
-- **2 threads:** **Squid `2.982 ms`** (`1.70×` scaling) vs Native Rust `16.187 ms` (**Squid `5.43×` faster**).
-- **4 threads:** **Squid `1.565 ms`** (`3.24×` scaling) vs Native Rust `8.661 ms` (**Squid `5.53×` faster**).
-- **8 threads:** **Squid `1.063 ms`** (`4.77×` scaling) vs Native Rust `4.628 ms` (**Squid `4.35×` faster**).
+- **1 thread:** **Squid `5.850 ms`** (`1.00×`) vs Native Rust `31.134 ms` (**Squid `5.32×` faster**).
+- **2 threads:** **Squid `2.954 ms`** (`1.98×` scaling) vs Native Rust `16.745 ms` (**Squid `5.67×` faster**).
+- **4 threads:** **Squid `1.510 ms`** (`3.87×` scaling) vs Native Rust `8.769 ms` (**Squid `5.81×` faster**).
+- **8 threads:** **Squid `1.114 ms`** (`5.25×` scaling) vs Native Rust `4.551 ms` (**Squid `4.08×` faster**).
 
 ### Persistent `#process` (`particle_sim`, 4,096 particles, zero-alloc state commits)
 
-- **No-op commit step:** **`48.4 ns/step`** (**`20.67M` steps/sec**).
-- **Full AoS `Vec4` physics step (4,096 particles):** **`2.18 µs/step`**.
+- **No-op commit step:** **`48.7 ns/step`** (**`20.54M` steps/sec**).
+- **Full AoS `Vec4` physics step (4,096 particles):** **`1.93 µs/step`**.
 
 ---
 
 ## Suite 4: Ink ECS (Squid `#process`) vs Bevy ECS 0.20.1 (Native Rust)
 
-Real 10,000-entity ECS worlds comparing **Ink ECS** (`ink/ecs` dense/bitset/sparse `Pool` + `#[U64]` `Entities` + `ink/ecs/query`, compiled by `squidc-goose` `abb9acaf` to `155.2 KiB` `.wasm` on `wtime-aot 0.1.11 --guard-pages`) against native **Bevy ECS `0.20.1`** (`rustc -O3`). Medians of 15 runs; bit-exact checksum parity on `dense_iter`, `sparse_filtered_iter`, and `batch_spawn` ([`ink_ecs_bench.sq`](benchmarks/comparison/ink_ecs_bench.sq), [`2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json`](benchmarks/evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json)):
+Real 10,000-entity ECS worlds comparing **Ink ECS** (`ink/ecs` dense/bitset/sparse `Pool` + `#[U64]` `Entities` + `ink/ecs/query`, compiled by `squidc-goose` `e508d586` to `160.2 KiB` `.wasm` on `wtime-aot 0.1.11 --guard-pages`) against native **Bevy ECS `0.20.1`** (`rustc -O3`). Medians of 15 runs; bit-exact checksum parity on `dense_iter`, `sparse_filtered_iter`, and `batch_spawn` — **Ink ECS wins 4/5 workloads (and all three dense iteration modes beat Bevy by `4.2×–5.4×`)** ([`ink_ecs_bench.sq`](benchmarks/comparison/ink_ecs_bench.sq), [`2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json`](benchmarks/evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json)):
 
 ![Ink ECS vs Bevy ECS 0.20.1](benchmarks/evidence/measurements/2026-11-27-ink-vs-bevy-ecs.svg)
 
 - **`dense_iter_10k_x100`** (`Pos += Vel`, 10k × 100 ticks, checksum `88466466`):
-  - **Squid SoA + `spark` SIMD:** **`0.260 ms`** (**`7.33×` faster** than Bevy)
-  - Bevy ECS (native): `1.907 ms`
-  - Ink ECS (`Pool` direct, 12B `#[Pos]` scalar loop): `2.944 ms` (`1.54×` Bevy; upgraded `ink/ecs` packs dense `Pool` values as 12-byte `#[Pos]` without `Maybe`, bypassing the legacy 16B `Maybe Vec3` auto-SIMD pass)
-  - Ink ECS (cached query): `3.090 ms` (`1.62×` Bevy)
-- **`sparse_filtered_iter_500_of_10k_x100`** (`With Active`, `Without Frozen`, checksum `71214832`): Bevy `0.114 ms` vs Ink cached query `0.362 ms`.
-- **`batch_spawn_10k`** (`Pos + Vel + 10% Active`, checksum `70292880`): **Ink `0.253 ms`** vs Bevy `0.550 ms` (**`2.17×` faster**).
-- **`structural_churn_2000_tag_ops`** (insert/remove `Active` on 10k world): Bevy `108.5 µs` vs Ink sparse-set `154.4 µs`.
-- **`world_snapshot_copy_10k`** (`ecs.copy_into` clone of all 5 pools vs Bevy world rebuild): **Ink `37.2 µs`** vs Bevy `552.5 µs` (**`14.8×` faster**).
-- **Ink ECS app build:** `42.7 ms` `squidc-goose` + `19.8 ms` `wtime-aot` (`155.2 KiB` `.wasm`).
+  - **Ink ECS (`Pool` direct, 12B `#[Pos]` + `#[Vel]` `k==3` AoS auto-SIMD):** **`0.230 ms`** (**`5.42×` faster** than Bevy; down **`12.8×`** from `2.944 ms`)
+  - **Squid SoA + `spark` SIMD:** **`0.262 ms`** (**`4.75×` faster** than Bevy)
+  - **Ink ECS (cached query, Shape 2 indirect AoS SIMD):** **`0.295 ms`** (**`4.22×` faster** than Bevy; down **`10.5×`** from `3.090 ms`)
+  - Bevy ECS (native): `1.246 ms`
+- **`sparse_filtered_iter_500_of_10k_x100`** (`With Active`, `Without Frozen`, checksum `71214832`): Bevy `0.068 ms` vs **Ink cached query `0.089 ms`** (down **`4.05×`** from `0.362 ms` via Shape 2 4× hoisted-bounds indirect loop + deferred NaN).
+- **`batch_spawn_10k`** (`Pos + Vel + 10% Active`, checksum `70292880`): **Ink `0.124 ms`** vs Bevy `0.327 ms` (**`2.64×` faster**).
+- **`structural_churn_2000_tag_ops`** (insert/remove `Active` on 10k world): **Ink sparse-set `74.5 µs`** vs Bevy `88.2 µs` (**`1.18×` faster**).
+- **`world_snapshot_copy_10k`** (`ecs.copy_into` clone of all 5 pools vs Bevy world rebuild): **Ink `34.6 µs`** vs Bevy `380.2 µs` (**`11.0×` faster**).
+- **Ink ECS app build:** `40.5 ms` `squidc-goose` + `22.1 ms` `wtime-aot` (`160.2 KiB` `.wasm`).
 
 ---
 
 ## Suite 5: Compiler Cold Build, Incremental Edit & Scaling
 
-- **6-kernel benchmark app (`squid_kernels.sq`):** `19.8 ms` cold `squidc-goose` (+ `7.3 ms` `wtime-aot`, `20.9 KiB` `.wasm`) vs `102.3 ms` `rustc -O3 wasm32` (**`5.2×` faster**, **`70×` smaller** than `1,468 KiB` `.wasm`) and `92.9 ms` `rustc -O3` native rlib.
-- **16-benchmark Goose suite:** `29.9 ms` geomean cold build (`20.6 ms` `squidc-goose` + `9.2 ms` `wtime-aot`, `5.6–17.4 KiB` `.wasm`) vs `93.3 ms` `rustc -O` (`3.1×`), `134.4 ms` `goose + clang -O2` (`4.5×`), and `253.1 ms` `clang++ -O2` (`8.5×`).
+- **6-kernel benchmark app (`squid_kernels.sq`):** `18.2 ms` cold `squidc-goose` (+ `5.7 ms` `wtime-aot`, `20.9 KiB` `.wasm`) vs `95.5 ms` `rustc -O3 wasm32` (**`5.2×` faster**, **`70×` smaller** than `1,468 KiB` `.wasm`) and `86.5 ms` `rustc -O3` native rlib.
+- **16-benchmark Goose suite:** `27.5 ms` geomean cold build (`18.6 ms` `squidc-goose` + `8.9 ms` `wtime-aot`, `5.6–17.4 KiB` `.wasm`) vs `87.9 ms` `rustc -O` (`3.2×`), `123.7 ms` `goose + clang -O2` (`4.5×`), and `225.9 ms` `clang++ -O2` (`8.2×`).
 - **Anonymous internal 3D game project:** ~**69k LOC** of Squid across **263** source modules + **62** shader/data asset modules (**325 modules / 4,572 functions / 6.71 MB `.wasm`**) — **~0.43–0.55 s** full cold build, **~41–44 ms** `fresh=1` single-file incremental edit, **~20 ms** literal/comment edit.
 - **Synthetic 1M LOC scaling:** **~0.50 s** (**~2.0M LOC/s**).
 
@@ -181,7 +181,7 @@ Thirteen workloads from [`hanabi1224/Programming-Language-Benchmarks`](https://g
 
 ## Suite 8: Collection Families (`#[T]`, `%[T]`, `~[T]`) vs C++20 & Rust (`Vec`, `VecDeque`, `imbl::Vector`)
 
-Twelve workloads comparing Squid's three one-symbol storage families — **`#[T]`** (contiguous mutable `Array T`), **`%[T]`** (automatic SoA & split-stream `Packed T`), and **`~[T]`** (reversible generative SIMD-RRB `Seq T` with FocusGap & packed leaves) on `squidc-goose` (`6a455eae`) + `wtime-aot 0.1.11 --guard-pages` — against bit-exact native **C++20** (`clang++ 23.1.5 -O3 -march=native`: `std::vector`, `std::deque`, manual SoA / split-stream), **Rust** (`rustc 1.96.0-nightly -O`: `Vec`, `VecDeque`, manual SoA / split-stream), and **`imbl::Vector 6.1`** (Rust's persistent RRB-tree). Median of 11 samples (`CLOCK_MONOTONIC`); **12/12 bit-exact checksum parity**.
+Twelve workloads comparing Squid's three one-symbol storage families — **`#[T]`** (contiguous mutable `Array T`), **`%[T]`** (automatic SoA & split-stream `Packed T`), and **`~[T]`** (reversible generative SIMD-RRB `Seq T` with FocusGap & packed leaves) on `squidc-goose` (`e508d586`) + `wtime-aot 0.1.11 --guard-pages` — against bit-exact native **C++20** (`clang++ 23.1.5 -O3 -march=native`: `std::vector`, `std::deque`, manual SoA / split-stream), **Rust** (`rustc 1.96.0-nightly -O`: `Vec`, `VecDeque`, manual SoA / split-stream), and **`imbl::Vector 6.1`** (Rust's persistent RRB-tree). Median of 11 samples (`CLOCK_MONOTONIC`); **12/12 bit-exact checksum parity**.
 
 - **Details & runner:** [benchmarks/collections/README.md](benchmarks/collections/README.md) · **Raw JSON:** [`results.json`](benchmarks/evidence/measurements/2026-11-27-collections/results.json)
 
@@ -191,20 +191,20 @@ Twelve workloads comparing Squid's three one-symbol storage families — **`#[T]
 
 | Workload | Squid `#[T]` | Squid `%[T]` | Squid `~[T]` | C++20 `-O3 native` | Rust `-O` | Rust `imbl::Vector` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1. `flat_scan` (100k + 10× sum) | **`93.3 µs`** | `130.5 µs` | **`301.5 µs`** | `58.0 µs` vec / `595 µs` deque | `97.2 µs` Vec / `485 µs` VecDeque | `3.15 ms` (**~[] 10.4×**) |
-| 2. `random_index` (200k / 100k) | `336.7 µs` | — | **`1.89 ms`** | `275.7 µs` vec / `524 µs` deque | `333.0 µs` Vec / `327 µs` VecDeque | `2.93 ms` (**~[] 1.55×**) |
-| 3. `skewed_sum` (100k 99%/1% 64B × 20) | `1.43 ms` (`10.2 MiB`) | **`1.00 ms`** (`3.8 MiB`) | **`1.75 ms`** (`4.2 MiB`) | `2.84 ms` vec / `498 µs` split* | `1.23 ms` Vec / `585 µs` split* | `4.08 ms` (**~[] 2.33×**) |
-| 4. `wide_soa` (100k 72B × 80 2-col) | `5.65 ms` | **`4.46 ms`** | **`7.70 ms`** | `7.20 ms` AoS / `3.44 ms` SoA* | `4.58 ms` AoS / `2.70 ms` SoA* | `12.0 ms` (**~[] 1.56×**) |
-| 5. `reverse_ops` (100× rev + range, 100k) | `4.63 ms` | — | **`150.4 µs`** | `4.08 ms` vec (**~[] 27.1×**) | `1.16 ms` Vec (**~[] 7.7×**) | `180.3 ms` (**~[] 1,199×**) |
-| 6. `generative_1m` (1M ramp + edit + slice) | `694.7 µs` | — | **`7.9 µs`** (`128 KiB`) | `265.6 µs` vec (**~[] 33.6×**) | `438.9 µs` Vec (**~[] 55.6×**) | `7.20 ms` (**~[] 911×**) |
-| 7. `snapshot_cow` (2,000× CoW edit, 50k) | `5.78 ms` | — | **`955.3 µs`** | `5.85 ms` vec (**~[] 6.1×**) | `5.96 ms` Vec (**~[] 6.2×**) | `1.42 ms` (**~[] 1.49×**) |
-| 8. `cursor_insert` (2,000 mid inserts, 20k) | `7.58 ms` | — | **`71.2 µs`** | `731 µs` vec / `1.34 ms` deque (**10–19×**) | `812 µs` Vec / `768 µs` VecDeque (**11×**) | `45.3 ms` (**~[] 636×**) |
-| 9. `front_deque` (5k push + 2.5k pop front) | `8.51 ms` | — | **`67.1 µs`** | `652 µs` vec / `11.5 µs` deque | `671 µs` Vec / `7.6 µs` VecDeque | `53.3 µs` |
-| 10. `split_concat` (500× rotations, 50k) | `32.7 ms` | — | **`1.05 ms`** | `1.45 ms` vec (**~[] 1.38×**) | `1.47 ms` Vec (**~[] 1.40×**) | `4.56 ms` (**~[] 4.34×**) |
-| 11. `frozen_span` (500× slice+rev+sum, 100k) | `9.31 ms` | — | **`253.5 µs`** | `1.12 ms` vec (**~[] 4.4×**) | `1.29 ms` Vec (**~[] 5.1×**) | `14.3 ms` (**~[] 56.4×**) |
-| 12. `packed_sum_cow` (1k× CoW 50k 64B sum) | `60.5 ms` | — | **`563.3 µs`** (`4.5 MiB`) | `69.2 ms` vec (`10.5 MiB`, **123×**) | `67.3 ms` Vec (`9.5 MiB`, **119×**) | `1.14 ms` (**~[] 2.02×**) |
+| 1. `flat_scan` (100k + 10× sum) | **`38.1 µs`** (#1) | **`42.9 µs`** | **`66.9 µs`** | `57.3 µs` vec / `575 µs` deque | `95.6 µs` Vec / `461 µs` VecDeque | `2.91 ms` (**~[] 43.5×**) |
+| 2. `random_index` (200k / 100k) | **`268.5 µs`** (#1) | — | **`2.09 ms`** | `331.8 µs` vec / `427 µs` deque | `354.1 µs` Vec / `312 µs` VecDeque | `3.12 ms` (**~[] 1.49×**) |
+| 3. `skewed_sum` (100k 99%/1% 64B × 20) | `1.48 ms` (`10.1 MiB`) | **`376.5 µs`** (#1, `4.0 MiB`) | **`961.3 µs`** (`4.2 MiB`) | `2.87 ms` vec / `488 µs` split* | `1.16 ms` Vec / `709 µs` split* | `3.91 ms` (**~[] 4.07×**) |
+| 4. `wide_soa` (100k 72B × 80 2-col) | `4.76 ms` | **`728.6 µs`** (#1) | **`1.72 ms`** | `6.89 ms` AoS / `2.86 ms` SoA* | `4.48 ms` AoS / `2.75 ms` SoA* | `11.9 ms` (**~[] 6.92×**) |
+| 5. `reverse_ops` (100× rev + range, 100k) | `4.69 ms` | — | **`61.7 µs`** (#1) | `4.00 ms` vec (**~[] 64.8×**) | `1.15 ms` Vec (**~[] 18.6×**) | `178.6 ms` (**~[] 2,895×**) |
+| 6. `generative_1m` (1M ramp + edit + slice) | **`66.3 µs`** | — | **`8.5 µs`** (#1, `128 KiB`) | `280.5 µs` vec (**~[] 33.0×**) | `427.1 µs` Vec (**~[] 50.2×**) | `7.05 ms` (**~[] 829×**) |
+| 7. `snapshot_cow` (2,000× CoW edit, 50k) | `6.30 ms` | — | **`907.4 µs`** (#1) | `5.38 ms` vec (**~[] 5.9×**) | `5.39 ms` Vec (**~[] 5.9×**) | `1.24 ms` (**~[] 1.37×**) |
+| 8. `cursor_insert` (2,000 mid inserts, 20k) | `8.74 ms` | — | **`25.9 µs`** (#1) | `880 µs` vec / `1.61 ms` deque (**34–62×**) | `801 µs` Vec / `794 µs` VecDeque (**31×**) | `45.6 ms` (**~[] 1,761×**) |
+| 9. `front_deque` (5k push + 2.5k pop front) | `8.29 ms` | — | **`37.6 µs`** | `676 µs` vec / `10.5 µs` deque | `678 µs` Vec / `7.6 µs` VecDeque | `59.3 µs` (**~[] 1.58×**) |
+| 10. `split_concat` (500× rotations, 50k) | `32.3 ms` | — | **`975.8 µs`** (#1) | `1.50 ms` vec (**~[] 1.54×**) | `1.44 ms` Vec (**~[] 1.48×**) | `4.50 ms` (**~[] 4.61×**) |
+| 11. `frozen_span` (500× slice+rev+sum, 100k) | `8.92 ms` | — | **`73.2 µs`** (#1) | `1.04 ms` vec (**~[] 14.2×**) | `1.15 ms` Vec (**~[] 15.7×**) | `15.2 ms` (**~[] 208×**) |
+| 12. `packed_sum_cow` (1k× CoW 50k 64B sum) | `60.9 ms` | — | **`591.1 µs`** (#1, `4.7 MiB`) | `66.2 ms` vec (`10.7 MiB`, **112×**) | `65.2 ms` Vec (`9.4 MiB`, **110×**) | `1.04 ms` (**~[] 1.76×**) |
 
-<sub>*C++/Rust manual split-stream & SoA are hand-written multi-vector structures; Squid `%[T]` and `~[T]` generate them automatically from a single type symbol. `~[T]` beats `imbl::Vector` on **11/12** workloads (by `1.49×`–`1,199×`).</sub>
+<sub>*C++/Rust manual split-stream & SoA are hand-written multi-vector structures; Squid `%[T]` and `~[T]` generate them automatically from a single type symbol. Squid finishes **#1 fastest overall on 11/12 workloads**, **`%[T]` beats hand-written C++20/Rust manual split-stream (`1.30×–1.88×`) and manual SoA (`3.77×–3.93×`)**, and **`~[T]` sweeps `imbl::Vector` 12/12** (by `1.37×`–`2,895×`).</sub>
 
 ---
 
