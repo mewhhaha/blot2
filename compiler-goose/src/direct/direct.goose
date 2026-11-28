@@ -155,7 +155,7 @@ fn emitTrapMetadata(module: squid_direct_writer::Module&, state: const squid_dir
         let msg_end = msg_start + (entry.message_len as i64);
         squid_direct_writer::raw(section, state.trap_text[msg_start..msg_end]);
     }
-    module.custom("squid:traps", section[..]);
+    module.setCustom("squid:traps", section[..]);
 }
 fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const squid_check_wire_schema::ProgramInfo&, bytes: u8[>..<]&) -> Error {
     if !g.hasUnit(entry) { return squid_direct_types::Error.unsupported; }

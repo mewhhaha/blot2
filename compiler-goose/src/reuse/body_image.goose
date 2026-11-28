@@ -846,6 +846,7 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     s.replaying=true;
     s.dep_match=true;
     let sections=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len];
+    let traps_before=s.traps.len;
     var drop_unit:u32=0;
     if old_m.nodes.len!=m.nodes.len { drop_unit=changed_unit; }
     squid_direct_relocations::beginReplay(image.layout.body_sites,skip_fn[..],drop_unit);
@@ -877,6 +878,9 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
        sections!=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len] {
         squid_direct_relocations::abortReplay();
         return false;
+    }
+    if s.traps.len!=traps_before && !s.exported_storage && w.has_memory {
+        squid_direct::emitTrapMetadata(w,s);
     }
     var bytes:u8[>..<]=[];
     squid_direct_writer::assemble(w,bytes);

@@ -2722,6 +2722,38 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if !primitive_result && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
     },
+    associated, result_associated => {
+        // Deferred polymorphic associated dispatch (`+`, `@type.call`, `@type.result`)
+        // borrows its operands rather than escaping them. When the result type is still
+        // open, conservatively treat it as a potential holder (matching unresolved
+        // `Tag.project`) so loans stay live until last use, while concrete non-borrowing
+        // results (e.g. `F32`, `Bool`) end temporary briefs and loans immediately.
+        let primitive_result = n.ty != 0 && n.ty <= squid_check_types::never;
+        let holder = !primitive_result && (lends(self_, m, n.ty) || openType(m, n.ty, 0));
+        let base = self_.captured.len;
+        let ends = self_.briefs.len;
+        let held_base = self_.arguments_held.len;
+        let place_base = self_.argument_places.len;
+        var exits = false;
+        if n.a != 0 {
+            let value = lend(self_, m, n.a, holder, lends_to, brief);
+            exits = exits || value.exits;
+        }
+        if tag == squid_check_core::Tag.associated && n.b != 0 {
+            let value = lend(self_, m, n.b, holder, lends_to, brief);
+            exits = exits || value.exits;
+        }
+        if self_.arguments_held.len != held_base { self_.arguments_held.resize(held_base); }
+        if self_.argument_places.len != place_base { self_.argument_places.resize(place_base); }
+        if self_.captured.len != base { giveBack(self_, base); }
+        if !holder {
+            if self_.briefs.len != ends { endBriefs(self_, ends); }
+            if !self_.dry && self_.loans.len != 0 && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
+        }
+        var fact: Fact = none;
+        if !primitive_result && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
+        return Value { fact: fact, exits: exits, .. };
+    },
     _ => {
         let exits = visitChildren(self_, m, id);
         return Value { exits: exits, .. };

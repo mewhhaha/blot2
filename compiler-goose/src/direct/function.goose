@@ -1762,6 +1762,23 @@ fn isOpaqueOutsideUnit(g: const Generator&, m: const Module&, ty: Ty) -> bool {
     }
     return false;
 }
+fn recordTrapEntry(g: Generator&, kind: u8, unit: u32, sp_start: u32, sp_end: u32, message: Chars) -> u32 {
+    if g.s.replaying {
+        for entry, i in g.s.traps {
+            if entry.kind == kind && entry.unit == unit && entry.start == sp_start && entry.end == sp_end && (entry.message_len as i64) == message.len {
+                let ms = entry.message_start as i64;
+                if g.s.trap_text[ms..ms + (entry.message_len as i64)] == message {
+                    return (i + 1) as u32;
+                }
+            }
+        }
+    }
+    let msg_start = g.s.trap_text.len as u32;
+    g.s.trap_text.append(message);
+    let msg_len = (g.s.trap_text.len as u32) - msg_start;
+    g.s.traps.push(squid_direct_emit::TrapEntry { kind: kind, unit: unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: msg_len });
+    return g.s.traps.len as u32;
+}
 fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
     if !g.module.has_memory {
         if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
@@ -1787,11 +1804,7 @@ fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
         uleb(g, 0);
         return;
     }
-    let msg_start = g.s.trap_text.len as u32;
-    g.s.trap_text.append(message);
-    let msg_len = (g.s.trap_text.len as u32) - msg_start;
-    g.s.traps.push(squid_direct_emit::TrapEntry { kind: kind, unit: g.units[f.unit - 1].unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: msg_len });
-    let trap_id = g.s.traps.len as u32;
+    let trap_id = recordTrapEntry(g, kind, g.units[f.unit - 1].unit, sp_start, sp_end, message);
     i32Const(g, squid_direct_runtime::trap_site_offset);
     i32Const(g, trap_id);
     op(g, OP_i32_store);
@@ -1823,11 +1836,7 @@ fn emitPanicTrap(g: Generator&, f: Fn&, id: u32) {
         uleb(g, 0);
         return;
     }
-    let msg_start = g.s.trap_text.len as u32;
-    g.s.trap_text.append(g.units[f.unit - 1].panicMessage(id));
-    let msg_len = (g.s.trap_text.len as u32) - msg_start;
-    g.s.traps.push(squid_direct_emit::TrapEntry { kind: 1, unit: g.units[f.unit - 1].unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: msg_len });
-    let trap_id = g.s.traps.len as u32;
+    let trap_id = recordTrapEntry(g, 1, g.units[f.unit - 1].unit, sp_start, sp_end, g.units[f.unit - 1].panicMessage(id));
     i32Const(g, squid_direct_runtime::trap_site_offset);
     i32Const(g, trap_id);
     op(g, OP_i32_store);

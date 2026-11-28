@@ -635,6 +635,8 @@ func caller (n: U32): U32 =>
   xs := self.push 9
   return xs[0] + alias[0]
 func editable (x: U32): U32 =>
+  if x == 999:
+    panic "unreachable guard"
   let p = $Pair { a: x, b: 10 }
   return f4 p + (${extraExpr})
 func run_all (): U32 =>

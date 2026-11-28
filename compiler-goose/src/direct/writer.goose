@@ -398,6 +398,17 @@ fn custom(module: Module&, section_name: const u8[:], payload: const u8[:]) {
     let owned_payload = own(module, payload);
     module.customs.push(Custom { name: owned_name, payload: owned_payload });
 }
+fn setCustom(module: Module&, section_name: const u8[:], payload: const u8[:]) {
+    if module.readonly { module.readonly_hit = true; return; }
+    for &entry in module.customs {
+        let start = entry.name.start as i64;
+        if (entry.name.len as i64) == section_name.len && module.text[start..start + (entry.name.len as i64)] == section_name {
+            entry.payload = own(module, payload);
+            return;
+        }
+    }
+    custom(module, section_name, payload);
+}
 fn setName(module: Module&, function: u32, value: const u8[:]) {
     if module.readonly { module.readonly_hit = true; return; }
     let owned = own(module, value);

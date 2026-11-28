@@ -312,3 +312,48 @@ io const answer = func (): U32 => 4 \`ops.combine\` 2
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("polymorphic associated binary operators borrow operands without escaping unique owners", async () => {
+  await compileAndRun(
+    `type Box is data = $Box { xs: #[U32] }
+func push_box (b: own Box): Box =>
+  @storage.push b.xs 1
+  return b
+func step policy -> (own access) =>
+  let acc: F32 = 0.0
+  for i in 0..3:
+    let h: F32 = policy.rise access () 1.0 2.0 + 0.5
+    let nested: F32 = policy.stack_top (policy.rise access ()) 1.0 + 0.5
+    acc := self + h + nested
+    access.b := push_box self
+  return (access, acc)
+io const answer = func (): U32 =>
+  let a = { b: $Box { xs: #[] } }
+  let p = {
+    rise: func _ -> _ -> (x: F32) -> (z: F32) => x + z,
+    stack_top: func g -> (x: F32) => g x 2.0,
+  }
+  let (r, acc) = step p a
+  return r.b.xs.length + F32.to_u32 acc
+`,
+    (guest) => {
+      // 3 iterations: h = 3.5, nested = 3.5 -> acc = 21.0; xs.length = 3 -> 24
+      equal(guest.call("answer", null), 24);
+    },
+  );
+  // Soundness: an open-result `@type.call` borrow cannot outlive mutating its receiver.
+  await compileExpectedFailure(
+    `type Holder a is data = $Holder { items: #[a] }
+func Holder.add (h: Holder a) -> (i: U32): a => h.items[i]
+func bad (own h) -> (v: #[U32]) =>
+  let elem = h + 0
+  @storage.push h.items v
+  return elem
+io const answer = func (): U32 =>
+  let h = $Holder { items: #[#[1]] }
+  let e = bad h #[2]
+  return e[0]
+`,
+    "aliased_update",
+  );
+});
