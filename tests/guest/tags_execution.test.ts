@@ -56,9 +56,10 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
     const records = new TextDecoder().decode(run.stdout).trim().split("\n").map(
       (line) => JSON.parse(line),
     );
+    const comp = records.find((record) => record.kind === "compilation");
     equal(
-      records.find((record) => record.kind === "compilation").memory.live_bytes,
-      0,
+      comp.memory.live_bytes,
+      comp.memory.coverage === "unavailable" ? null : 0,
     );
     const guest = await instantiateGuest(
       await Deno.readFile(`${dir}/program.wasm`),

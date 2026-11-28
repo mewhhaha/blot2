@@ -124,7 +124,10 @@ for (
       const metrics = records.find((record) => record.kind === "compilation");
       equal(diagnostic?.code, code);
       if (origin !== undefined) equal(diagnostic.start, origin);
-      equal(metrics.memory.live_bytes, 0);
+      equal(
+        metrics.memory.live_bytes,
+        metrics.memory.coverage === "unavailable" ? null : 0,
+      );
       try {
         await Deno.stat(output);
       } catch (error) {

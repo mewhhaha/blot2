@@ -37,7 +37,8 @@ interface Measurement {
   success: boolean;
   diagnostic?: { code: string };
   type_nodes: number;
-  allocated_bytes: number;
+  allocated_bytes: number | null;
+  memory_coverage?: string;
 }
 /** Counters pinned by a budget. */
 type Budgeted = { type_nodes: number; allocated_bytes: number };
@@ -66,6 +67,7 @@ async function measure(program: SyntheticProgram): Promise<Measurement> {
       diagnostic: records.find((record) => record.kind === "diagnostic"),
       type_nodes: metrics.type_nodes,
       allocated_bytes: metrics.memory.allocated_bytes,
+      memory_coverage: metrics.memory.coverage,
     };
   } finally {
     await Deno.remove(directory, { recursive: true });
@@ -79,7 +81,7 @@ function assertWithinBudget(
   allocationHeadroom = headroom,
 ) {
   assert(actual.success, `${label} failed: ${JSON.stringify(actual)}`);
-  const observed: Budgeted = {
+  const observed: Record<keyof Budgeted, number | null> = {
     type_nodes: actual.type_nodes,
     allocated_bytes: actual.allocated_bytes,
   };
@@ -89,7 +91,14 @@ function assertWithinBudget(
       measured * (name === "allocated_bytes" ? allocationHeadroom : headroom),
     );
     const value = observed[name as keyof Budgeted];
-    if (!(value <= budget)) {
+    if (
+      name === "allocated_bytes" &&
+      actual.memory_coverage === "unavailable" &&
+      value === null
+    ) {
+      continue;
+    }
+    if (value === null || !(value <= budget)) {
       failures.push(
         `${name}: ${value} exceeds budget ${budget} (was ${measured})`,
       );

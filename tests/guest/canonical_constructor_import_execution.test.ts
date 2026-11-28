@@ -42,7 +42,7 @@ for(const asynchronous of [false,true])Deno.test(`imported callable record const
   await Deno.writeTextFile(dir+"/model.sq",producerSource);await Deno.writeTextFile(dir+"/main.sq",consumerSource);
   const result=await new Deno.Command(compiler,{args:["build-project",dir+"/main.sq",dir+"/program.wasm","--prelude","none"],stdout:"piped",stderr:"piped"}).output();
   const text=new TextDecoder().decode(result.stdout);if(!result.success)throw new Error(text+new TextDecoder().decode(result.stderr));
-  const metrics=text.trim().split("\n").map(line=>JSON.parse(line)).find(row=>row.kind==="compilation");strictEqual(metrics.memory.live_bytes,0);
+  const metrics=text.trim().split("\n").map(line=>JSON.parse(line)).find(row=>row.kind==="compilation");strictEqual(metrics.memory.live_bytes,metrics.memory.coverage==="unavailable"?null:0);
   const bytes=await Deno.readFile(dir+"/program.wasm");strictEqual(WebAssembly.validate(bytes),true);
   const guest=await instantiateGuest(bytes,{asynchronous});
   try{

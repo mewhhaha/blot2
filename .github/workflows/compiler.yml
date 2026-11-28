@@ -30,7 +30,7 @@ jobs:
               | tar -xz --strip-components=1 -C "../$repo"
           }
           fetch_sources pen b301f55cc94620a409444ffd001b490844c7886e
-          fetch_sources ink 29b672fb7323bafc8c612885c3e9ba228bf60994
+          fetch_sources ink 46287c5fb4e7d7b1ae740c9443088afff5f1cb64
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -38,19 +38,18 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --yes clang cmake ninja-build wabt
+          sudo apt-get install --yes clang wabt
       - name: Cache Deno
         uses: actions/cache@v4
         with:
           path: ~/.cache/deno
           key: deno-${{ runner.os }}-${{ hashFiles('squid-lang/deno.lock') }}
           restore-keys: deno-${{ runner.os }}-
-      # The compiler is written in Goose; its build first builds upstream Goose
-      # with the patch series in compiler-goose/tools/upstream-32a4f44.
-      - name: Cache the patched Goose compiler
+      # The compiler is written in Goose and compiled with goosew (mewhhaha/goose-to-wasm).
+      - name: Cache goosew toolchain
         uses: actions/cache@v4
         with:
-          path: squid-lang/build/goose-port
-          key: goose-${{ runner.os }}-${{ hashFiles('squid-lang/compiler-goose/tools/upstream-32a4f44/**') }}
+          path: squid-lang/compiler-goose/build/goosew
+          key: goosew-${{ runner.os }}-${{ runner.arch }}-v2026.4-8
       - run: deno task check
       - run: deno publish --dry-run --allow-dirty

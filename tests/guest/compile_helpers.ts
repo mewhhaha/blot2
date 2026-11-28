@@ -4,6 +4,18 @@
 import { instantiateGuest } from "../../host/guest.ts";
 const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
+export function assertZeroCompilerLeaks(
+  memory: { live_bytes?: number | null; coverage?: string } | undefined,
+  context?: string,
+): void {
+  if (!memory) throw new Error(`Missing compiler memory record${context ? `: ${context}` : ""}`);
+  if (memory.coverage === "unavailable") {
+    equal(memory.live_bytes, null);
+  } else {
+    equal(memory.live_bytes, 0);
+  }
+}
+
 export async function compileAndRun(
   source: string,
   run: (guest: Awaited<ReturnType<typeof instantiateGuest>>, bytes: Uint8Array<ArrayBuffer>, metrics: Record<string, unknown>) => void | Promise<void>,
@@ -22,7 +34,8 @@ export async function compileAndRun(
     const text = new TextDecoder().decode(result.stdout);
     if (!result.success) throw new Error(`${text}\n${new TextDecoder().decode(result.stderr)}`);
     const metrics = text.trim().split("\n").map(line => JSON.parse(line)).find(value => value.kind === "compilation");
-    if (!metrics.success || metrics.memory.live_bytes !== 0) throw new Error(text);
+    if (!metrics.success) throw new Error(text);
+    assertZeroCompilerLeaks(metrics.memory, text);
     const bytes = await Deno.readFile(output);
     if (!WebAssembly.validate(bytes)) throw new Error("Invalid native Wasm");
     const guest = await instantiateGuest(bytes, { asynchronous: options.asynchronous });
@@ -55,7 +68,7 @@ export async function compileExpectedFailure(source: string, code: string, messa
     }
     if (message !== undefined) equal(diagnostic.message, message);
     equal(metrics?.success, false);
-    equal(metrics?.memory.live_bytes, 0);
+    assertZeroCompilerLeaks(metrics?.memory, text);
     try { await Deno.stat(output); } catch (error) {
       if (error instanceof Deno.errors.NotFound) return;
       throw error;

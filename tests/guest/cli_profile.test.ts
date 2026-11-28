@@ -17,8 +17,8 @@ interface Phases {
     string,
     {
       us: number;
-      requested_bytes: number;
-      allocations: number;
+      requested_bytes: number | null;
+      allocations: number | null;
       rss_growth_kib: number;
     }
   >;
@@ -29,9 +29,27 @@ function assertPhases(record: Phases) {
   assert(Number.isSafeInteger(record.total_us), JSON.stringify(record));
   let sum = 0;
   let growth = 0;
+  let observedPools = false;
   for (const [name, phase] of Object.entries(record.phases ?? {})) {
-    for (const value of Object.values(phase)) {
-      assert(Number.isSafeInteger(value) && value >= 0, name);
+    assert(Number.isSafeInteger(phase.us) && phase.us >= 0, `${name}.us`);
+    assert(
+      Number.isSafeInteger(phase.rss_growth_kib) && phase.rss_growth_kib >= 0,
+      `${name}.rss_growth_kib`,
+    );
+    if (phase.requested_bytes !== null || phase.allocations !== null) {
+      observedPools = true;
+      assert(
+        typeof phase.requested_bytes === "number" &&
+          Number.isSafeInteger(phase.requested_bytes) &&
+          phase.requested_bytes >= 0,
+        `${name}.requested_bytes`,
+      );
+      assert(
+        typeof phase.allocations === "number" &&
+          Number.isSafeInteger(phase.allocations) &&
+          phase.allocations >= 0,
+        `${name}.allocations`,
+      );
     }
     sum += phase.us;
     growth += phase.rss_growth_kib;
@@ -39,9 +57,12 @@ function assertPhases(record: Phases) {
   for (const name of phaseNames) assert(record.phases?.[name], name);
   const { check, backend } = record.phases!;
   assert(check.us > 0 && backend.us > 0);
-  // Checking and emission allocate; requests are charged where they happen.
-  assert(check.allocations > 0 && check.requested_bytes > 0);
-  assert(backend.allocations > 0 && backend.requested_bytes > 0);
+  // Checking and emission allocate; requests are charged where they happen
+  // when the host runtime observes its pools.
+  if (observedPools) {
+    assert(check.allocations! > 0 && check.requested_bytes! > 0);
+    assert(backend.allocations! > 0 && backend.requested_bytes! > 0);
+  }
   assert(Number.isSafeInteger(record.peak_rss_kib));
   assert(growth <= record.peak_rss_kib!);
   if (Deno.build.os === "linux") assert(record.peak_rss_kib! > 0);

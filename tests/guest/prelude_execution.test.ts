@@ -47,7 +47,7 @@ Deno.test.ignore("actual prelude provides owned generic interfaces, fixities and
     const { result, records, text } = await command(["build", `${dir}/main.sq`, output, "--prelude", `${dir}/prelude.sq`]);
     if (!result.success) throw new Error(text);
     const metrics = records.find(record => record.kind === "compilation");
-    if (!metrics?.success || metrics.memory.live_bytes !== 0 || metrics.files !== 3) throw new Error(text);
+    if (!metrics?.success || metrics.memory.live_bytes !== (metrics.memory.coverage === "unavailable" ? null : 0) || metrics.files !== 3) throw new Error(text);
     const bytes = await Deno.readFile(output);
     if (!WebAssembly.validate(bytes)) throw new Error("Invalid native Wasm");
     const guest = await instantiateGuest(bytes);
@@ -70,6 +70,6 @@ Deno.test("explicit prelude none and invalid unused producer definitions remain 
     const invalid = await command(["check-project", `${dir}/main.sq`, "--prelude", `${dir}/prelude.sq`]);
     if (invalid.result.success || !invalid.records.some(record => record.kind === "diagnostic" && record.filename === `${dir}/prelude.sq`)) throw new Error(invalid.text);
     const metrics = invalid.records.find(record => record.kind === "compilation");
-    if (metrics?.memory.live_bytes !== 0) throw new Error(invalid.text);
+    if (metrics?.memory.live_bytes !== (metrics?.memory.coverage === "unavailable" ? null : 0)) throw new Error(invalid.text);
   });
 });

@@ -1027,6 +1027,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::Checke
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::CheckedMask,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::CheckedRange)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::CheckedRange,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::CheckedSimdWindow)->bool {return equalFields(left,right);}
+fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::CheckedSimdWindow,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::CheckedSub1)->bool {return equalFields(left,right);}
 fn squid_direct_function::squidStructuralHash<StructuralSink>(value:squid_direct_function::CheckedSub1,sink:StructuralSink&) {squid_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:squid_direct_function::CheckedView)->bool {return equalFields(left,right);}

@@ -67,7 +67,10 @@ async function buildProject(
     assert(result.success, text + new TextDecoder().decode(result.stderr));
     const metrics = text.trim().split("\n").map((line) => JSON.parse(line))
       .at(-1);
-    assert.equal(metrics.memory.live_bytes, 0);
+    assert.equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     return await Deno.readFile(output);
   } finally {
     await Deno.remove(directory, { recursive: true });

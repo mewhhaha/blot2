@@ -25,10 +25,10 @@ speed.
 From the repository root:
 
 - `deno task build:compiler` writes the optimized compiler,
-  `compiler-goose/build/squidc-goose`, in about seven minutes. Pen, the
-  sibling checkouts and the tests' default path run this file.
+  `compiler-goose/build/squidc-goose`, in about two minutes using `goosew`.
+  Pen, the sibling checkouts and the tests' default path run this file.
 - `deno task build:compiler:dev` writes a debug compiler,
-  `compiler-goose/build/squidc-goose-dev`, in about a minute and a half.
+  `compiler-goose/build/squidc-goose-dev`, in under a minute.
 - `deno task build:compiler:pgo` writes `compiler-goose/build/squidc-goose-pgo`.
   This release target needs Clang's profile runtime and matching
   `llvm-profdata`. It runs five small Squid programs through an instrumented
@@ -37,16 +37,18 @@ From the repository root:
   Gdev with it, run `deno run -A scripts/integration/build_gdev.ts
   --compiler compiler-goose/build/squidc-goose-pgo --frontend-workers 8`.
 
-The regular builds run `compiler-goose/build.sh`, which takes `--release`, `--output FILE`
-and `--cflag=FLAG`. It needs clang, cmake, ninja and Python 3. A rebuilt
-compiler has a new identity, so dependency bundles made by the previous
-build are declined as stale.
+The regular builds run `compiler-goose/build.sh`, which takes `--release`,
+`--output FILE` and `--cflag=FLAG`. It needs `clang` and Python 3. A rebuilt
+compiler has a new identity, so dependency bundles made by the previous build
+are declined as stale.
 
-- The first run builds the Goose compiler: upstream Goose
-  ([github.com/aardappel/goose](https://github.com/aardappel/goose)) with
-  the patch series in `tools/upstream-32a4f44/`, into
-  `build/goose-port/upstream-d5ae5bb/build-precision/` (about two minutes).
-- Then `build.py` has Goose emit C and compiles it with clang. It
+- All builds default to `goosew` (`mewhhaha/goose-to-wasm`), resolved from
+  `$GOOSEW_BIN`, a sibling checkout at `../goose-to-wasm/build/bin/goosew`,
+  `goosew` on `PATH`, or an auto-fetched pinned release cached under
+  `compiler-goose/build/goosew/`. Set `GOOSE_USE_UPSTREAM=1` only to opt into
+  the legacy patched C++ Goose build (`tools/upstream-32a4f44/`, requiring
+  `cmake` and `ninja`).
+- Then `build.py` has `goosew` emit C and compiles it with `clang`. It
   regenerates `src/source_identity.goose`.
 
 After a module, a struct or a field is added or removed, regenerate the

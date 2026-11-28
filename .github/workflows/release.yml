@@ -3,13 +3,48 @@ name: Publish Squid compiler
 on:
   push:
     tags: ["v[0-9]*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and attach assets to (e.g. v0.2.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark release as prerelease (when creating a new release)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  GOOSEW_VERSION: v2026.4-8
+  WTIME_VERSION: v0.1.15
+
 jobs:
-  linux:
-    runs-on: ubuntu-24.04
+  build-linux:
+    name: Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            wtime_target: x86_64-unknown-linux-gnu
+            wtime_cli_sha: 1590d35727a03164dddc12b67287219c3773d7c6d410b886c99dde595bef54e5
+            wtime_aot_sha: 169b2df58fe67f5ae0a48b4fd0b0fe78cae04b7a15110ff5b3a40dc83d4e17c3
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            wtime_target: aarch64-unknown-linux-gnu
+            wtime_cli_sha: 1bc2bddf288efc17b8318a26bc7348668cbda218a19d7ef2d618e854200c4f25
+            wtime_aot_sha: 53e6d1ea930bd0654bd48ed3143c7cafbc5aa68ae2fcc1d21bd5c9686d6a0812
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,23 +55,289 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends clang cmake ninja-build
-      - name: Build the compiler and test the standard library
+          sudo apt-get install -y --no-install-recommends clang
+      - name: Cache goosew toolchain
+        uses: actions/cache@v4
+        with:
+          path: compiler-goose/build/goosew
+          key: goosew-linux-${{ matrix.arch }}-${{ env.GOOSEW_VERSION }}
+      - name: Build squidc with goosew and verify references
         run: |
           deno task build:compiler
+          python3 compiler-goose/tools/test_direct.py
+          python3 compiler-goose/tools/test_uniqueness.py
+          python3 compiler-goose/tools/test_fixtures.py
           deno task test:std
-      - name: Package and publish
+      - name: Fetch pinned wtime binaries and package Linux bundle
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+          WTIME_TARGET: ${{ matrix.wtime_target }}
+          WTIME_CLI_SHA: ${{ matrix.wtime_cli_sha }}
+          WTIME_AOT_SHA: ${{ matrix.wtime_aot_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/wtime dist
+          for tool in wtime-cli wtime-aot; do
+            tarball="${tool}-${WTIME_VERSION}-${WTIME_TARGET}.tar.gz"
+            curl --fail --silent --show-error --location --retry 3 \
+              "https://github.com/mewhhaha/wtime/releases/download/${WTIME_VERSION}/${tarball}" \
+              -o "/tmp/wtime/${tarball}"
+            expected="$WTIME_CLI_SHA"
+            if [ "$tool" = "wtime-aot" ]; then expected="$WTIME_AOT_SHA"; fi
+            printf '%s  %s\n' "$expected" "/tmp/wtime/${tarball}" | sha256sum -c -
+            tar -xzf "/tmp/wtime/${tarball}" -C /tmp/wtime "$tool"
+          done
+
+          # Smoke test compiled Wasm with bundled wtime-cli and wtime-aot.
+          printf 'io answer (x: I32): I32 => return x + 40\n' > /tmp/smoke.sq
+          compiler-goose/build/squidc-goose build-project /tmp/smoke.sq /tmp/smoke.wasm \
+            --std-root std --prelude std/prelude.sq --frontend-workers 1
+          /tmp/wtime/wtime-cli check /tmp/smoke.wasm
+          test "$(/tmp/wtime/wtime-cli run /tmp/smoke.wasm answer i32:2)" = "I32(42)"
+          /tmp/wtime/wtime-aot --help >/dev/null
+
+          PKG="squid-${TAG#v}-linux-${ARCH}"
+          STAGE="/tmp/${PKG}"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/bin"
+          install -m 755 compiler-goose/build/squidc-goose "$STAGE/bin/squidc"
+          install -m 755 /tmp/wtime/wtime-cli "$STAGE/bin/wtime-cli"
+          install -m 755 /tmp/wtime/wtime-aot "$STAGE/bin/wtime-aot"
+          cp -R std LICENSE README.md CHEATSHEET.md IDIOMS.md "$STAGE/"
+          printf '%s\n' "$GITHUB_SHA" > "$STAGE/source-commit"
+          tar -czf "dist/${PKG}.tar.gz" -C /tmp "$PKG"
+          ls -lh dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: dist/*
+
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - name: Cache goosew toolchain
+        uses: actions/cache@v4
+        with:
+          path: compiler-goose/build/goosew
+          key: goosew-macos-${{ matrix.arch }}-${{ env.GOOSEW_VERSION }}
+      - name: Build squidc with goosew and verify standard library
+        run: |
+          deno task build:compiler
+          python3 compiler-goose/tools/test_direct.py
+          deno task test:std
+      - name: Build pinned wtime-cli and wtime-aot from source and package macOS bundle
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/wtime-src dist
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://codeload.github.com/mewhhaha/wtime/tar.gz/refs/tags/${WTIME_VERSION}" \
+            | tar -xz --strip-components=1 -C /tmp/wtime-src
+          (
+            cd /tmp/wtime-src
+            cargo build --release --locked -p wtime-cli
+            cargo build --release --locked --manifest-path tools/wtime-aot/Cargo.toml
+          )
+
+          # Smoke test compiled Wasm with bundled wtime-cli and wtime-aot.
+          printf 'io answer (x: I32): I32 => return x + 40\n' > /tmp/smoke.sq
+          compiler-goose/build/squidc-goose build-project /tmp/smoke.sq /tmp/smoke.wasm \
+            --std-root std --prelude std/prelude.sq --frontend-workers 1
+          /tmp/wtime-src/target/release/wtime-cli check /tmp/smoke.wasm
+          test "$(/tmp/wtime-src/target/release/wtime-cli run /tmp/smoke.wasm answer i32:2)" = "I32(42)"
+          /tmp/wtime-src/tools/wtime-aot/target/release/wtime-aot --help >/dev/null
+
+          PKG="squid-${TAG#v}-macos-${ARCH}"
+          STAGE="/tmp/${PKG}"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/bin"
+          install -m 755 compiler-goose/build/squidc-goose "$STAGE/bin/squidc"
+          install -m 755 /tmp/wtime-src/target/release/wtime-cli "$STAGE/bin/wtime-cli"
+          install -m 755 /tmp/wtime-src/tools/wtime-aot/target/release/wtime-aot "$STAGE/bin/wtime-aot"
+          cp -R std LICENSE README.md CHEATSHEET.md IDIOMS.md "$STAGE/"
+          printf '%s\n' "$GITHUB_SHA" > "$STAGE/source-commit"
+          tar -czf "dist/${PKG}.tar.gz" -C /tmp "$PKG"
+          ls -lh dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: dist/*
+
+  build-windows-x64:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Preserve LF line endings on Windows checkout
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: false
+          install: >-
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-llvm
+      - name: Add CLANG64 toolchain to PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $clangBin = Join-Path "${{ steps.msys2.outputs.msys2-location }}" "clang64\bin"
+          $clangBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Fetch pinned goosew and build squidc.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $ver = $env:GOOSEW_VERSION
+          $zip = "goose-to-wasm-$ver-windows-x64.zip"
+          $url = "https://github.com/mewhhaha/goose-to-wasm/releases/download/$ver/$zip"
+          $zipPath = Join-Path $env:TEMP $zip
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          if ($ver -eq "v2026.4-8") {
+            $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLower()
+            if ($hash -ne "fac271c86bc61892609569c2d455d3b63ef97818457d27731ecbb8e14a014efd") {
+              throw "SHA-256 mismatch for ${zip}: $hash"
+            }
+          }
+          $extract = Join-Path $env:TEMP "goosew-$ver"
+          if (Test-Path $extract) { Remove-Item -Recurse -Force $extract }
+          Expand-Archive -Path $zipPath -DestinationPath $extract -Force
+          $gooseRoot = Join-Path $extract "goose-to-wasm-$ver-windows-x64"
+          $goosew = Join-Path $gooseRoot "bin\goosew.exe"
+          $stdlib = Join-Path $gooseRoot "bin\stdlib"
+          clang --version
+          python compiler-goose/build.py --release --goose $goosew --stdlib $stdlib --cc clang `
+            --output compiler-goose/build/squidc-goose.exe --stage-timeout 3000 --total-timeout 3400
+          python compiler-goose/tools/test_direct.py --goose $goosew --stdlib $stdlib
+
+          $dlls = @(llvm-objdump -p compiler-goose\build\squidc-goose.exe | Select-String "DLL Name:")
+          Write-Host ($dlls -join "`n")
+          if (-not $dlls -or ($dlls | Where-Object { $_ -match "msys-|libwinpthread|libgcc|libstdc\+\+" })) {
+            throw "Unexpected DLL dependency list in squidc-goose.exe"
+          }
+      - name: Build pinned wtime-cli and wtime-aot and package Windows bundle
+        shell: pwsh
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $wtimeVer = $env:WTIME_VERSION
+          $srcZip = Join-Path $env:TEMP "wtime-$wtimeVer.zip"
+          Invoke-WebRequest -Uri "https://codeload.github.com/mewhhaha/wtime/zip/refs/tags/$wtimeVer" -OutFile $srcZip
+          $wtimeDir = Join-Path $env:TEMP "wtime-src"
+          if (Test-Path $wtimeDir) { Remove-Item -Recurse -Force $wtimeDir }
+          Expand-Archive -Path $srcZip -DestinationPath $wtimeDir -Force
+          $wtimeRoot = (Get-ChildItem -Directory $wtimeDir | Select-Object -First 1).FullName
+          Push-Location $wtimeRoot
+          cargo build --release --locked -p wtime-cli
+          cargo build --release --locked --manifest-path tools\wtime-aot\Cargo.toml
+          Pop-Location
+
+          $wtimeCli = Join-Path $wtimeRoot "target\release\wtime-cli.exe"
+          $wtimeAot = Join-Path $wtimeRoot "tools\wtime-aot\target\release\wtime-aot.exe"
+
+          # Smoke test compiled Wasm with bundled wtime-cli and wtime-aot.
+          $smokeSq = Join-Path $env:TEMP "smoke.sq"
+          $smokeWasm = Join-Path $env:TEMP "smoke.wasm"
+          [System.IO.File]::WriteAllText($smokeSq, "io answer (x: I32): I32 => return x + 40`n")
+          .\compiler-goose\build\squidc-goose.exe build-project $smokeSq $smokeWasm `
+            --std-root std --prelude std\prelude.sq --frontend-workers 1
+          & $wtimeCli check $smokeWasm
+          $ans = (& $wtimeCli run $smokeWasm answer i32:2).Trim()
+          if ($ans -ne "I32(42)") { throw "Unexpected wtime-cli output: $ans" }
+          & $wtimeAot --help | Out-Null
+
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $ver = $env:TAG -replace '^v', ''
+          $pkg = "squid-$ver-windows-x64"
+          $stage = Join-Path $env:TEMP $pkg
+          if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "bin") | Out-Null
+          Copy-Item compiler-goose\build\squidc-goose.exe (Join-Path $stage "bin\squidc.exe")
+          Copy-Item $wtimeCli (Join-Path $stage "bin\wtime-cli.exe")
+          Copy-Item $wtimeAot (Join-Path $stage "bin\wtime-aot.exe")
+          Copy-Item -Recurse std (Join-Path $stage "std")
+          Copy-Item LICENSE, README.md, CHEATSHEET.md, IDIOMS.md $stage
+          [System.IO.File]::WriteAllText((Join-Path $stage "source-commit"), "$($env:GITHUB_SHA)`n")
+          Compress-Archive -Path $stage -DestinationPath "dist\$pkg.zip" -Force
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: dist/*
+
+  publish:
+    name: Publish release assets
+    needs: [build-linux, build-macos, build-windows-x64]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Assemble checksums and publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          PRERELEASE: ${{ github.event.inputs.prerelease || 'false' }}
         run: |
-          mkdir -p bundle
-          install -m 755 compiler-goose/build/squidc-goose bundle/squidc
-          cp -R std LICENSE bundle/
-          printf '%s\n' "$GITHUB_SHA" > bundle/source-commit
-          archive="squid-${GITHUB_REF_NAME#v}-ubuntu-24.04-x86_64.tar.gz"
-          tar -czf "$archive" -C bundle .
-          sha256sum "$archive" > "$archive.sha256"
-          gh release create "$GITHUB_REF_NAME" --verify-tag \
-            --title "Squid ${GITHUB_REF_NAME#v}" \
-            --notes 'Native compiler and matching standard library for Ubuntu 24.04 x86_64. Extract the archive and run `./squidc --help`.' \
-            "$archive" "$archive.sha256"
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -type f -exec cp {} dist/ \;
+          (
+            cd dist
+            LC_ALL=C sha256sum $(ls -1 | LC_ALL=C sort) > ../SHA256SUMS.txt
+          )
+          mv SHA256SUMS.txt dist/SHA256SUMS.txt
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            EXTRA=""
+            if [ "$PRERELEASE" = "true" ]; then EXTRA="--prerelease"; fi
+            gh release create "$TAG" dist/* \
+              --title "Squid ${TAG#v}" \
+              --notes "Cross-OS Squid compiler (built with goosew ${GOOSEW_VERSION}), standard library, and bundled wtime ${WTIME_VERSION} (wtime-cli + wtime-aot) for Linux (x64, arm64), macOS (arm64, x64), and Windows (x64)." \
+              $EXTRA
+          fi

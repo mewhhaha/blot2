@@ -2,7 +2,7 @@
 namespace squid_cli;
 import .cli_diagnostics;
 import .cli_project;
-import main;
+import config_state;
 import inference_limits;
 import execution_policy;
 import parse.lexer;
@@ -47,7 +47,7 @@ fn unsigned(text:const u8[:],maximum:u64)->u64,Error {
 }
 fn workerCount(value:const u8[:])->u8,bool {let workers,error=unsigned(value,255);if error!=squid_error::Error.none||workers==0||workers>16 {return 0,false;}return workers as u8,true;}
 fn budgetMb(value:const u8[:])->u32,bool {let mb,error=unsigned(value,1024);if error!=squid_error::Error.none||mb==0||mb>1024 {return 0,false;}return mb as u32,true;}
-fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=squid_error::Error.none {return error;}return squid_main::configureInferenceBudget(limit);}
+fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=squid_error::Error.none {return error;}return squid_config_state::configureInferenceBudget(limit);}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len&&text[..prefix.len]==prefix;}
 fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",doc_project=>"doc-project",lex=>"lex",parse=>"parse",check_exports=>"check-exports",check=>"check",build=>"build",dependencies=>"dependencies"}}
 fn parseCommand(text:const u8[:])->Command,bool {for command in [Command.lex,Command.parse,Command.check,Command.build,Command.dependencies,Command.parse_project,Command.check_project,Command.build_project,Command.doc_project] {if text==commandName(command) {return command,true;}}return Command.lex,false;}
@@ -191,10 +191,10 @@ fn run(args:const Argument[:])->bool,Error {
    at+=2;
   }
   if stack_mb+heap_mb+transport_mb>3584 {return false,squid_error::Error.invalid_serve_arguments;}
-  squid_main::configureWasmFeatures(relaxed_simd,tail_calls);
-  squid_main::configureTestMode(test_mode);
-  squid_main::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
-  let error=squid_reuse_zig_project_server::run(squid_io::Reader{0},stdout,squid_main::configured_identity,policy);return error==squid_error::Error.none,error;
+  squid_config_state::configureWasmFeatures(relaxed_simd,tail_calls);
+  squid_config_state::configureTestMode(test_mode);
+  squid_config_state::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
+  let error=squid_reuse_zig_project_server::run(squid_io::Reader{0},stdout,squid_config_state::configured_identity,policy);return error==squid_error::Error.none,error;
  }
  let command,valid=parseCommand(args[1]);if !valid {let error=squid_io::write_all(stderr,usage);return false,error;}
  if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=squid_io::write_all(stderr,usage);return false,error;}
@@ -229,11 +229,11 @@ fn run(args:const Argument[:])->bool,Error {
    else {return false,squid_error::Error.none;}
   }
   if stack_mb+heap_mb+transport_mb>3584 {return false,squid_error::Error.none;}
-  squid_main::configureWasmFeatures(relaxed_simd,tail_calls);
-  squid_main::configureTestMode(test_mode);
-  squid_main::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
+  squid_config_state::configureWasmFeatures(relaxed_simd,tail_calls);
+  squid_config_state::configureTestMode(test_mode);
+  squid_config_state::configureMemoryBudgets(stack_mb,heap_mb,transport_mb);
   options.aliases=aliases[..];
-  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls||custom_budgets {return false,squid_error::Error.none;}var out=stdout;return squid_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,squid_main::configured_identity);}
+  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls||custom_budgets {return false,squid_error::Error.none;}var out=stdout;return squid_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,squid_config_state::configured_identity);}
   var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}else if command==Command.doc_project {selected=Command.doc_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=squid_support::none<const u8[:]>();if selected==Command.build_project {output=squid_support::some<const u8[:]>(args[3]);}

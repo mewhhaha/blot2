@@ -35,7 +35,10 @@ async function project(
       -1,
     );
     equal(metrics.success, true);
-    equal(metrics.memory.live_bytes, 0);
+    equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     const bytes = await Deno.readFile(output);
     equal(WebAssembly.validate(bytes), true);
     await run(bytes, metrics);

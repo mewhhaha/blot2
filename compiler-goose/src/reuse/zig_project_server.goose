@@ -64,7 +64,7 @@ struct Request {
     // Accepted and validated; the direct backend lays out its own regions.
     storage:squid_support::Option<StorageBudgets> =squid_support::none<StorageBudgets>(),sources:const SourceRange[:]=default<const SourceRange[:]>(),nativeAssets:squid_support::Option<squid_backend_native_assets::Options> =squid_support::none<squid_backend_native_assets::Options>(),assetSources:const SourceRange[:]=default<const SourceRange[:]>(),
 }
-fn validPath(path:const u8[:])->bool {if path.len==0 || path[0]!='/' {return false;}for byte in path {if byte==0 {return false;}}return true;}
+fn validPath(path:const u8[:])->bool {if path.len==0 {return false;}let drive=path.len>=3 && ((path[0]>='A' && path[0]<='Z') || (path[0]>='a' && path[0]<='z')) && path[1]==':' && (path[2]=='/' || path[2]=='\\');if path[0]!='/' && !drive {return false;}for byte in path {if byte==0 {return false;}}return true;}
 fn utf8(bytes:const u8[:])->bool {var at:i64=0;while at<bytes.len {let width=squid_parse_lexer::utf8_width(bytes[at]);if width==0 || width>bytes.len-at {return false;}let point,error=squid_parse_lexer::decode_point(bytes[at..at+width]);if error!=squid_error::Error.none {return false;}at+=width;}return true;}
 fn sourceViews(ranges:const SourceRange[:],payload:const u8[:],result:Source[>..]&)->Error {return rangeViews(ranges,payload,0,true,result);}
 // Only invocation-local headers borrow the live request; snapshots own their bytes.

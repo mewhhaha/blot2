@@ -1,4 +1,7 @@
+#ifdef __linux__
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "request_transport.h"
 #include "request_supervisor.h"
 #include <errno.h>
@@ -400,3 +403,13 @@ int32_t squid_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
     if (entry_fd >= 0) close(entry_fd);
     squid_request_stop(); return result;
 }
+#else
+#include "request_transport.h"
+#include <errno.h>
+
+int32_t squid_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
+    (void)reader_fd; (void)writer_fd; return -ENOSYS;
+}
+int32_t squid_request_transport_reply_open(void) { return -ENOSYS; }
+int32_t squid_request_transport_finish(uint64_t token) { (void)token; return -ENOSYS; }
+#endif

@@ -1,8 +1,7 @@
 // Build the Squid compiler, which is written in Goose (compiler-goose/).
-//   build_compiler.ts        the optimized compiler, about seven minutes
-//   build_compiler.ts --dev  the debug compiler, about a minute and a half
-// The first build also builds the patched Goose compiler it needs. Both need
-// clang, cmake, ninja and Python 3.
+//   build_compiler.ts        the optimized compiler (~2 minutes via goosew)
+//   build_compiler.ts --dev  the debug compiler (~50 seconds via goosew)
+// Uses goosew (mewhhaha/goose-to-wasm), clang and Python 3.
 import { fileURLToPath } from "node:url";
 
 export const releaseCompiler = "compiler-goose/build/squidc-goose";

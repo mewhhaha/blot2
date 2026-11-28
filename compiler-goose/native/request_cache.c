@@ -1,4 +1,7 @@
+#ifdef __linux__
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "request_cache.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -209,3 +212,31 @@ void squid_request_cache_publish(void) {
     }
     squid_request_cache_discard();
 }
+#else
+#include "request_cache.h"
+#include <errno.h>
+
+int32_t squid_request_cache_active(void) { return 0; }
+int32_t squid_request_cache_stage_write(uint32_t part,
+    const uint8_t *directory, uint64_t directory_length,
+    const uint8_t *lock, uint64_t lock_length,
+    const uint8_t *target, uint64_t target_length,
+    const uint8_t *temporary, uint64_t temporary_length,
+    const uint8_t *bytes, uint64_t length) {
+    (void)part; (void)directory; (void)directory_length; (void)lock; (void)lock_length;
+    (void)target; (void)target_length; (void)temporary; (void)temporary_length;
+    (void)bytes; (void)length;
+    return -ENOSYS;
+}
+int32_t squid_request_cache_stage_remove(uint32_t part,
+    const uint8_t *directory, uint64_t directory_length,
+    const uint8_t *lock, uint64_t lock_length,
+    const uint8_t *target, uint64_t target_length) {
+    (void)part; (void)directory; (void)directory_length; (void)lock; (void)lock_length;
+    (void)target; (void)target_length;
+    return -ENOSYS;
+}
+uint32_t squid_request_cache_pending(void) { return 0; }
+void squid_request_cache_discard(void) {}
+void squid_request_cache_publish(void) {}
+#endif

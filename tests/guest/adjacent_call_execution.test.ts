@@ -32,9 +32,10 @@ async function compile(
     }).output();
     const records = new TextDecoder().decode(result.stdout).trim().split("\n")
       .filter(Boolean).map((line) => JSON.parse(line));
+    const comp = records.find((r) => r.kind === "compilation");
     assert.equal(
-      records.find((r) => r.kind === "compilation").memory.live_bytes,
-      0,
+      comp.memory.live_bytes,
+      comp.memory.coverage === "unavailable" ? null : 0,
     );
     assert.equal(result.success, true, JSON.stringify(records));
     const bytes = await Deno.readFile(output);
@@ -95,9 +96,10 @@ Deno.test("adjacent parenthesized calls still reject tuple, extra, Unit and scal
         records.find((r) => r.kind === "diagnostic").code,
         item.name === "bad_spaced_member" ? "missing_member" : "type_mismatch",
       );
+      const comp = records.find((r) => r.kind === "compilation");
       assert.equal(
-        records.find((r) => r.kind === "compilation").memory.live_bytes,
-        0,
+        comp.memory.live_bytes,
+        comp.memory.coverage === "unavailable" ? null : 0,
       );
       await assert.rejects(
         () => Deno.stat(`${dir}/source.wasm`),

@@ -192,7 +192,11 @@ io const answer = func () => return do (@effect.provider Read (func () => return
     if (!result.success) {
       throw new Error(text + new TextDecoder().decode(result.stderr));
     }
-    equal(JSON.parse(text.trim().split("\n").at(-1)!).memory.live_bytes, 0);
+    const comp1 = JSON.parse(text.trim().split("\n").at(-1)!);
+    equal(
+      comp1.memory.live_bytes,
+      comp1.memory.coverage === "unavailable" ? null : 0,
+    );
     const bytes = await Deno.readFile(output);
     equal(WebAssembly.validate(bytes), true);
     const guest = await instantiateGuest(bytes);
@@ -224,7 +228,11 @@ io const answer = func () => return invoke (func () => return 42)
       records.find((record) => record.kind === "diagnostic").code,
       "ambiguous_qualified",
     );
-    equal(records.at(-1).memory.live_bytes, 0);
+    const comp2 = records.at(-1);
+    equal(
+      comp2.memory.live_bytes,
+      comp2.memory.coverage === "unavailable" ? null : 0,
+    );
   } finally {
     await Deno.remove(directory, { recursive: true });
   }

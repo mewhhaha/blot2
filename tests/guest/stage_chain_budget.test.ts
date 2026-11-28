@@ -61,7 +61,10 @@ Deno.test("CLI rejects inference budget exhaustion without publishing output", a
     budget(issues[0], entry, source);
     const metrics = records.find((record) => record.kind === "compilation");
     assert.equal(metrics.success, false);
-    assert.equal(metrics.memory.live_bytes, 0);
+    assert.equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     await assert.rejects(() => Deno.stat(output), Deno.errors.NotFound);
     passed = true;
   } finally {

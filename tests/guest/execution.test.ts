@@ -46,7 +46,10 @@ async function withCompilation(
     const records = text.trim().split("\n").map((line) => JSON.parse(line));
     const metrics = records.find((record) => record.kind === "compilation");
     equal(metrics.success, true);
-    equal(metrics.memory.live_bytes, 0);
+    equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     const bytes = await Deno.readFile(output);
     equal(WebAssembly.validate(bytes), true);
     await run(bytes, metrics);

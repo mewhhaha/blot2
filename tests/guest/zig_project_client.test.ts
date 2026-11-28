@@ -108,7 +108,14 @@ async function command(
   const rows = new TextDecoder().decode(result.stdout).trim().split("\n").map(
     (line) => JSON.parse(line),
   );
-  for (const row of rows) if (row.memory) equal(row.memory.live_bytes, 0);
+  for (const row of rows) {
+    if (row.memory) {
+      equal(
+        row.memory.live_bytes,
+        row.memory.coverage === "unavailable" ? null : 0,
+      );
+    }
+  }
   return rows;
 }
 async function fresh(

@@ -1,4 +1,7 @@
+#ifdef __linux__
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "request_supervisor.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -427,3 +430,32 @@ int32_t squid_request_submit(int32_t request_fd, uint64_t length, uint64_t token
     if (error || r.kind != IDLE || r.token != token) { squid_request_stop(); return -EPIPE; }
     return result;
 }
+#else
+#include "request_supervisor.h"
+#include <errno.h>
+#include <stdlib.h>
+
+void squid_request_fork_hook(void (*hook)(void)) { (void)hook; }
+void squid_request_adopt_hook(void (*hook)(void)) { (void)hook; }
+void squid_request_reply_validator(int32_t (*validate)(int32_t, uint64_t, uint64_t)) { (void)validate; }
+int32_t squid_request_start(uint64_t max_request, uint64_t max_reply, uint32_t timeout_ms) {
+    (void)max_request; (void)max_reply; (void)timeout_ms; return -ENOSYS;
+}
+int32_t squid_request_submit(int32_t request_fd, uint64_t length, uint64_t token) {
+    (void)request_fd; (void)length; (void)token; return -ENOSYS;
+}
+int32_t squid_request_reply_fd(void) { return -1; }
+uint64_t squid_request_reply_length(void) { return 0; }
+void squid_request_stop(void) {}
+int32_t squid_request_begin(void) { return -ENOSYS; }
+int32_t squid_request_input_fd(void) { return -1; }
+uint64_t squid_request_input_length(void) { return 0; }
+int32_t squid_request_stage_init(int *argc, char **argv) { (void)argc; (void)argv; return 0; }
+int32_t squid_request_stage_capability(void) { return -1; }
+uint64_t squid_request_token(void) { return 0; }
+int32_t squid_request_finish(int32_t reply_fd, uint64_t length, uint64_t token) {
+    (void)reply_fd; (void)length; (void)token; return -ENOSYS;
+}
+_Noreturn void squid_request_fail_oom(uint64_t token) { (void)token; _Exit(121); }
+_Noreturn void squid_request_fail(uint64_t token) { (void)token; _Exit(122); }
+#endif

@@ -2,6 +2,9 @@
 #define _GNU_SOURCE
 #endif
 #include <errno.h>
+#ifndef ENOTSUP
+#define ENOTSUP ENOSYS
+#endif
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

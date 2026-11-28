@@ -1,20 +1,35 @@
+#if !defined(_WIN32)
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
+#endif
 #include <stdint.h>
 #include <stdatomic.h>
 #include <errno.h>
 #include <float.h>
 #include <limits.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <direct.h>
+#include <psapi.h>
+#include <bcrypt.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#else
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/resource.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
-#include <math.h>
 #include <spawn.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -23,6 +38,10 @@
 #include <dirent.h>
 #ifdef __linux__
 #include <sys/prctl.h>
+#endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #endif
 
 _Static_assert(sizeof(void *) == 8, "the native port uses the Goose C.2 64-bit host layout");
@@ -53,6 +72,315 @@ void squid_copy_u8(uint8_t *dst, const uint8_t *src, uint64_t count) {
 void squid_copy_flat(const uint8_t *dst, const uint8_t *src, uint64_t count) {
     if (count) memcpy((void *)dst, src, (size_t)count);
 }
+uint32_t squid_platform_is_linux(void) {
+#if defined(__linux__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+uint32_t squid_i32_bits(int32_t value) {
+    uint32_t result;
+    memcpy(&result, &value, sizeof(result));
+    return result;
+}
+int32_t squid_i32_from_bits(uint32_t value) {
+    int32_t result;
+    memcpy(&result, &value, sizeof(result));
+    return result;
+}
+float squid_f32_mul_add(float left, float right, float addend) {
+    return fmaf(left, right, addend);
+}
+static int squid_argc;
+static char **squid_argv;
+int64_t squid_argument_count(void) { return squid_argc; }
+int64_t squid_argument_size(int64_t index) {
+    if (index < 0 || index >= squid_argc) return -EINVAL;
+    return (int64_t)strlen(squid_argv[index]);
+}
+int64_t squid_argument_copy(int64_t index, uint8_t *out, uint64_t capacity) {
+    int64_t size = squid_argument_size(index);
+    if (size < 0) return size;
+    if ((uint64_t)size > capacity) return -ENAMETOOLONG;
+    memcpy(out, squid_argv[index], (size_t)size);
+    return size;
+}
+int64_t squid_environment_size(const uint8_t *name) {
+    const char *value = getenv((const char *)name);
+    if (!value) return -ENOENT;
+    return (int64_t)strlen(value);
+}
+int64_t squid_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capacity) {
+    const char *value = getenv((const char *)name);
+    if (!value) return -ENOENT;
+    size_t size = strlen(value);
+    if (size > capacity) return -ENAMETOOLONG;
+    memcpy(out, value, size);
+    return (int64_t)size;
+}
+
+#if defined(_WIN32)
+int64_t squid_read(int32_t fd, uint8_t *out, uint64_t count) {
+    if (count > (uint64_t)INT_MAX) count = (uint64_t)INT_MAX;
+    int result = _read(fd, out, (unsigned int)count);
+    if (result < 0) return -(int64_t)errno;
+    return (int64_t)result;
+}
+int64_t squid_write(int32_t fd, const uint8_t *bytes, uint64_t count) {
+    if (count > (uint64_t)INT_MAX) count = (uint64_t)INT_MAX;
+    int result = _write(fd, bytes, (unsigned int)count);
+    if (result < 0) return -(int64_t)errno;
+    return (int64_t)result;
+}
+int32_t squid_open_read(const uint8_t *path) {
+    int fd = _open((const char *)path, _O_RDONLY | _O_BINARY | _O_NOINHERIT);
+    if (fd < 0) return -errno;
+    return fd;
+}
+int32_t squid_open_regular_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+    int fd = _open((const char *)path, _O_RDONLY | _O_BINARY | _O_NOINHERIT);
+    if (fd < 0) return -errno;
+    struct __stat64 st;
+    if (_fstat64(fd, &st) != 0 || !(st.st_mode & _S_IFREG) || st.st_size < 0 || (uint64_t)st.st_size > maximum) {
+        _close(fd);
+        return -EINVAL;
+    }
+    int64_t sz = (int64_t)st.st_size;
+    if (size_out) memcpy(size_out, &sz, sizeof(sz));
+    return fd;
+}
+int32_t squid_open_regular(const uint8_t *path, uint64_t maximum) {
+    return squid_open_regular_sized(path, maximum, NULL);
+}
+int32_t squid_open_regular_nofollow_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+    return squid_open_regular_sized(path, maximum, size_out);
+}
+int32_t squid_open_write(const uint8_t *path, _Bool exclusive) {
+    int flags = _O_WRONLY | _O_CREAT | _O_BINARY | _O_NOINHERIT;
+    if (exclusive) flags |= _O_EXCL;
+    else flags |= _O_TRUNC;
+    int fd = _open((const char *)path, flags, _S_IREAD | _S_IWRITE);
+    if (fd < 0) return -errno;
+    return fd;
+}
+int32_t squid_close(int32_t fd) { if (_close(fd) < 0) return -errno; return 0; }
+int32_t squid_sync(int32_t fd) { if (_commit(fd) < 0) return -errno; return 0; }
+int64_t squid_file_size(int32_t fd) {
+    struct __stat64 st;
+    if (_fstat64(fd, &st) < 0) return -(int64_t)errno;
+    if (st.st_size < 0) return -EOVERFLOW;
+    return (int64_t)st.st_size;
+}
+int32_t squid_rename(const uint8_t *before, const uint8_t *after) {
+    if (!MoveFileExA((const char *)before, (const char *)after, MOVEFILE_REPLACE_EXISTING)) return -EIO;
+    return 0;
+}
+int32_t squid_remove(const uint8_t *path) { if (_unlink((const char *)path) < 0) return -errno; return 0; }
+int32_t squid_mkdir(const uint8_t *path) { if (_mkdir((const char *)path) < 0) return -errno; return 0; }
+uint64_t squid_clock_ns(void) {
+    static LARGE_INTEGER freq;
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    uint64_t q = (uint64_t)now.QuadPart;
+    uint64_t f = (uint64_t)freq.QuadPart;
+    return (q / f) * UINT64_C(1000000000) + ((q % f) * UINT64_C(1000000000)) / f;
+}
+uint64_t squid_thread_cpu_ns(void) {
+    FILETIME ct, et, kt, ut;
+    if (!GetThreadTimes(GetCurrentThread(), &ct, &et, &kt, &ut)) return 0;
+    uint64_t k = ((uint64_t)kt.dwHighDateTime << 32) | kt.dwLowDateTime;
+    uint64_t u = ((uint64_t)ut.dwHighDateTime << 32) | ut.dwLowDateTime;
+    return (k + u) * UINT64_C(100);
+}
+uint64_t squid_thread_id(void) { return (uint64_t)GetCurrentThreadId(); }
+uint64_t squid_peak_rss_kib(void) {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (!GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof pmc)) return 0;
+    return (uint64_t)(pmc.PeakWorkingSetSize / 1024);
+}
+uint64_t squid_random_u64(void) {
+    uint64_t value = 0;
+    if (BCryptGenRandom(NULL, (PUCHAR)&value, (ULONG)sizeof value, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0)
+        return value;
+    return squid_clock_ns() ^ ((uint64_t)GetCurrentProcessId() << 32) ^ squid_owner_id();
+}
+uint32_t squid_process_id(void) { return (uint32_t)GetCurrentProcessId(); }
+int64_t squid_real_path(const uint8_t *path, uint8_t *out, uint64_t capacity) {
+    char *resolved = _fullpath(NULL, (const char *)path, 0);
+    if (!resolved) return -(int64_t)errno;
+    DWORD attr = GetFileAttributesA(resolved);
+    if (attr == INVALID_FILE_ATTRIBUTES) { free(resolved); return -ENOENT; }
+    for (char *p = resolved; *p; ++p) { if (*p == '\\') *p = '/'; }
+    size_t length = strlen(resolved);
+    if (length < capacity) memcpy(out, resolved, length + 1);
+    free(resolved);
+    if (length > (size_t)INT64_MAX) return -EOVERFLOW;
+    return (int64_t)length;
+}
+static SRWLOCK scalar_atomic_lock = SRWLOCK_INIT;
+static uint64_t scalar_load(const uint64_t *value) { uint64_t r; memcpy(&r, value, sizeof r); return r; }
+static void scalar_store(uint64_t *value, uint64_t next) { memcpy(value, &next, sizeof next); }
+uint64_t squid_atomic_add(uint64_t *value, uint64_t amount) {
+    AcquireSRWLockExclusive(&scalar_atomic_lock);
+    uint64_t before = scalar_load(value);
+    scalar_store(value, before + amount);
+    ReleaseSRWLockExclusive(&scalar_atomic_lock);
+    return before;
+}
+uint64_t squid_atomic_sub(uint64_t *value, uint64_t amount) {
+    AcquireSRWLockExclusive(&scalar_atomic_lock);
+    uint64_t before = scalar_load(value);
+    scalar_store(value, before - amount);
+    ReleaseSRWLockExclusive(&scalar_atomic_lock);
+    return before;
+}
+uint64_t squid_atomic_max(uint64_t *value, uint64_t candidate) {
+    AcquireSRWLockExclusive(&scalar_atomic_lock);
+    uint64_t before = scalar_load(value);
+    if (candidate > before) scalar_store(value, candidate);
+    ReleaseSRWLockExclusive(&scalar_atomic_lock);
+    return before;
+}
+uint64_t squid_atomic_load(const uint64_t *value) {
+    AcquireSRWLockShared(&scalar_atomic_lock);
+    uint64_t r = scalar_load(value);
+    ReleaseSRWLockShared(&scalar_atomic_lock);
+    return r;
+}
+void squid_atomic_store(uint64_t *value, uint64_t next) {
+    AcquireSRWLockExclusive(&scalar_atomic_lock);
+    scalar_store(value, next);
+    ReleaseSRWLockExclusive(&scalar_atomic_lock);
+}
+static SRWLOCK debug_print_lock = SRWLOCK_INIT;
+void squid_debug_write(const unsigned char *bytes, uint64_t count) {
+    AcquireSRWLockExclusive(&debug_print_lock);
+    while (count != 0) {
+        unsigned int chunk = count > (uint64_t)INT_MAX ? (unsigned int)INT_MAX : (unsigned int)count;
+        int written = _write(2, bytes, chunk);
+        if (written <= 0) break;
+        bytes += (size_t)written;
+        count -= (uint64_t)written;
+    }
+    ReleaseSRWLockExclusive(&debug_print_lock);
+}
+void squid_platform_entry_init(int argc, char **argv) {
+    squid_argc = argc;
+    squid_argv = argv;
+    (void)_setmode(0, _O_BINARY);
+    (void)_setmode(1, _O_BINARY);
+    (void)_setmode(2, _O_BINARY);
+}
+int64_t squid_worker_spawn(uint32_t slot) { (void)slot; return -ENOSYS; }
+int32_t squid_worker_descriptor(uint32_t slot, _Bool writing) { (void)slot; (void)writing; return -EBADF; }
+void squid_worker_detach(void) {}
+int32_t squid_worker_stop(uint32_t slot) { (void)slot; return 0; }
+int32_t squid_worker_quiesce(void) { return 0; }
+int32_t squid_lock_open(const uint8_t *path) {
+    int fd = _open((const char *)path, _O_RDWR | _O_CREAT | _O_BINARY | _O_NOINHERIT, _S_IREAD | _S_IWRITE);
+    if (fd < 0) return -errno;
+    return fd;
+}
+int32_t squid_try_lock(int32_t fd, _Bool exclusive) { (void)fd; (void)exclusive; return 0; }
+int32_t squid_unlock(int32_t fd) { (void)fd; return 0; }
+int32_t squid_truncate(int32_t fd, uint64_t length) {
+    if (length > (uint64_t)INT64_MAX) return -EOVERFLOW;
+    if (_chsize_s(fd, (__int64)length) != 0) return -errno;
+    return 0;
+}
+int64_t squid_pwrite(int32_t fd, const uint8_t *data, uint64_t count, uint64_t offset) {
+    if (count > (uint64_t)INT_MAX || offset > (uint64_t)INT64_MAX) return -EOVERFLOW;
+    __int64 saved = _lseeki64(fd, 0, SEEK_CUR);
+    if (_lseeki64(fd, (__int64)offset, SEEK_SET) < 0) return -(int64_t)errno;
+    int written = _write(fd, data, (unsigned int)count);
+    int err = errno;
+    if (saved >= 0) (void)_lseeki64(fd, saved, SEEK_SET);
+    if (written < 0) return -(int64_t)err;
+    return (int64_t)written;
+}
+void squid_sleep_ms(uint64_t milliseconds) {
+    if (milliseconds > (uint64_t)INFINITE - 1) milliseconds = (uint64_t)INFINITE - 1;
+    Sleep((DWORD)milliseconds);
+}
+int64_t squid_fork(void) { return -ENOSYS; }
+uint64_t squid_check_reply_open(void) { return 0; }
+void squid_check_reply_close(uint64_t handle) { (void)handle; }
+_Bool squid_check_reply_append(uint64_t handle, const uint8_t *bytes, uint64_t length) { (void)handle; (void)bytes; (void)length; return 0; }
+int64_t squid_check_reply_size(uint64_t handle, uint64_t offset) { (void)handle; (void)offset; return -1; }
+int64_t squid_check_reply_copy(uint64_t handle, uint64_t offset, uint8_t *bytes, uint64_t length) { (void)handle; (void)offset; (void)bytes; (void)length; return -1; }
+_Noreturn void squid_job_exit(int32_t status) { _Exit(status); }
+int32_t squid_detach_session(void) { return -ENOSYS; }
+_Bool squid_wait_success(uint32_t pid) { (void)pid; return 0; }
+void squid_null_standard_io(void) {}
+int32_t squid_path_kind(const uint8_t *path) {
+    DWORD attr = GetFileAttributesA((const char *)path);
+    if (attr == INVALID_FILE_ATTRIBUTES) {
+        DWORD err = GetLastError();
+        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) return 0;
+        return -1;
+    }
+    if (attr & FILE_ATTRIBUTE_DIRECTORY) return 2;
+    return 1;
+}
+struct squid_win_dir { HANDLE handle; WIN32_FIND_DATAA data; int have_data; int done; };
+int64_t squid_directory_open(const uint8_t *path) {
+    size_t len = strlen((const char *)path);
+    char *pat = (char *)malloc(len + 3);
+    if (!pat) return -1;
+    memcpy(pat, path, len);
+    if (len > 0 && pat[len - 1] != '/' && pat[len - 1] != '\\') pat[len++] = '\\';
+    pat[len++] = '*'; pat[len] = 0;
+    struct squid_win_dir *cursor = (struct squid_win_dir *)calloc(1, sizeof *cursor);
+    if (!cursor) { free(pat); return -1; }
+    cursor->handle = FindFirstFileA(pat, &cursor->data);
+    free(pat);
+    if (cursor->handle == INVALID_HANDLE_VALUE) {
+        DWORD err = GetLastError();
+        free(cursor);
+        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) return 0;
+        return -1;
+    }
+    cursor->have_data = 1;
+    return (int64_t)(uintptr_t)cursor;
+}
+int64_t squid_directory_next(int64_t handle, uint8_t *out, uint64_t capacity) {
+    if (handle <= 0) return -1;
+    struct squid_win_dir *cursor = (struct squid_win_dir *)(uintptr_t)handle;
+    for (;;) {
+        if (!cursor->have_data) {
+            if (cursor->done) return 0;
+            if (!FindNextFileA(cursor->handle, &cursor->data)) {
+                cursor->done = 1;
+                if (GetLastError() == ERROR_NO_MORE_FILES) return 0;
+                return -1;
+            }
+            cursor->have_data = 1;
+        }
+        DWORD attr = cursor->data.dwFileAttributes;
+        if ((attr & FILE_ATTRIBUTE_DIRECTORY) || (attr & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            cursor->have_data = 0;
+            continue;
+        }
+        size_t length = strlen(cursor->data.cFileName);
+        if (length > capacity) return (int64_t)length;
+        if (length) memcpy(out, cursor->data.cFileName, length);
+        cursor->have_data = 0;
+        return (int64_t)length;
+    }
+}
+int32_t squid_directory_close(int64_t handle) {
+    if (handle <= 0) return -1;
+    struct squid_win_dir *cursor = (struct squid_win_dir *)(uintptr_t)handle;
+    int ok = FindClose(cursor->handle) != 0;
+    free(cursor);
+    return ok ? 0 : -1;
+}
+int32_t squid_last_errno(void) { return errno; }
+void squid_runtime_memory_mark(void) {}
+uint64_t squid_runtime_observation(uint32_t field) { (void)field; return 0; }
+#else
 
 int64_t squid_read(int32_t fd, uint8_t *out, uint64_t count) {
     if (count > SSIZE_MAX) return -EINVAL;
@@ -166,6 +494,10 @@ uint64_t squid_peak_rss_kib(void) {
     }
     fclose(file);
     return value;
+#elif defined(__APPLE__)
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage)) return 0;
+    return (uint64_t)usage.ru_maxrss / 1024;
 #else
     struct rusage usage;
     if (getrusage(RUSAGE_SELF, &usage)) return 0;
@@ -236,28 +568,6 @@ void squid_atomic_store(uint64_t *value, uint64_t next) {
     pthread_mutex_unlock(&scalar_atomic_lock);
 }
 
-uint32_t squid_platform_is_linux(void) {
-#if defined(__linux__)
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-uint32_t squid_i32_bits(int32_t value) {
-    uint32_t result;
-    memcpy(&result, &value, sizeof(result));
-    return result;
-}
-int32_t squid_i32_from_bits(uint32_t value) {
-    int32_t result;
-    memcpy(&result, &value, sizeof(result));
-    return result;
-}
-float squid_f32_mul_add(float left, float right, float addend) {
-    return fmaf(left, right, addend);
-}
-
 static pthread_mutex_t debug_print_lock = PTHREAD_MUTEX_INITIALIZER;
 void squid_debug_write(const unsigned char *bytes, uint64_t count) {
     pthread_mutex_lock(&debug_print_lock);
@@ -273,9 +583,6 @@ void squid_debug_write(const unsigned char *bytes, uint64_t count) {
     pthread_mutex_unlock(&debug_print_lock);
 }
 
-/* The C host retains only process arguments and operating-system handles. */
-static int squid_argc;
-static char **squid_argv;
 void squid_platform_entry_init(int argc, char **argv) {
     squid_argc = argc;
     squid_argv = argv;
@@ -287,31 +594,6 @@ void squid_platform_entry_init(int argc, char **argv) {
     }
 #endif
 }
-int64_t squid_argument_count(void) { return squid_argc; }
-int64_t squid_argument_size(int64_t index) {
-    if (index < 0 || index >= squid_argc) return -EINVAL;
-    return (int64_t)strlen(squid_argv[index]);
-}
-int64_t squid_argument_copy(int64_t index, uint8_t *out, uint64_t capacity) {
-    int64_t size = squid_argument_size(index);
-    if (size < 0) return size;
-    if ((uint64_t)size > capacity) return -ENAMETOOLONG;
-    memcpy(out, squid_argv[index], (size_t)size);
-    return size;
-}
-int64_t squid_environment_size(const uint8_t *name) {
-    const char *value = getenv((const char *)name);
-    if (!value) return -ENOENT;
-    return (int64_t)strlen(value);
-}
-int64_t squid_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capacity) {
-    const char *value = getenv((const char *)name);
-    if (!value) return -ENOENT;
-    size_t size = strlen(value);
-    if (size > capacity) return -ENAMETOOLONG;
-    memcpy(out, value, size);
-    return (int64_t)size;
-}
 struct squid_worker_process { pid_t pid; int input; int output; };
 static struct squid_worker_process squid_workers[16];
 extern char **environ;
@@ -320,10 +602,15 @@ extern uint64_t squid_request_token(void) __attribute__((weak));
 int64_t squid_worker_spawn(uint32_t slot) {
     if (slot >= 16 || squid_workers[slot].pid) return -EINVAL;
     char executable[PATH_MAX];
+#if defined(__APPLE__)
+    uint32_t exe_size = (uint32_t)sizeof executable;
+    if (_NSGetExecutablePath(executable, &exe_size) != 0) return -ENAMETOOLONG;
+#else
     ssize_t size = readlink("/proc/self/exe", executable, sizeof executable - 1);
     if (size < 0) return -errno;
     if ((size_t)size >= sizeof executable - 1) return -ENAMETOOLONG;
     executable[size] = 0;
+#endif
     int request[2], response[2];
     if (pipe(request) < 0) return -errno;
     if (pipe(response) < 0) { int saved = errno; close(request[0]); close(request[1]); return -saved; }
@@ -605,3 +892,4 @@ uint64_t squid_runtime_observation(uint32_t field) {
 #endif
     return 0;
 }
+#endif

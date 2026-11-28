@@ -1,10 +1,12 @@
 #include <stdint.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include "allocation_observer.h"
 #include "request_supervisor.h"
 #include "request_cache.h"
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
 #include <sys/resource.h>
 #endif
 
@@ -49,8 +51,13 @@ static void allocation_failed(int kind, uint64_t bytes) {
     uint64_t token = squid_request_token();
     if (token) squid_request_fail_oom(token);
     static const char message[] = "squidc: out_of_memory\n";
+#if defined(_WIN32)
+    (void)_write(2, message, (unsigned)(sizeof message - 1));
+    _Exit(125);
+#else
     (void)write(STDERR_FILENO, message, sizeof message - 1);
     _exit(125);
+#endif
 }
 
 int main(int argc, char **argv) {

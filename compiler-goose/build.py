@@ -12,6 +12,7 @@ import json
 import math
 import os
 from pathlib import Path
+import platform
 import shlex
 import shutil
 import signal
@@ -82,7 +83,7 @@ def fingerprint(args: argparse.Namespace, goose: Path | None,
     if runtime is not None:
         runtime_sha = digest_file(runtime)
     configuration = {
-        "schema": 1, "host": sys.platform, "machine": os.uname().machine,
+        "schema": 1, "host": sys.platform, "machine": platform.machine(),
         "entry": "src/main.goose", "host_entry": "squid_goose_main",
         "goose_inline": args.inline, "c_flags": args.cflag,
         "stdlib": args.stdlib,
@@ -145,9 +146,17 @@ def call(stage: str, command: list[str], timeout: float) -> None:
     reason = None
     first_error = None
     with log.open("wb") as stream:
+        popen_kwargs: dict = {
+            "cwd": ROOT / "src",
+            "stdout": stream,
+            "stderr": subprocess.STDOUT,
+        }
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            popen_kwargs["start_new_session"] = True
         try:
-            process = subprocess.Popen(command, cwd=ROOT / "src", stdout=stream,
-                                       stderr=subprocess.STDOUT, start_new_session=True)
+            process = subprocess.Popen(command, **popen_kwargs)
         except OSError as failure:
             raise RuntimeError(f"{stage} could not start: {failure}") from failure
         try:
@@ -170,16 +179,23 @@ def call(stage: str, command: list[str], timeout: float) -> None:
             reason = "interrupted"
         finally:
             if process.poll() is None:
-                for sig in (signal.SIGTERM, signal.SIGKILL):
+                if sys.platform == "win32":
+                    process.terminate()
                     try:
-                        os.killpg(process.pid, sig)
-                    except ProcessLookupError:
-                        pass
-                    if sig == signal.SIGTERM:
+                        process.wait(timeout=0.5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                else:
+                    for sig in (signal.SIGTERM, signal.SIGKILL):
                         try:
-                            process.wait(timeout=0.5)
-                        except subprocess.TimeoutExpired:
+                            os.killpg(process.pid, sig)
+                        except ProcessLookupError:
                             pass
+                        if sig == signal.SIGTERM:
+                            try:
+                                process.wait(timeout=0.5)
+                            except subprocess.TimeoutExpired:
+                                pass
                 process.wait()
     elapsed = time.monotonic() - started
     record = {"stage": stage, "command": command, "seconds": round(elapsed, 3),
@@ -201,7 +217,7 @@ def cached_object(stage: str, source: Path, build: Path, compiler: list[str],
             headers += frame(header.name.encode()) + frame(header.read_bytes())
     key = hashlib.sha256(frame(source.read_bytes()) + frame(headers) + frame(
         json.dumps({"cc": cc_digest, "flags": flags,
-                    "host": sys.platform, "machine": os.uname().machine},
+                    "host": sys.platform, "machine": platform.machine()},
                    sort_keys=True).encode())).hexdigest()
     output = build / f"{source.stem}-{key[:24]}.o"
     if output.exists():
@@ -219,7 +235,7 @@ def cached_object(stage: str, source: Path, build: Path, compiler: list[str],
 def main() -> None:
     global BUILD_DEADLINE
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", "goose"))
+    parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", "goosew"))
     parser.add_argument("--cc", default=os.environ.get("CC", "clang"))
     parser.add_argument("--output", type=Path, default=ROOT / "build/squidc-goose")
     parser.add_argument("--inline", choices=["-O0", "-O1", "-O2"], default=None)
@@ -260,7 +276,15 @@ def main() -> None:
         optimization = "-O2"
     if args.inline is None:
         args.inline = optimization
-    args.cflag = ["-std=gnu11", "-D_GNU_SOURCE", optimization, "-pthread"] + args.cflag
+    if sys.platform == "win32":
+        args.cflag = ["-std=gnu11", optimization, "-Wno-parentheses-equality"] + args.cflag
+        link_flags = ["-lpsapi", "-lbcrypt", "-static"]
+    else:
+        args.cflag = [
+            "-std=gnu11", "-D_GNU_SOURCE", optimization, "-pthread",
+            "-Wno-parentheses-equality",
+        ] + args.cflag
+        link_flags = ["-lm"]
     if args.identity_only:
         write_identity(fingerprint(args, None, None, None))
         return
@@ -292,11 +316,12 @@ def main() -> None:
           args.inline, "--stdlib", args.stdlib, str(ROOT / "src/main.goose")], args.stage_timeout)
     args.output = args.output.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    pending_output = args.output.with_name(f"{args.output.name}.{os.getpid()}.tmp")
+    suffix = ".exe" if sys.platform == "win32" else ""
+    pending_output = args.output.with_name(f"{args.output.stem}.{os.getpid()}.tmp{suffix}")
     try:
         call("compile and link program", compiler + args.cflag + [str(program),
              *[str(path) for path in native_objects],
-             str(runtime_object), "-lm", "-o", str(pending_output)],
+             str(runtime_object), *link_flags, "-o", str(pending_output)],
              args.stage_timeout)
         pending_output.replace(args.output)
     finally:

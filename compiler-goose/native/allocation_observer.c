@@ -5,7 +5,9 @@
 typedef void (*event_fn)(int, uint64_t, uint64_t, uint64_t, uint64_t);
 typedef int (*try_fn)(int, uint64_t, uint64_t);
 typedef void (*oom_fn)(int, uint64_t);
+#if !defined(_WIN32)
 extern void gs_runtime_observer_install(event_fn, try_fn, oom_fn) __attribute__((weak));
+#endif
 
 static squid_allocation_stats stats;
 static uint64_t selected_failure;
@@ -88,11 +90,15 @@ static void event(int kind, uint64_t owner, uint64_t old_bytes,
 }
 
 void squid_allocation_observer_install(void (*oom)(int, uint64_t)) {
+#if !defined(_WIN32)
     if (!gs_runtime_observer_install) return;
     terminal_oom = oom;
     stats.coverage = SQUID_OBS_POOL_OPERATIONS | SQUID_OBS_REGION_RESERVATIONS |
         SQUID_OBS_EXPLICIT_CAPACITY_REQUESTS | SQUID_OBS_REGISTRY_ALLOCATION;
     gs_runtime_observer_install(event, attempt, refusal);
+#else
+    (void)oom;
+#endif
 }
 
 void squid_allocation_observer_begin(uint64_t request, uint64_t fail_at, int fail_kind) {

@@ -39,7 +39,10 @@ Deno.test("production million-step budget rejects adversarial stage chains", asy
     assert.match(issues[0].message, /budget of 1000000 steps while checking/);
     const metrics = records.find((record) => record.kind === "compilation");
     assert.equal(metrics.success, false);
-    assert.equal(metrics.memory.live_bytes, 0);
+    assert.equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     await assert.rejects(() => Deno.stat(output), Deno.errors.NotFound);
   } finally {
     await Deno.remove(directory, { recursive: true });

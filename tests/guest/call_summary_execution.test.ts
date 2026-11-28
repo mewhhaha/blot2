@@ -253,10 +253,10 @@ for (
           const errors = records.filter((record) => record.kind === "diagnostic");
           assert(errors.length > 0, new TextDecoder().decode(result.stderr));
           assert(errors.every((record) => record.code !== "constant_fuel"));
+          const comp = records.find((record) => record.kind === "compilation");
           assert.equal(
-            records.find((record) => record.kind === "compilation").memory
-              .live_bytes,
-            0,
+            comp.memory.live_bytes,
+            comp.memory.coverage === "unavailable" ? null : 0,
           );
           if (!leaf.includes("@u32")) {
             const start = source.lastIndexOf(use);

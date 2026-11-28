@@ -4,7 +4,10 @@ import { join } from "node:path";
 /** Prefer the already-built compiler in a source checkout. */
 export async function findCheckoutCompiler(): Promise<URL | undefined> {
   if (Deno.build.standalone) return;
-  const url = new URL("../compiler-goose/build/squidc-goose", import.meta.url);
+  const name = Deno.build.os === "windows"
+    ? "squidc-goose.exe"
+    : "squidc-goose";
+  const url = new URL(`../compiler-goose/build/${name}`, import.meta.url);
   try {
     if ((await Deno.stat(url)).isFile) return url;
   } catch (error) {
@@ -12,28 +15,44 @@ export async function findCheckoutCompiler(): Promise<URL | undefined> {
   }
 }
 
+async function readBundledCompiler(): Promise<Uint8Array> {
+  const candidates = [
+    new URL(
+      `../generated/compiler/squidc-${Deno.build.os}-${Deno.build.arch}.gz`,
+      import.meta.url,
+    ),
+  ];
+  if (Deno.build.os === "linux" && Deno.build.arch === "x86_64") {
+    candidates.push(
+      new URL("../generated/compiler/squidc.gz", import.meta.url),
+    );
+  }
+  for (const url of candidates) {
+    try {
+      return await Deno.readFile(url);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+  }
+  throw new Error(
+    `This @mewhhaha/squid package does not bundle a native compiler for ${Deno.build.os}/${Deno.build.arch}; download a release bundle or provide a compiler built for your platform`,
+  );
+}
+
 // JSR caches and compiled virtual filesystems do not promise an executable
-// file on disk, so expand the bundled Zig compiler before spawning it.
+// file on disk, so expand the bundled native compiler before spawning it.
 export async function extractNativeCompiler(): Promise<{
   readonly path: string;
   dispose(): Promise<void>;
 }> {
-  if (Deno.build.os !== "linux" || Deno.build.arch !== "x86_64") {
-    throw new Error(
-      "This @mewhhaha/squid package bundles a Zig compiler for Linux x86-64 only; provide an executable built for your platform",
-    );
-  }
-  const path = await Deno.makeTempFile({ prefix: "squidc-" });
+  const compressed = await readBundledCompiler();
+  const suffix = Deno.build.os === "windows" ? ".exe" : "";
+  const path = await Deno.makeTempFile({ prefix: "squidc-", suffix });
   try {
-    await Deno.writeFile(
-      path,
-      gunzipSync(
-        await Deno.readFile(
-          new URL("../generated/compiler/squidc.gz", import.meta.url),
-        ),
-      ),
-    );
-    await Deno.chmod(path, 0o700);
+    await Deno.writeFile(path, gunzipSync(compressed));
+    if (Deno.build.os !== "windows") {
+      await Deno.chmod(path, 0o700);
+    }
   } catch (error) {
     await Deno.remove(path);
     throw error;

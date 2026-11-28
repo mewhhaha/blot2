@@ -51,7 +51,10 @@ io const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
     if (!result.success) throw new Error(text);
     const metrics = text.trim().split("\n").map((line) => JSON.parse(line))
       .find((row) => row.kind === "compilation");
-    equal(metrics.memory.live_bytes, 0);
+    equal(
+      metrics.memory.live_bytes,
+      metrics.memory.coverage === "unavailable" ? null : 0,
+    );
     const bytes = await Deno.readFile(output);
     equal(WebAssembly.validate(bytes), true);
     const guest = await instantiateGuest(bytes);
